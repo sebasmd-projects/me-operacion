@@ -1,0 +1,644 @@
+<!-- generar_rechazo.html · v2.1.1
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js      marco visual, sesión y registro
+       assets/me-api.js                 acceso al CM (Keycloak + consultas)
+       assets/logica-rechazo.js         causales, nombre, PDF y compresión
+       assets/me-rechazo-puente.js      enganche entre la lógica y el shell
+
+     Reemplaza las tres macros de Excel (MACRO DE PORTABILIDAD .xlsx / LS /
+     LD). El PDF se arma aquí con fuentes estándar, que no se incrustan:
+     el archivo pasa de 217 KB a 12-35 KB y deja de truncarse al subirlo.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Generar archivo de rechazo</title>
+
+    <!-- Se abre la conexión con los CDN antes de pedirles nada: sin esto, el
+         DNS y el TLS de cada origen se pagan en medio de la carga y la página
+         tarda más en pintar el marco. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+
+    <style>
+        /* ---------- Selector de causal ---------- */
+        .causales {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: .5rem;
+        }
+
+        .causal {
+            border: 1px solid var(--me-borde-2);
+            border-radius: .5rem;
+            background: #fff;
+            padding: .6rem .5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s, box-shadow .15s;
+        }
+
+        .causal:hover {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .causal.activa {
+            border-color: var(--me-negro);
+            background: var(--me-amarillo);
+            box-shadow: inset 0 0 0 1px var(--me-negro);
+        }
+
+        .causal .cod {
+            font-family: var(--me-mono);
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .causal .txt {
+            font-size: .68rem;
+            color: #4A4A45;
+            line-height: 1.25;
+            display: block;
+            margin-top: .1rem;
+        }
+
+        .causal.activa .txt {
+            color: var(--me-negro);
+        }
+
+        /* ---------- Campos del formato ---------- */
+        .campo {
+            margin-bottom: .55rem;
+        }
+
+        .campo .me-lbl {
+            display: block;
+            margin-bottom: .12rem;
+        }
+
+        .pista-cm {
+            display: inline-block;
+            margin-left: .3rem;
+            padding: 0 .28rem;
+            border-radius: .2rem;
+            background: #E5ECF8;
+            color: var(--me-info);
+            font-family: var(--me-mono);
+            font-size: .6rem;
+            font-weight: 600;
+            vertical-align: 1px;
+        }
+
+        .req {
+            color: var(--me-err);
+            margin-left: .2rem;
+            font-weight: 700;
+        }
+
+        /* Los tres grupos siguen el orden de trabajo del analista:
+           llenar → revisar → automáticos. La franja de color a la izquierda
+           dice de un vistazo cuánta atención pide cada bloque. */
+        .grupo-titulo {
+            display: flex;
+            align-items: baseline;
+            gap: .5rem;
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--me-tinta);
+            margin: 1.25rem 0 .5rem;
+            padding: .25rem .5rem;
+            border-left: 3px solid var(--me-borde-2);
+            background: #F4F4F0;
+            border-radius: 0 .25rem .25rem 0;
+        }
+
+        .grupo-titulo small {
+            margin-left: auto;
+            font-size: .64rem;
+            font-weight: 500;
+            letter-spacing: 0;
+            text-transform: none;
+            color: var(--me-suave);
+        }
+
+        .grupo-titulo.llenar {
+            border-left-color: var(--me-err);
+            background: #FBE2DF;
+        }
+
+        .grupo-titulo.revisar {
+            border-left-color: var(--me-warn);
+            background: #FBEED8;
+        }
+
+        .grupo-titulo.automatico {
+            border-left-color: var(--me-off);
+        }
+
+        .grupo-titulo:first-child {
+            margin-top: 0;
+        }
+
+        /* Los automáticos se ven atenuados: están para mirarlos, no tocarlos. */
+        #grupoAutomatico .campo .form-control {
+            background: #FBFBF9;
+            color: #55554F;
+        }
+
+        /* ---------- Nombre del archivo ---------- */
+        #despieceNombre {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            margin-top: .3rem;
+            font-family: var(--me-mono);
+            font-size: .72rem;
+        }
+
+        #despieceNombre span {
+            padding: .1rem .35rem;
+            border-radius: .2rem;
+            background: #F0F0EC;
+            color: #4A4A45;
+        }
+
+        #despieceNombre span:nth-child(1) {
+            background: #ECECEA;
+        }
+
+        #despieceNombre span:nth-child(2) {
+            background: #E5ECF8;
+            color: var(--me-info);
+        }
+
+        #despieceNombre span:nth-child(3) {
+            background: #FFF1BD;
+            color: #795800;
+        }
+
+        #despieceNombre span:nth-child(4) {
+            background: #E3F3E9;
+            color: var(--me-ok);
+        }
+
+        /* ---------- Imagen ---------- */
+        .zona-imagen {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: .9rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .zona-imagen:hover,
+        .zona-imagen.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .zona-imagen p {
+            margin: 0;
+            font-size: .78rem;
+            color: #5C5C57;
+        }
+
+        /* ---------- Galería de imágenes ---------- */
+        /* Una fila por imagen, en el mismo orden en que se apilan en el PDF:
+           la lista se ve tal como queda el documento. */
+        .imagen-item {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            padding: .35rem .4rem;
+            border: 1px solid var(--me-borde);
+            border-radius: .4rem;
+            background: #fff;
+        }
+
+        .imagen-item+.imagen-item {
+            margin-top: .4rem;
+        }
+
+        .imagen-item img {
+            width: 46px;
+            height: 34px;
+            object-fit: contain;
+            background: #F4F4F0;
+            border-radius: .25rem;
+            flex: none;
+        }
+
+        .imagen-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .imagen-info .nombre {
+            font-size: .76rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .imagen-info .peso-item {
+            font-size: .68rem;
+            color: var(--me-suave);
+            font-family: var(--me-mono);
+        }
+
+        .btn-quitar {
+            border: none;
+            background: transparent;
+            color: var(--me-suave);
+            padding: .2rem .35rem;
+            border-radius: .3rem;
+            flex: none;
+        }
+
+        .btn-quitar:hover {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        /* ---------- Editor de plantilla de nombre ---------- */
+        .editor-plantilla {
+            margin-top: .5rem;
+            padding: .6rem .6rem .2rem;
+            border: 1px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+        }
+
+        /* ---------- Avisos ---------- */
+        .aviso {
+            font-size: .75rem;
+            padding: .35rem .5rem;
+            border-left: 3px solid var(--me-warn);
+            background: #FBEED8;
+            border-radius: 0 .25rem .25rem 0;
+            margin-top: .35rem;
+        }
+
+        .aviso.nota {
+            border-left-color: var(--me-info);
+            background: #E5ECF8;
+        }
+
+        /* ---------- Visor del PDF ---------- */
+        /* El shell dispone la zona de datos con `align-items: start`, así que
+           esta columna NO recibe altura del contenedor: hay que dársela. Sin
+           esto el iframe se queda en su alto por defecto y el PDF se ve
+           cortado, con el marco gris ocupando el resto. Se usa la misma
+           medida que el shell aplica a la columna de pasos. */
+        .panel-salida {
+            display: flex;
+            flex-direction: column;
+            height: calc(var(--me-alto-util) - 2rem);
+            min-height: 460px;
+        }
+
+        .barra-salida {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            flex-wrap: wrap;
+            padding: .5rem .6rem;
+            background: #FAFAF7;
+            border: 1px solid var(--me-borde);
+            border-radius: .5rem .5rem 0 0;
+        }
+
+        .peso {
+            font-size: .76rem;
+            padding: .18rem .5rem;
+            border-radius: .25rem;
+            white-space: nowrap;
+        }
+
+        .peso.ok {
+            background: #E3F3E9;
+            color: var(--me-ok);
+        }
+
+        .peso.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .peso.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .marco-visor {
+            flex: 1;
+            min-height: 0;
+            border: 1px solid var(--me-borde);
+            border-top: none;
+            border-radius: 0 0 .5rem .5rem;
+            background: #57565B;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Como elemento flexible crece con el marco; `height:100%` solo no
+           bastaba porque el padre no tenía altura definida. */
+        #visor {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            border: 0;
+        }
+
+        #visorVacio {
+            margin: auto;
+            padding: 2rem;
+            color: #E8E8E3;
+            font-size: .85rem;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Sesión del CM -->
+            <section data-me-paso="1" data-me-titulo="Sesión del CM" data-me-abierto="sin-sesion">
+                <div class="me-hint mb-2">
+                    Se necesita para traer los datos de la línea. Si ya iniciaste sesión en otra
+                    herramienta, aquí se reutiliza sola.
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="user">Usuario</label>
+                        <input type="text" class="form-control form-control-sm me-mono" id="user"
+                            autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="pass">Contraseña</label>
+                        <input type="password" class="form-control form-control-sm me-mono" id="pass"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-me w-100" id="btnLogin" type="button">Iniciar sesión</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2 · Causal -->
+            <section data-me-paso="2" data-me-titulo="Causal del rechazo" data-me-abierto="siempre">
+                <div class="causales">
+                    <button type="button" class="causal activa" data-causal="FC">
+                        <span class="cod">FC</span>
+                        <span class="txt">FC titularidad</span>
+                    </button>
+                    <button type="button" class="causal" data-causal="LS">
+                        <span class="cod">LS</span>
+                        <span class="txt">Línea Suspendida</span>
+                    </button>
+                    <button type="button" class="causal" data-causal="LD">
+                        <span class="cod">LD</span>
+                        <span class="txt">Línea Desactivada</span>
+                    </button>
+                </div>
+                <div class="me-hint mt-2">
+                    <strong id="tituloCausal">FC titularidad</strong><br>
+                    <span id="descCausal"></span>
+                </div>
+            </section>
+
+            <!-- 3 · Línea -->
+            <section data-me-paso="3" data-me-titulo="Línea y consulta al CM" data-me-abierto="siempre">
+                <label class="me-lbl" for="inMsisdn">Número de línea</label>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm me-mono" id="inMsisdn"
+                        placeholder="3053836332" inputmode="numeric">
+                    <button class="btn btn-sm btn-me" id="btnCM" type="button" title="Traer los datos del CM">
+                        <i class="bi bi-cloud-download"></i> CM
+                    </button>
+                </div>
+                <div class="me-hint">10 dígitos que empiezan por 3. Si pegas el 57 al inicio, se quita solo.</div>
+                <div id="avisosCM"></div>
+            </section>
+
+            <!-- 4 · Datos del formato -->
+            <section data-me-paso="4" data-me-titulo="Datos del formato" data-me-abierto="siempre">
+                <div class="me-hint mb-2">
+                    Un campo en blanco se imprime como <span class="me-mono">N/A</span>.
+                </div>
+
+                <div class="grupo-titulo revisar">Revisar<small>traen valor, confírmalo</small></div>
+                <div id="grupoRevisar"></div>
+
+                <div class="grupo-titulo llenar">Llenar<small>vacíos, hay que escribirlos</small></div>
+                <div id="grupoLlenar"></div>
+                <div class="aviso nota" id="avisoJuridica" hidden>
+                    Persona <strong>jurídica</strong>: diligencia también los campos del representante legal.
+                </div>
+
+                <div class="grupo-titulo automatico">Automáticos<small>se calculan solos</small></div>
+                <div id="grupoAutomatico"></div>
+            </section>
+
+            <!-- 5 · Imagen -->
+            <section data-me-paso="5" data-me-titulo="Imagen de manifestación" data-me-abierto="siempre">
+                <div class="zona-imagen" id="zonaImagen" tabindex="0" role="button"
+                    aria-label="Adjuntar imagen de manifestación">
+                    <p><strong>Arrastra la captura</strong> o haz clic.<br>
+                        También puedes pegarla con <span class="me-mono">Ctrl+V</span>.</p>
+                    <input type="file" id="inputImagen" accept="image/*" multiple hidden>
+                </div>
+
+                <!-- Lo normal es una sola imagen: esta galería solo se ve con
+                     al menos una adjunta, y «Añadir otra» es la vía explícita
+                     para el caso excepcional de más de una evidencia. Se
+                     apilan en el PDF en el mismo orden en que aparecen aquí. -->
+                <div id="galeriaImagenes" hidden>
+                    <div id="listaImagenes"></div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <button class="btn btn-sm btn-me-line" id="btnAgregarImagen" type="button">
+                            <i class="bi bi-plus-lg"></i> Añadir otra imagen
+                        </button>
+                        <span class="me-hint" id="contadorImagenes"></span>
+                    </div>
+                </div>
+
+                <div class="me-hint mt-1">
+                    Cada imagen se comprime antes de incrustarla: sin comprimir devolvería el problema de peso.
+                </div>
+            </section>
+
+            <!-- 6 · Nombre -->
+            <section data-me-paso="6" data-me-titulo="Nombre del archivo" data-me-abierto="siempre">
+                <div class="me-hint mb-2">
+                    La plantilla no está limitada a una convención fija: se crean, usan y borran las que
+                    hagan falta, y quedan guardadas de forma permanente en este navegador.
+                </div>
+
+                <label class="me-lbl" for="selPlantilla">Plantilla</label>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm me-mono" id="selPlantilla" style="flex:1"></select>
+                    <button class="btn btn-sm btn-outline-danger" id="btnEliminarPlantilla" type="button"
+                        title="Eliminar esta plantilla">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+
+                <div class="editor-plantilla" id="editorPlantilla" hidden>
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <label class="me-lbl" for="inPrefijoNuevo">Prefijo</label>
+                            <input type="text" class="form-control form-control-sm me-mono" id="inPrefijoNuevo"
+                                placeholder="0008" maxlength="12">
+                        </div>
+                        <div class="col-6">
+                            <label class="me-lbl" for="inDigitosNuevo">Dígitos del consecutivo</label>
+                            <input type="number" class="form-control form-control-sm me-mono" id="inDigitosNuevo"
+                                min="1" max="9" value="5">
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-sm btn-me w-100" id="btnGuardarPlantilla" type="button">
+                                Guardar plantilla
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-5">
+                        <label class="me-lbl" for="inConsecutivo">Consecutivo</label>
+                        <input type="number" class="form-control form-control-sm me-mono" id="inConsecutivo" min="1"
+                            value="1">
+                    </div>
+                    <div class="col-7 d-flex align-items-end">
+                        <div class="me-hint mb-1">Se reinicia cada día y se recuerda al guardar.</div>
+                    </div>
+                </div>
+
+                <label class="me-lbl mt-2" for="inNombre">Nombre final <span class="me-hint">(editable)</span></label>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm me-mono" id="inNombre">
+                    <button class="btn btn-sm btn-me-line" id="btnResetNombre" type="button"
+                        title="Volver al nombre sugerido">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+                <div id="despieceNombre"></div>
+                <div class="aviso" id="avisoNombre" hidden>
+                    Nombre editado a mano: ya no se recalcula solo ni consume el consecutivo.
+                </div>
+            </section>
+
+            <!-- 7 · Registro -->
+            <section data-me-paso="7" data-me-titulo="Registro" data-me-abierto="nunca">
+                <div id="log" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button"
+                        onclick="MEUI.limpiarLog()">Limpiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: vista previa ================= -->
+        <div class="me-trabajo-datos">
+            <div class="panel-salida">
+
+                <div class="barra-salida">
+                    <button class="btn btn-sm btn-me" id="btnDescargar" type="button" disabled
+                        title="Abre el selector para elegir dónde guardar el archivo">
+                        <i class="bi bi-download"></i> Guardar PDF como…
+                    </button>
+                    <button class="btn btn-sm btn-me-line" id="btnRegenerar" type="button" title="Rehacer el documento">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <span class="peso ok" id="peso">—</span>
+                    <span class="me-hint ms-auto">La vista previa es el PDF real, no una maqueta.</span>
+                </div>
+
+                <div class="marco-visor">
+                    <iframe id="visor" title="Vista previa del documento de rechazo" hidden></iframe>
+                    <div id="visorVacio">Escribe el número de línea para ver el documento.</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- jsPDF va con `defer` y DESPUÉS del shell a propósito: son ~350 KB y,
+         cargándolo de forma bloqueante antes de me-ui.js, el marco de la
+         página no se pintaba hasta que la descarga terminaba — de ahí el
+         parpadeo al entrar a esta herramienta. Con `defer` se descarga en
+         paralelo y se ejecuta al final del parseo, antes de DOMContentLoaded,
+         que es cuando el puente lo necesita. -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "rechazo",
+            version: "2.1.1",
+            doc: "../doc/generar-rechazo/README.md",
+            titulo: "Generar archivo de rechazo",
+            descripcion: "Soportes PDF de rechazo de portabilidad · Móvil Éxito",
+            sesiones: ["cm"],
+            instrucciones: [
+                "1 · Sesión: si ya iniciaste sesión del CM en otra herramienta, aquí se reutiliza sola. Si no, escribe usuario y contraseña.",
+                "2 · Causal: elige FC titularidad, Línea Suspendida o Línea Desactivada. El formulario cambia según la causal.",
+                "3 · Línea: escribe el MSISDN y presiona CM para traer identificación, estado y fechas. Lo que el CM no devuelva queda en N/A para completarlo a mano.",
+                "4 · Datos: los campos van agrupados por lo que hay que hacer con ellos — Revisar, Llenar y Automáticos, en ese orden. Un campo en blanco se imprime como N/A.",
+                "4b · Con NIT la persona pasa a JURIDICA y se bloquea el campo: es regla de negocio. Los campos del representante legal solo aparecen en persona jurídica.",
+                "5 · Imagen: arrastra o pega la captura de manifestación. Lo normal es una sola; «Añadir otra» permite el caso excepcional de más de una, y se apilan en el PDF en el mismo orden.",
+                "6 · Nombre: la plantilla (prefijo + dígitos del consecutivo) no está fija a una sola convención — se crean, usan y borran desde «+ Nueva plantilla…», y quedan guardadas de forma permanente.",
+                "7 · La vista previa de la derecha es el PDF real: lo que ves es exactamente lo que se descarga.",
+                "«Guardar PDF como…» abre el selector nativo para elegir dónde queda el archivo en cada descarga, sin depender de la configuración del navegador.",
+                "El documento se ajusta solo a una página, como la macro. Si adjuntas capturas muy altas o varias, se reducen antes que el texto.",
+                "Reemplaza las tres macros de Excel. El PDF pesa unos 12-35 KB en vez de 217 KB porque no incrusta fuentes: ese peso era lo que hacía que la plataforma truncara el archivo.",
+                "Después de subirlo, descárgalo de la plataforma y compara el tamaño. Si no coincide, se truncó y hay que volver a cargarlo."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM -->
+    <script src="../assets/me-api.js"></script>
+
+    <!-- 3 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-rechazo.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-rechazo-puente.js"></script>
+</body>
+
+</html>

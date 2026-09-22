@@ -1,0 +1,354 @@
+<!-- export_tipificacion.html · v2.0
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js          marco visual, tablas, registro,
+                                            exportación
+       assets/me-api.js                     Keycloak, auth y GET al CRM
+       assets/logica-tipificacion.js        consulta, paginación y armado
+       assets/me-tipificacion-puente.js     enganche con el shell
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+  <title>Exportar casos · Tipificación</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="../assets/me-ui.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
+
+    /* Tom Select también tiene que verse en rojo cuando falta un dato */
+    .ts-invalid .ts-control {
+      border-color: var(--me-err) !important;
+    }
+
+    .ts-invalid+.invalid-feedback,
+    .ts-invalid~.invalid-feedback {
+      display: block;
+    }
+
+    .ts-wrapper .ts-control {
+      font-size: .85rem;
+      min-height: 31px;
+      padding: .15rem .4rem;
+    }
+
+    /* Pestañas Resultados / Vista previa */
+    .me-tabs {
+      border-bottom: 1px solid var(--me-borde);
+      gap: .2rem;
+    }
+
+    .me-tabs .nav-link {
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: .45rem .45rem 0 0;
+      color: var(--me-suave);
+      font-weight: 600;
+      font-size: .86rem;
+      padding: .4rem .9rem;
+    }
+
+    .me-tabs .nav-link.active {
+      background: #fff;
+      border-color: var(--me-borde);
+      color: var(--me-tinta);
+    }
+
+    /* Pestañas de autenticación (usuario / token) */
+    #authTabs .nav-link {
+      font-size: .8rem;
+      padding: .25rem .6rem;
+      color: var(--me-suave);
+    }
+
+    #authTabs .nav-link.active {
+      background: var(--me-negro);
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body class="me-body">
+
+  <!-- ============ RESUMEN ============ -->
+  <div class="me-kpis">
+    <div class="me-kpi ok" style="cursor:default">
+      <div class="n" id="badgeCount">0</div>
+      <div class="lbl">Casos descargados</div>
+    </div>
+    <div class="me-kpi neutro" style="cursor:default">
+      <div class="n" id="colsCount">0</div>
+      <div class="lbl">Columnas en la salida</div>
+    </div>
+    <div class="me-kpi neutro" style="cursor:default">
+      <div class="n" id="chipTiempo">—</div>
+      <div class="lbl">Duración de la descarga</div>
+    </div>
+  </div>
+
+  <div class="me-trabajo">
+
+    <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+    <div class="me-trabajo-lateral">
+
+      <!-- 1 · Autenticación -->
+      <section data-me-paso="1" data-me-titulo="Autenticación" data-me-abierto="sin-sesion">
+        <ul class="nav nav-pills nav-fill mb-2" id="authTabs">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabUser"
+              type="button">Usuario y clave</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabToken"
+              type="button">Token</button></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="tabUser">
+            <div class="mb-2">
+              <label class="me-lbl" for="username">Usuario CRM</label>
+              <input class="form-control form-control-sm me-mono" id="username" autocomplete="username">
+              <div class="invalid-feedback">Ingresa el usuario del CRM (o usa la pestaña Token).</div>
+            </div>
+            <div>
+              <label class="me-lbl" for="password">Contraseña</label>
+              <input type="password" class="form-control form-control-sm me-mono" id="password"
+                autocomplete="current-password">
+              <div class="invalid-feedback">Ingresa la contraseña (o usa la pestaña Token).</div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tabToken">
+            <div class="mb-2">
+              <label class="me-lbl" for="token">Access token (Bearer)</label>
+              <textarea class="form-control form-control-sm me-mono" id="token" rows="3" placeholder="eyJ…"></textarea>
+              <div class="invalid-feedback">Pega un access token, o vuelve a «Usuario y clave».</div>
+            </div>
+            <div>
+              <label class="me-lbl" for="refreshToken">Refresh token <span
+                  class="text-secondary">(opcional)</span></label>
+              <textarea class="form-control form-control-sm me-mono" id="refreshToken" rows="2"></textarea>
+            </div>
+            <div class="me-hint mt-1">Útil si Keycloak no permite direct grant: copia el token de una
+              sesión activa.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 · Filtros -->
+      <section data-me-paso="2" data-me-titulo="Filtros de la consulta" data-me-abierto="con-sesion">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="hoy">
+          <label class="form-check-label small" for="hoy">Solo lo de hoy</label>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="me-lbl" for="desde">Desde</label>
+            <input type="date" class="form-control form-control-sm" id="desde">
+            <div class="invalid-feedback" id="fbDesde">Indica la fecha inicial.</div>
+          </div>
+          <div class="col-6">
+            <label class="me-lbl" for="hasta">Hasta</label>
+            <input type="date" class="form-control form-control-sm" id="hasta">
+            <div class="invalid-feedback" id="fbHasta">Indica la fecha final.</div>
+          </div>
+          <div class="col-12 me-hint">El rango es obligatorio y de máximo 31 días. Si supera 10.000 casos se
+            divide en sub-rangos automáticamente.</div>
+
+          <div class="col-12">
+            <label class="me-lbl" for="estados">Estados (state_id)</label>
+            <select id="estados" multiple></select>
+            <div class="invalid-feedback" id="fbEstados">Indica al menos un state_id (solo números).</div>
+            <div class="me-hint mt-1">Escribe un número y presiona Enter para agregar más estados.</div>
+          </div>
+
+          <div class="col-6">
+            <label class="me-lbl" for="perPage">Por página</label>
+            <input type="number" class="form-control form-control-sm me-mono" id="perPage" value="100" min="1"
+              max="100">
+            <div class="invalid-feedback">Entre 1 y 100.</div>
+          </div>
+          <div class="col-6">
+            <label class="me-lbl" for="concurrencia">En paralelo</label>
+            <input type="number" class="form-control form-control-sm me-mono" id="concurrencia" value="1" min="1"
+              max="10" title="Peticiones simultáneas al API">
+            <div class="invalid-feedback">Entre 1 y 10.</div>
+          </div>
+          <div class="col-8">
+            <label class="me-lbl" for="sortBy">Ordenar por</label>
+            <select id="sortBy"></select>
+          </div>
+          <div class="col-4">
+            <label class="me-lbl" for="orderBy">Orden</label>
+            <select class="form-select form-select-sm" id="orderBy">
+              <option value="asc" selected>asc</option>
+              <option value="desc">desc</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 · Páginas -->
+      <section data-me-paso="3" data-me-titulo="Páginas a descargar" data-me-abierto="nunca">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="pageMode" id="pmAll" value="all" checked>
+          <label class="form-check-label small" for="pmAll">Todas las páginas</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="pageMode" id="pmOne" value="one">
+          <label class="form-check-label small" for="pmOne">Una página específica</label>
+        </div>
+        <div class="ms-4 mb-2">
+          <input type="number" class="form-control form-control-sm me-mono" id="pageOne" min="1"
+            placeholder="Nº de página" style="max-width:160px" disabled>
+          <div class="invalid-feedback">Indica el número de la página (mínimo 1).</div>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="pageMode" id="pmRange" value="range">
+          <label class="form-check-label small" for="pmRange">Rango de páginas</label>
+        </div>
+        <div class="ms-4 row g-2" style="max-width:280px">
+          <div class="col">
+            <input type="number" class="form-control form-control-sm me-mono" id="pageFrom" min="1" placeholder="Desde"
+              disabled>
+            <div class="invalid-feedback" id="fbPageFrom">Mínimo 1.</div>
+          </div>
+          <div class="col">
+            <input type="number" class="form-control form-control-sm me-mono" id="pageTo" min="1" placeholder="Hasta"
+              disabled>
+            <div class="invalid-feedback" id="fbPageTo">Debe ser ≥ «Desde».</div>
+          </div>
+        </div>
+        <div class="me-hint ms-4 mt-1">Si solo indicas «Hasta», se descarga de la página 1 hasta esa. En estos
+          modos no se divide el rango de fechas.</div>
+      </section>
+
+      <!-- 4 · Descarga -->
+      <section data-me-paso="4" data-me-titulo="Descarga y progreso" data-me-abierto="siempre">
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          <button class="btn btn-sm btn-me-line" id="btnPreview" type="button">Vista previa (1 página)</button>
+          <button class="btn btn-sm btn-me" id="btnRun" type="button">Descargar casos</button>
+          <button class="btn btn-sm btn-outline-danger d-none" id="btnCancel" type="button">Cancelar</button>
+        </div>
+        <div class="progress" style="height:20px">
+          <div class="progress-bar bg-dark" id="pbar" style="width:0%"></div>
+        </div>
+        <div class="me-hint mt-2">La vista previa trae una sola página y muestra el primer ticket campo por
+          campo: sirve para confirmar los filtros antes de descargar todo.</div>
+      </section>
+
+      <!-- 5 · Registro -->
+      <section data-me-paso="5" data-me-titulo="Registro de la descarga" data-me-abierto="nunca">
+        <div id="log" data-me-log></div>
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+          <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= COLUMNA DERECHA: tablas ================= -->
+    <div class="me-trabajo-datos">
+
+      <ul class="nav me-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#paneResultados" type="button"
+            role="tab">Resultados</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#panePreview" type="button" role="tab">Vista
+            previa</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- ---------- Resultados ---------- -->
+        <div class="tab-pane fade show active" id="paneResultados" role="tabpanel">
+          <div class="me-filtros mt-2">
+            <span class="me-hint" id="resultsInfo">Todavía no hay descarga</span>
+            <div class="me-filtros-der">
+              <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+              <button class="btn btn-sm btn-me-line" id="dlCsv" type="button"><i class="bi bi-filetype-csv"></i>
+                CSV</button>
+              <button class="btn btn-sm btn-me-line" id="dlXlsx" type="button"><i class="bi bi-file-earmark-excel"></i>
+                Excel</button>
+              <button class="btn btn-sm btn-me-line" id="dlJson" type="button"><i class="bi bi-filetype-json"></i>
+                JSON</button>
+            </div>
+          </div>
+
+          <div class="me-tabla-panel mt-2">
+            <table id="resultsTable" class="table table-sm table-striped table-hover w-100" style="display:none">
+            </table>
+            <div class="me-hint p-2" id="resultsVacio">
+              Completa los filtros del paso <strong>2</strong> y presiona <strong>Descargar casos</strong>.
+              La tabla muestra todos los casos descargados; los archivos exportados llevan las mismas
+              filas y columnas.
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------- Vista previa ---------- -->
+        <div class="tab-pane fade" id="panePreview" role="tabpanel">
+          <div class="me-tabla-panel mt-2">
+            <table id="previewTable" class="table table-sm table-striped table-hover w-100" style="display:none">
+            </table>
+            <div class="me-hint p-2" id="previewVacio">
+              Presiona <strong>Vista previa</strong> para traer una sola página y revisar el primer
+              ticket campo por campo.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LIBRERÍAS ============ -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+  <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+  <!-- 1 · Shell común -->
+  <script src="../assets/me-ui.js"></script>
+  <script>
+    MEUI.init({
+      app: "tipificacion",
+      version: "2.0",
+      doc: "../doc/reporte-tipificacion/README.md",
+      titulo: "Exportar casos · Tipificación",
+      descripcion: "Descarga masiva de casos del CRM",
+      sesiones: ["cm"],
+      instrucciones: [
+        "1 · Autenticación: usuario y clave del CRM, o pega un access token si Keycloak no permite direct grant.",
+        "2 · Filtros: rango de fechas (máximo 31 días) y los state_id que quieras traer.",
+        "3 · Páginas: normalmente «todas»; los otros modos sirven para reanudar o revisar una página puntual.",
+        "4 · «Vista previa» trae una página y muestra el primer ticket; «Descargar casos» trae todo el rango.",
+        "5 · Exporta con CSV / Excel / JSON desde la pestaña de resultados.",
+        "Si un rango supera 10.000 casos se divide solo en sub-rangos: es el límite de búsqueda del CRM."
+      ]
+    });
+  </script>
+
+  <!-- 2 · Acceso al CRM (compartido con las otras herramientas) -->
+  <script src="../assets/me-api.js"></script>
+
+  <!-- 3 · Reglas de negocio de esta herramienta -->
+  <script src="../assets/logica-tipificacion.js"></script>
+
+  <!-- 4 · Enganche entre la lógica y el shell -->
+  <script src="../assets/me-tipificacion-puente.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,390 @@
+<!-- validador_hlr_cruzado.html · v1.2
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js         marco visual, sesión, registro,
+                                            tablas, importación y exportación
+       assets/logica-hlr-cruzado.js        consulta en paralelo a Claro (QDN,
+                                            OAuth2) y Tigo (X-Api-Key), y
+                                            concluye la ubicación de la línea
+       assets/me-hlr-cruzado-puente.js     enganche entre la lógica y el shell
+
+     Por cada MSISDN responde: ¿está en Claro, en Tigo, en ninguno, en
+     ambos (para revisar), o hay un residuo sin depurar en el HLR/HSS de
+     Tigo? Duplica lo mínimo de cada motor (autenticación +
+     una consulta); el detalle forense completo vive en las herramientas
+     dedicadas de cada operador (Validador QDN · Claro / Consulta QDN · Tigo).
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>¿En qué HLR está?</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        .me-kpi.kpi-activo {
+            box-shadow: inset 0 0 0 2px var(--me-negro);
+        }
+
+        .badge-estado {
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border-radius: .35rem;
+            padding: .3em .55em;
+            white-space: nowrap;
+        }
+
+        .badge-estado.ok {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .badge-estado.off {
+            background: #ECECEA;
+            color: var(--me-off);
+        }
+
+        .badge-estado.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .badge-estado.info {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .badge-estado.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .badge-estado.neutro {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        td.col-accion {
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .dropzone {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: 1.1rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .dropzone .icon {
+            font-size: 1.4rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+            font-size: .8rem;
+            color: #5C5C57;
+        }
+
+        .file-info {
+            font-family: var(--me-mono);
+            font-size: .74rem;
+        }
+
+        .modal-header {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .modal-header .modal-title {
+            font-weight: 800;
+        }
+
+        pre.json {
+            background: #141414;
+            color: #E8E8E3;
+            border-radius: .5rem;
+            padding: 1rem;
+            font-size: .73rem;
+            max-height: 360px;
+            overflow: auto;
+        }
+
+        .dl-grid {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: .25rem .9rem;
+            font-size: .82rem;
+        }
+
+        .dl-grid dt {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .dl-grid dd {
+            font-family: var(--me-mono);
+            margin: 0;
+            word-break: break-all;
+        }
+
+        #barraFiltros .dropdown-menu {
+            max-height: 280px;
+            overflow: auto;
+            min-width: 260px;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--me-negro);
+            border-color: var(--me-negro);
+        }
+
+        #progresoWrap {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN (tarjetas = filtros rápidos) ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi info kpi-click" data-fdim="ubicacion" data-fval="CLARO">
+            <div class="n" id="kpiClaro">0</div>
+            <div class="lbl">En Claro<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi ok kpi-click" data-fdim="ubicacion" data-fval="TIGO">
+            <div class="n" id="kpiTigo">0</div>
+            <div class="lbl">En Tigo<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi warn kpi-click" data-fdim="ubicacion" data-fval="RESIDUO">
+            <div class="n" id="kpiResiduoTigo">0</div>
+            <div class="lbl">Residuo en Tigo<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro kpi-click" data-fdim="ubicacion" data-fval="NINGUNO">
+            <div class="n" id="kpiNinguno">0</div>
+            <div class="lbl">Ninguno<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="ubicacion" data-fval="REVISAR">
+            <div class="n" id="kpiRevisar">0</div>
+            <div class="lbl">Ambos / no concluyente<small>filtrar ▸</small></div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Líneas a consultar -->
+            <section data-me-paso="1" data-me-titulo="Líneas a consultar" data-me-abierto="siempre">
+                <div class="me-hint mb-2">Consulta <strong>Claro (QDN)</strong> y <strong>Tigo (HLR)</strong> al mismo
+                    tiempo por cada línea, y concluye en cuál de las dos redes está — o en ninguna.</div>
+                <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Cargar archivo Excel o CSV">
+                    <div class="icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                    <p><strong>Arrastra el Excel (.xlsx) o CSV</strong><br>o haz clic para elegirlo.</p>
+                    <input type="file" id="inputArchivo" accept=".xlsx,.xls,.csv" hidden>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <div class="file-info text-muted flex-grow-1" id="fileInfo"></div>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="btnQuitarArchivo"
+                        title="Quitar el archivo cargado">✕</button>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="me-lbl" for="selHoja">Hoja</label>
+                        <select class="form-select form-select-sm me-mono" id="selHoja" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="selColumna">Columna de MSISDN</label>
+                        <select class="form-select form-select-sm me-mono" id="selColumna" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="inputLineas">O escribe los MSISDN</label>
+                        <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="1"
+                            placeholder="3057888636  3054325342 ..."></textarea>
+                        <div class="me-hint">Acepta espacios, tabulaciones, saltos de línea, coma o punto y coma.</div>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="cfgConcurrencia">Líneas en paralelo</label>
+                        <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono"
+                            value="5" min="1" max="15">
+                        <div class="me-hint">Cada línea dispara 2 consultas (Claro + Tigo) a la vez.</div>
+                    </div>
+                    <div class="col-7 d-flex align-items-end">
+                        <button class="btn btn-me w-100" id="btnConsultar">Consultar</button>
+                    </div>
+                </div>
+
+                <div id="progresoWrap" class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="me-mono" id="progresoTexto">Consultando…</small>
+                        <small class="me-mono" id="progresoPct">0%</small>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2 · Registro -->
+            <section data-me-paso="2" data-me-titulo="Registro de la consulta" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: filtros + tabla ================= -->
+        <div class="me-trabajo-datos">
+
+            <div class="me-filtros" id="barraFiltros" hidden>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFUbicacion">Ubicación</button>
+                    <ul class="dropdown-menu p-2" id="fUbicacion"></ul>
+                </div>
+                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar filtros <i
+                        class="bi bi-x-circle"></i></button>
+
+                <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button class="btn btn-sm btn-me-line" id="btnCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+                    <button class="btn btn-sm btn-me-line" id="btnXLSX"><i class="bi bi-file-earmark-excel"></i>
+                        Excel</button>
+                    <button class="btn btn-sm btn-me-line" id="btnJSON"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaResultados" class="table table-striped table-hover align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th>MSISDN</th>
+                            <th>Ubicación</th>
+                            <th>Claro</th>
+                            <th>Tigo</th>
+                            <th>RETCODE Tigo</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="me-hint p-2" id="msgVacio">
+                    Escribe uno o varios MSISDN (o carga un Excel/CSV) y presiona <strong>Consultar</strong>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdMsisdn"
+                                title="Copiar línea">⧉</button>
+                        </h5>
+                        <div class="mt-1" style="font-size:.8rem;opacity:.85">
+                            IMSI <span id="mdImsi" class="me-mono">—</span>
+                            <button type="button" class="btn-copy" data-copy-target="mdImsi"
+                                title="Copiar IMSI">⧉</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mdResumen" class="mb-3"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Claro (QDN)</h6>
+                            <div id="mdClaroResumen"></div>
+                            <details class="mt-2">
+                                <summary class="me-hint" style="cursor:pointer">Ver JSON crudo</summary>
+                                <pre class="json me-mono mt-2" id="mdClaroJson"></pre>
+                            </details>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Tigo (HLR)</h6>
+                            <div id="mdTigoResumen"></div>
+                            <details class="mt-2">
+                                <summary class="me-hint" style="cursor:pointer">Ver JSON crudo</summary>
+                                <pre class="json me-mono mt-2" id="mdTigoJson"></pre>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "hlr-cruzado",
+            version: "1.2",
+            doc: "../doc/hlr-cruzado/README.md",
+            titulo: "¿En qué HLR está?",
+            descripcion: "Cruce Claro (QDN) ⇄ Tigo (HLR) por MSISDN",
+            sesiones: [],
+            instrucciones: [
+                "1 · Líneas: escribe uno o varios MSISDN (sin el 57 para Tigo, se agrega solo) o carga un Excel/CSV, y presiona Consultar.",
+                "2 · Por cada línea se consulta Claro y Tigo EN PARALELO, con hasta 2 reintentos automáticos por timeout en cada uno.",
+                "3 · La columna «Ubicación» concluye: Claro, Tigo, Residuo en Tigo, Claro + residuo en Tigo, Ninguno, o Ambos/No concluyente si hace falta revisar a mano.",
+                "4 · Claro no distingue 'no existe' de 'inactiva' (ambas responden Inactiva). En Tigo: RETCODE 0 = tiene perfil; 3001 = sin perfil (no dice de quién es el número — se escala a Optiva solo si en ME figura activa); 1033 = la línea se portó a ME pero Tigo no la eliminó de su HLR/HSS, es un residuo que se escala a Tigo y luego pasa a 3001.",
+                "5 · Haz clic en una fila o en 👁 para ver el detalle y el JSON crudo de cada operador.",
+                "6 · Exporta con CSV / Excel / JSON lo que quede a la vista.",
+                "Para el detalle forense completo de cada operador usa «Validador QDN · Claro» o «Consulta QDN · Tigo» en el menú."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-hlr-cruzado.js"></script>
+
+    <!-- 3 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-hlr-cruzado-puente.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,835 @@
+<!-- validador_qdn.html · v3.3
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js      marco visual, sesión, registro,
+                                        tablas, importación y exportación
+       assets/logica-qdn.js             reglas de negocio de esta herramienta
+                                        (auth QDN propia, parseo del response,
+                                        concurrencia, reintentos, filtros)
+       assets/logica-qdn-operaciones.js operaciones que ESCRIBEN en la red:
+                                        bloqueo, desbloqueo y conciliación
+       assets/me-qdn-puente.js          enganche entre la lógica y el shell
+
+     Basado en la HU "Validador HLR/HSS mediante consulta QDN Movil Éxito -
+     Claro": consulta individual y masiva por MSISDN, hasta 8 solicitudes
+     concurrentes, 2 reintentos por timeout, tabla resumen + detalle por
+     categorías con el JSON original.
+
+     Desde la v2.0 además OPERA sobre la línea (PATCH ModifingService), con
+     doble confirmación en bloqueo y conciliación. Ver doc/validador-qdn.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Validador QDN · Claro</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Sistema de diseño común a las herramientas -->
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* ---------------------------------------------------------------
+           Estilos propios de ESTA herramienta.
+           Todo lo estructural (shell, tablas, pasos, log) vive en me-ui.css.
+        --------------------------------------------------------------- */
+
+        .me-kpi.kpi-activo {
+            box-shadow: inset 0 0 0 2px var(--me-negro);
+        }
+
+        /* --- Operaciones de escritura: se ven distintas del resto a
+               propósito, para que no se confundan con una consulta. --- */
+        .btn-operar {
+            border: 1px solid #EAC4BF;
+            background: #FBE2DF;
+            color: var(--me-err);
+            font-weight: 600;
+        }
+
+        .btn-operar:hover,
+        .btn-operar:focus {
+            background: var(--me-err);
+            border-color: var(--me-err);
+            color: #fff;
+        }
+
+        details.bloque-operaciones {
+            border: 1px solid #EAC4BF;
+            border-radius: .5rem;
+            padding: .6rem .8rem;
+            background: #FFF8F7;
+        }
+
+        details.bloque-operaciones>summary {
+            cursor: pointer;
+            font-weight: 700;
+            font-size: .86rem;
+            color: var(--me-err);
+        }
+
+        /* ---------- Menú de operaciones (modal de la línea) ----------
+           Procesos y SIM arriba, como botones sueltos; Bloqueos al final,
+           plegados, una fila por familia con su par bloquear | desbloquear. */
+        .op-grupo { margin-bottom: .75rem; }
+
+        .op-grupo-tit {
+            font-weight: 700;
+            font-size: .78rem;
+            color: var(--me-suave);
+            margin-bottom: .35rem;
+        }
+
+        details.op-bloqueos > summary {
+            cursor: pointer;
+            list-style: none;
+        }
+
+        details.op-bloqueos > summary::-webkit-details-marker { display: none; }
+
+        details.op-bloqueos > summary::before {
+            content: "▸";
+            display: inline-block;
+            width: 1em;
+            transition: transform .15s;
+        }
+
+        details.op-bloqueos[open] > summary::before { transform: rotate(90deg); }
+
+        .op-familias {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: .4rem .9rem;
+            margin-top: .35rem;
+        }
+
+        .op-familia {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            border: 1px solid var(--me-borde);
+            border-radius: .4rem;
+            padding: .35rem .5rem;
+            background: #fff;
+        }
+
+        .op-familia-nom {
+            font-size: .8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .op-familia-nom .bi { margin-right: .25rem; color: var(--me-suave); }
+
+        .op-familia-par { display: flex; gap: .3rem; flex-shrink: 0; }
+
+        .btn-operacion .bi { margin-right: .2rem; }
+
+        /* Color por intención: bloquear/riesgo en rojo, desbloquear en verde,
+           conciliar en ámbar; el icono ya dice de qué se trata. */
+        .btn-operacion.op-bloqueo .bi,
+        .btn-operacion.op-riesgo_alto .bi,
+        .btn-operacion.op-provision .bi { color: var(--me-err); }
+
+        .btn-operacion.op-desbloqueo .bi { color: var(--me-ok); }
+
+        .btn-operacion.op-conciliacion .bi { color: var(--me-warn); }
+
+        .op-menu-familia {
+            padding: .35rem .75rem .1rem;
+            font-size: .72rem;
+            font-weight: 600;
+            color: var(--me-suave);
+        }
+
+        .op-menu-familia .bi { margin-right: .25rem; }
+
+        /* ---------- Tabla de confirmación de una operación ----------
+           Reparto de ancho fijo (table-layout) en vez de automático: con
+           el automático las columnas se peleaban el espacio y el valor
+           actual terminaba encimado con el input de al lado. */
+        .tabla-operacion-scroll {
+            max-height: 340px;
+            overflow: auto;
+            border: 1px solid var(--me-borde);
+            border-radius: .4rem;
+        }
+
+        .tabla-operacion {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .tabla-operacion thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #F7F6F1;
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            white-space: nowrap;
+        }
+
+        .tabla-operacion thead th small {
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 400;
+            color: var(--me-suave);
+        }
+
+        .tabla-operacion td,
+        .tabla-operacion th {
+            vertical-align: top;
+            padding: .4rem .5rem;
+        }
+
+        .tabla-operacion th.col-linea,
+        .tabla-operacion td.col-linea {
+            width: 8.5rem;
+        }
+
+        .tabla-operacion th.col-features,
+        .tabla-operacion td.col-features {
+            width: 11rem;
+        }
+
+        .tabla-operacion .linea-msisdn {
+            font-weight: 600;
+            font-size: .82rem;
+        }
+
+        /* El input ocupa el ancho de su celda y nada más: sin min-width no
+           puede empujar a las columnas vecinas ni desbordar la tabla. */
+        .tabla-operacion input.form-control {
+            width: 100%;
+            min-width: 0;
+            font-size: .78rem;
+        }
+
+        .tabla-operacion .me-hint {
+            font-size: .67rem;
+            line-height: 1.25;
+            margin-top: .15rem;
+            overflow-wrap: anywhere;
+        }
+
+        .tabla-operacion .me-hint.hint-aviso {
+            color: var(--me-warn);
+        }
+
+        /* "antes / después": dos renglones etiquetados y alineados, para que
+           se lea de un vistazo de qué valor a qué valor va el cambio. */
+        .tabla-operacion .cambio-fila {
+            display: flex;
+            align-items: baseline;
+            gap: .4rem;
+        }
+
+        .tabla-operacion .cambio-fila+.cambio-fila {
+            margin-top: .25rem;
+        }
+
+        .tabla-operacion .cambio-lbl {
+            flex: 0 0 3.6rem;
+            font-size: .6rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #9a9a94;
+        }
+
+        .tabla-operacion .cambio-lbl.nuevo {
+            color: var(--me-ok);
+            font-weight: 700;
+        }
+
+        .tabla-operacion .cambio-actual {
+            font-size: .78rem;
+            color: var(--me-suave);
+            overflow-wrap: anywhere;
+        }
+
+        .tabla-operacion .cambio-campo {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        /* Bloques plegables del modal de operación (líneas omitidas y
+           "cuerpo que se envía"): cerrados por defecto para que el
+           formulario se lea de corrido. */
+        details.op-plegable>summary {
+            cursor: pointer;
+            font-weight: 700;
+            font-size: .8rem;
+        }
+
+        .op-seccion-tit {
+            font-weight: 700;
+            font-size: .8rem;
+            margin-bottom: .35rem;
+        }
+
+        .op-conteo {
+            display: inline-block;
+            background: #EBEAE4;
+            border-radius: 999px;
+            padding: 0 .45em;
+            font-family: var(--me-mono);
+            font-size: .72rem;
+            font-weight: 600;
+        }
+
+        .badge-estado {
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border-radius: .35rem;
+            padding: .3em .55em;
+            white-space: nowrap;
+        }
+
+        .badge-estado.ok {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .badge-estado.off {
+            background: #ECECEA;
+            color: var(--me-off);
+        }
+
+        .badge-estado.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .badge-estado.info {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .badge-estado.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .badge-estado.neutro {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        .chip-bloqueo {
+            display: inline-flex;
+            align-items: center;
+            gap: .3em;
+            font-size: .74rem;
+            border: 1px solid var(--me-borde);
+            border-radius: 999px;
+            padding: .18em .6em;
+            background: #fff;
+            white-space: nowrap;
+            color: var(--me-suave);
+        }
+
+        .chip-bloqueo.activo {
+            border-color: #EAC4BF;
+            background: #FBE2DF;
+            color: var(--me-err);
+            font-weight: 600;
+        }
+
+        td.col-accion {
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        th.col-sel,
+        td.col-sel {
+            width: 1%;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        /* Aviso en la fila: la respuesta llegó, pero no es confiable tal cual */
+        .aviso-fila {
+            color: var(--me-warn);
+            font-weight: 700;
+            cursor: help;
+        }
+
+        .dropzone {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: 1.1rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .dropzone .icon {
+            font-size: 1.4rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+            font-size: .8rem;
+            color: #5C5C57;
+        }
+
+        .file-info {
+            font-family: var(--me-mono);
+            font-size: .74rem;
+        }
+
+        .modal-header {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .modal-header .modal-title {
+            font-weight: 800;
+        }
+
+        .modal-header .modal-title span {
+            color: var(--me-amarillo);
+        }
+
+        pre.json {
+            background: #141414;
+            color: #E8E8E3;
+            border-radius: .5rem;
+            padding: 1rem;
+            font-size: .73rem;
+            max-height: 420px;
+            overflow: auto;
+        }
+
+        .dl-grid {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: .25rem .9rem;
+            font-size: .82rem;
+        }
+
+        .dl-grid dt {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .dl-grid dd {
+            font-family: var(--me-mono);
+            margin: 0;
+            word-break: break-all;
+        }
+
+        #barraFiltros .dropdown-menu {
+            max-height: 280px;
+            overflow: auto;
+            min-width: 240px;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--me-negro);
+            border-color: var(--me-negro);
+        }
+
+        #progresoWrap {
+            display: none;
+        }
+
+        #mdCategorias {
+            max-height: 60vh;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN (tarjetas = filtros rápidos) ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi ok kpi-click" data-fdim="estado" data-fval="ACTIVE">
+            <div class="n" id="kpiActivas">0</div>
+            <div class="lbl">Activas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro kpi-click" data-fdim="estado" data-fval="INACTIVE">
+            <div class="n" id="kpiInactivas">0</div>
+            <div class="lbl">Inactivas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="bloqueo" data-fval="CON">
+            <div class="n" id="kpiBloqueos">0</div>
+            <div class="lbl">Con bloqueos<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi warn kpi-click" data-fdim="proceso" data-fval="INCONSISTENTE">
+            <div class="n" id="kpiRevisar">0</div>
+            <div class="lbl">Revisar respuesta<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="proceso" data-fval="FALLIDAS">
+            <div class="n" id="kpiErrores">0</div>
+            <div class="lbl">Errores / timeout<small>filtrar ▸</small></div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión QDN -->
+            <section data-me-paso="1" data-me-titulo="Conexión QDN" data-me-abierto="sin-sesion">
+                <div class="me-hint mb-2">La consulta QDN solo está confirmada contra <strong>PDN
+                        (Producción)</strong>. Los valores de conexión ya vienen configurados.</div>
+                <button class="btn btn-sm btn-me-ink" id="btnProbarQdn">Probar conexión / obtener token</button>
+                <div class="me-hint mt-2">El token se obtiene y renueva automáticamente al consultar; este botón solo
+                    sirve para verificar la conexión antes de una carga masiva.</div>
+
+                <button class="btn btn-sm btn-link px-0 mt-2" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#qdnAvanzado" aria-expanded="false" aria-controls="qdnAvanzado">
+                    Ver / editar datos de conexión (avanzado)
+                </button>
+                <div class="collapse" id="qdnAvanzado">
+                    <div class="row g-2 mt-1">
+                        <div class="col-12">
+                            <label class="me-lbl" for="cfgTokenUrl">Token URL</label>
+                            <input type="text" id="cfgTokenUrl" class="form-control form-control-sm me-mono">
+                        </div>
+                        <div class="col-6">
+                            <label class="me-lbl" for="cfgClientId">Client ID</label>
+                            <input type="text" id="cfgClientId" class="form-control form-control-sm me-mono">
+                        </div>
+                        <div class="col-6">
+                            <label class="me-lbl" for="cfgClientSecret">Client Secret</label>
+                            <input type="password" id="cfgClientSecret" class="form-control form-control-sm me-mono">
+                        </div>
+                        <div class="col-12">
+                            <label class="me-lbl" for="cfgBaseApigw">Base API gateway (QDN)</label>
+                            <input type="text" id="cfgBaseApigw" class="form-control form-control-sm me-mono">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-check-label me-lbl d-flex align-items-center gap-2"
+                                style="text-transform:none">
+                                <input type="checkbox" class="form-check-input" id="cfgAuthEnCuerpo" checked>
+                                Enviar client_id/secret en el cuerpo del token
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2 · Líneas a consultar -->
+            <section data-me-paso="2" data-me-titulo="Líneas a consultar" data-me-abierto="con-sesion">
+                <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Cargar archivo Excel o CSV">
+                    <div class="icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                    <p><strong>Arrastra el Excel (.xlsx) o CSV</strong><br>o haz clic para elegirlo.</p>
+                    <input type="file" id="inputArchivo" accept=".xlsx,.xls,.csv" hidden>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <div class="file-info text-muted flex-grow-1" id="fileInfo"></div>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="btnQuitarArchivo"
+                        title="Quitar el archivo cargado">✕</button>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="me-lbl" for="selHoja">Hoja</label>
+                        <select class="form-select form-select-sm me-mono" id="selHoja" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="selColumna">Columna de MSISDN</label>
+                        <select class="form-select form-select-sm me-mono" id="selColumna" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="inputLineas">O escribe los MSISDN</label>
+                        <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="1"
+                            placeholder="3332949603  3338123456 ..."></textarea>
+                        <div class="me-hint">Acepta espacios, tabulaciones, saltos de línea, coma o punto y coma. Uno
+                            solo lanza una consulta individual.</div>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="cfgConcurrencia">Concurrencia</label>
+                        <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono" value="8"
+                            min="1" max="15">
+                        <div class="me-hint">Recomendado 8 (máx. técnico QDN: 15 TPS).</div>
+                    </div>
+                    <div class="col-7 d-flex align-items-end">
+                        <button class="btn btn-me w-100" id="btnConsultar">Consultar</button>
+                    </div>
+                </div>
+
+                <div id="progresoWrap" class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="me-mono" id="progresoTexto">Consultando…</small>
+                        <small class="me-mono" id="progresoPct">0%</small>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3 · Registro -->
+            <section data-me-paso="3" data-me-titulo="Registro de la consulta" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: filtros + tabla ================= -->
+        <div class="me-trabajo-datos">
+
+            <div class="me-filtros" id="barraFiltros" hidden>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFEstado">Estado</button>
+                    <ul class="dropdown-menu p-2" id="fEstado"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFBloqueo">Bloqueos</button>
+                    <ul class="dropdown-menu p-2" id="fBloqueo"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnF5g">5G</button>
+                    <ul class="dropdown-menu p-2" id="f5g"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFRoaming">Roaming</button>
+                    <ul class="dropdown-menu p-2" id="fRoaming"></ul>
+                </div>
+                <select class="form-select form-select-sm" id="fSel" style="width:auto"
+                    title="Marcadas con la casilla de la tabla: origen de Conciliación y Aprovisionar en masivo">
+                    <option value="">Marcadas: todas</option>
+                    <option value="si">Solo marcadas</option>
+                    <option value="no">Solo sin marcar</option>
+                </select>
+                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar filtros <i
+                        class="bi bi-x-circle"></i></button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"><i class="bi bi-layout-three-columns"></i> Columnas</button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2" id="menuColumnas"></ul>
+                </div>
+
+                <!-- Operaciones MASIVAS sobre lo filtrado. Separadas del resto
+                     de la barra a propósito: son las únicas que escriben. -->
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-operar dropdown-toggle" data-bs-toggle="dropdown"
+                        id="btnOperaciones"><i class="bi bi-sliders"></i> Operaciones</button>
+                    <ul class="dropdown-menu p-2" id="menuOperaciones" style="max-height:420px;overflow:auto"></ul>
+                </div>
+                <button class="btn btn-sm btn-me-line" id="btnBitacora" type="button"
+                    title="Descargar el CSV de operaciones ejecutadas en esta sesión">
+                    <i class="bi bi-journal-text"></i> Bitácora</button>
+
+                <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button class="btn btn-sm btn-me-line" id="btnCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+                    <button class="btn btn-sm btn-me-line" id="btnXLSX"><i class="bi bi-file-earmark-excel"></i>
+                        Excel</button>
+                    <button class="btn btn-sm btn-me-line" id="btnJSON"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaResultados" class="table table-striped table-hover align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" class="form-check-input chk-todas"
+                                    title="Marcar o desmarcar lo visible"></th>
+                            <th>MSISDN</th>
+                            <th>Estado</th>
+                            <th>IMSI</th>
+                            <th>IMEI</th>
+                            <th>5G</th>
+                            <th>Telefonía</th>
+                            <th>SMS</th>
+                            <th>Datos</th>
+                            <th>Roaming</th>
+                            <th>Bloqueos</th>
+                            <th>Desvío</th>
+                            <th>APN</th>
+                            <th>IP</th>
+                            <th>Portabilidad</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="me-hint p-2" id="msgVacio">
+                    Escribe uno o varios MSISDN (o carga un Excel/CSV) y presiona <strong>Consultar</strong>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdMsisdn"
+                                title="Copiar línea">⧉</button>
+                        </h5>
+                        <div class="mt-1" style="font-size:.8rem;opacity:.85">
+                            IMSI <span id="mdImsi" class="me-mono">—</span>
+                            <button type="button" class="btn-copy" data-copy-target="mdImsi"
+                                title="Copiar IMSI">⧉</button>
+                            <span class="ms-3">ICCID <span id="mdIccid" class="me-mono">—</span></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdIccid"
+                                title="Copiar ICCID">⧉</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mdResumen" class="mb-3"></div>
+
+                    <!-- Operaciones de ESCRITURA sobre esta línea. Va plegado:
+                         el modal se abre para leer, operar es deliberado. -->
+                    <details class="bloque-operaciones mb-3">
+                        <summary><i class="bi bi-sliders"></i> Operaciones sobre la línea
+                        </summary>
+                        <div class="pt-2" id="mdOperaciones"></div>
+                    </details>
+
+                    <ul class="nav nav-tabs" id="mdTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#mdPanelDetalle"
+                                type="button">Detalle interpretado</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#mdPanelTecnico"
+                                type="button">Información técnica</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#mdPanelJson"
+                                type="button">JSON original</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content pt-3">
+                        <div class="tab-pane fade show active" id="mdPanelDetalle">
+                            <div id="mdCategorias"></div>
+                        </div>
+                        <div class="tab-pane fade" id="mdPanelTecnico">
+                            <div id="mdTecnico"></div>
+                        </div>
+                        <div class="tab-pane fade" id="mdPanelJson">
+                            <pre class="json me-mono" id="mdJson"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DE OPERACIÓN (confirmar y ejecutar) ============
+         Dos pasos para bloqueo y conciliación (revisar -> "¿seguro?"), uno
+         solo para desbloqueo. El listado de líneas afectadas se muestra
+         SIEMPRE, también en masivo. -->
+    <div class="modal fade" id="modalOperacion" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title mb-0"><i class="bi bi-exclamation-triangle"></i>
+                        <span id="opTitulo"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="opPaso1">
+                        <div id="opCuerpo"></div>
+                    </div>
+                    <div id="opPaso2" hidden>
+                        <div class="alert alert-danger">
+                            <div class="fw-bold mb-1">Última confirmación</div>
+                            <div id="opSeguroTexto"></div>
+                        </div>
+                    </div>
+                    <div id="opResultado"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-me-line" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-sm btn-me-line" id="btnOpVolver" hidden>Volver</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnOpGuardar">Guardar</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="btnOpSeguro" hidden>
+                        Sí, ejecutar en producción</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+
+    <!-- 1 · Shell común: se monta antes que todo lo demás -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "qdn",
+            version: "3.1",
+            doc: "../doc/validador-qdn/README.md",
+            titulo: "Validador QDN · Claro",
+            descripcion: "Estado, servicios y bloqueos por MSISDN vía QDN Móvil Éxito - Claro",
+            sesiones: ["qdn"],
+            instrucciones: [
+                "1 · Conexión: los valores de PDN ya vienen listos; usa «Probar conexión» solo para verificar.",
+                "2 · Líneas: escribe uno o varios MSISDN (separados por espacio, coma, «;» o salto de línea) o carga un Excel/CSV, y presiona Consultar.",
+                "3 · Las consultas corren en paralelo (por defecto 8 a la vez) con hasta 2 reintentos automáticos por timeout.",
+                "4 · Revisa la tabla: usa las tarjetas y los filtros para acotar, haz clic en una fila o en el ícono 👁 para ver el detalle completo por categorías y el JSON original.",
+                "5 · Exporta con CSV / Excel / JSON lo que quede a la vista.",
+                "6 · OPERAR (escribe en producción): en el detalle de una línea, bloque «Operaciones sobre la línea»; para varias, el botón rojo «Operaciones» de la barra, que aplica a lo que quede tras los filtros.",
+                "7 · Antes de ejecutar se listan TODAS las líneas afectadas y el cuerpo que se envía. Bloquear y conciliar piden doble confirmación; desbloquear pide una.",
+                "8 · Si falta el IMSI o el ICCID se piden ahí mismo y siempre se pueden corregir. El ICCID se deriva como 8957 + IMSI si no vino; también puedes subir un Excel/CSV con columnas imsi, iccid y ki.",
+                "9 · Cada operación queda en la bitácora con el usuario de tu sesión (CM/SIME); descárgala con el botón «Bitácora». Tras ejecutar se vuelve a consultar el QDN para verificar.",
+                "Atajo: Enter en el campo de líneas lanza la consulta."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Reglas de negocio de esta herramienta (incluye su propia auth QDN) -->
+    <script src="../assets/logica-qdn.js"></script>
+
+    <!-- 3 · Operaciones de provisión (bloqueo / desbloqueo / conciliación).
+         Va DESPUÉS de la lógica: reusa su token, sus filas y sus filtros. -->
+    <script src="../assets/logica-qdn-operaciones.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-qdn-puente.js"></script>
+</body>
+
+</html>

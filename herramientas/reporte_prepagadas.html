@@ -1,0 +1,1065 @@
+<!-- reporte_prepagadas.html · v9.3
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js      marco visual, sesión, registro,
+                                        tablas, importación y exportación
+       assets/me-api.js                 Keycloak, auth y consultas al CM/BSS
+       assets/logica-prepagadas.js      reglas de negocio de esta herramienta
+       assets/me-prepagadas-puente.js   enganche entre la lógica y el shell
+
+     Cambiar una consulta del CM se hace una vez en me-api.js; cambiar una
+     regla de prepagadas, una vez en logica-prepagadas.js.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Prepagadas · SIME ⇄ CM</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Sistema de diseño común a las 4 herramientas -->
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* ---------------------------------------------------------------
+           Estilos propios de ESTA herramienta.
+           Todo lo estructural (shell, tablas, pasos, log) vive en me-ui.css.
+        --------------------------------------------------------------- */
+
+        /* KPI: la clase kpi-click y kpi-activo las usa el JS existente */
+        .me-kpi.kpi-activo {
+            box-shadow: inset 0 0 0 2px var(--me-negro);
+        }
+
+        /* Badges de estado SIME */
+        .badge-estado {
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border-radius: .35rem;
+            padding: .3em .55em;
+        }
+
+        .badge-estado.ACTIVA {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .badge-estado.INACTIVA {
+            background: #ECECEA;
+            color: var(--me-off);
+        }
+
+        .badge-estado.SUSPENDIDA {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .badge-estado.FINALIZADA {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .badge-estado.CANCELADA,
+        .badge-estado.SIN_SIME,
+        .badge-estado.undefined {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        /* Chip de verificación SIME ⇄ CM */
+        .chip-verif {
+            display: inline-flex;
+            align-items: center;
+            gap: .35em;
+            font-family: var(--me-mono);
+            font-size: .7rem;
+            border: 1px solid var(--me-borde);
+            border-radius: 999px;
+            padding: .18em .6em;
+            background: #fff;
+            white-space: nowrap;
+        }
+
+        .chip-verif .dot {
+            width: .5em;
+            height: .5em;
+            border-radius: 50%;
+        }
+
+        .chip-verif.ok {
+            border-color: #BFE0CC;
+        }
+
+        .chip-verif.ok .dot {
+            background: var(--me-ok);
+        }
+
+        .chip-verif.fail {
+            border-color: #EAC4BF;
+        }
+
+        .chip-verif.fail .dot {
+            background: var(--me-err);
+        }
+
+        .chip-verif.na {
+            color: #8B8B86;
+        }
+
+        .chip-verif.na .dot {
+            background: #C9C9C4;
+        }
+
+        /* Barra de periodos */
+        .periodos {
+            min-width: 128px;
+        }
+
+        .periodos .bar {
+            height: 6px;
+            border-radius: 3px;
+            background: #EBEAE4;
+            overflow: hidden;
+        }
+
+        .periodos .fill {
+            height: 100%;
+            background: var(--me-negro);
+        }
+
+        .periodos small {
+            font-family: var(--me-mono);
+            font-size: .68rem;
+            color: var(--me-suave);
+        }
+
+        /* Fila oculta por el analista */
+        tr.fila-oculta {
+            opacity: .5;
+        }
+
+        tr.fila-oculta td.col-comentario,
+        tr.fila-oculta td:first-child {
+            text-decoration: line-through;
+            text-decoration-color: rgba(0, 0, 0, .25);
+        }
+
+        td.col-accion {
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        /* Zona de carga de archivo */
+        .dropzone {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: 1.1rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .dropzone .icon {
+            font-size: 1.4rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+            font-size: .8rem;
+            color: #5C5C57;
+        }
+
+        .file-info {
+            font-family: var(--me-mono);
+            font-size: .74rem;
+        }
+
+        /* Modal de detalle */
+        .modal-header {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .modal-header .modal-title {
+            font-weight: 800;
+        }
+
+        .modal-header .modal-title span {
+            color: var(--me-amarillo);
+        }
+
+        .btn-copy {
+            border: none;
+            background: rgba(255, 255, 255, .18);
+            color: inherit;
+            border-radius: .35rem;
+            padding: 0 .35rem;
+            font-size: .82rem;
+            cursor: pointer;
+        }
+
+        .btn-copy:hover {
+            background: rgba(255, 255, 255, .35);
+        }
+
+        .btn-copy.copiado {
+            background: #198754;
+            color: #fff;
+        }
+
+        #mdUso .btn-copy,
+        .tbl-datos .btn-copy {
+            background: #EBEAE4;
+            color: #333;
+        }
+
+        pre.json {
+            background: #141414;
+            color: #E8E8E3;
+            border-radius: .5rem;
+            padding: 1rem;
+            font-size: .73rem;
+            max-height: 320px;
+            overflow: auto;
+        }
+
+        .dl-grid {
+            display: grid;
+            grid-template-columns: 210px 1fr;
+            gap: .25rem .9rem;
+            font-size: .82rem;
+        }
+
+        .dl-grid dt {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .dl-grid dd {
+            font-family: var(--me-mono);
+            margin: 0;
+            word-break: break-all;
+        }
+
+        /* Uso y balance */
+        .uso-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: .6rem;
+        }
+
+        .uso-grupo {
+            grid-column: 1/-1;
+            font-weight: 700;
+            font-size: .82rem;
+            margin: .4rem 0 -.15rem;
+            display: flex;
+            gap: .5rem;
+            align-items: center;
+        }
+
+        .uso-grupo .uso-tot {
+            font-weight: 400;
+            color: var(--me-suave);
+            font-size: .76rem;
+        }
+
+        .uso-item {
+            border: 1px solid var(--me-borde);
+            border-radius: .5rem;
+            padding: .6rem .7rem;
+            background: #fff;
+        }
+
+        .uso-item .uso-name {
+            font-size: .82rem;
+            font-weight: 600;
+            display: block;
+        }
+
+        .uso-item .uso-val {
+            font-family: var(--me-mono);
+            font-size: .82rem;
+        }
+
+        .uso-item .uso-val .rem {
+            font-weight: 700;
+        }
+
+        .uso-item .uso-val .lim {
+            color: var(--me-suave);
+        }
+
+        .uso-item .uso-lbl {
+            font-size: .62rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #9a9a94;
+        }
+
+        .uso-item .bar {
+            height: 7px;
+            border-radius: 4px;
+            background: #EBEAE4;
+            overflow: hidden;
+            margin: .4rem 0 .25rem;
+        }
+
+        .uso-item .bar .fill {
+            height: 100%;
+        }
+
+        .uso-item .fill.lvl-ok {
+            background: #198754;
+        }
+
+        .uso-item .fill.lvl-mid {
+            background: #fd7e14;
+        }
+
+        .uso-item .fill.lvl-hi {
+            background: #dc3545;
+        }
+
+        .uso-item .uso-disp {
+            font-size: .78rem;
+            font-family: var(--me-mono);
+            margin-bottom: .15rem;
+        }
+
+        .uso-item .uso-disp strong {
+            font-weight: 700;
+        }
+
+        .uso-item .uso-sub {
+            font-size: .7rem;
+            color: var(--me-suave);
+            font-family: var(--me-mono);
+            display: flex;
+            justify-content: space-between;
+            gap: .5rem;
+        }
+
+        .uso-item.vencido {
+            opacity: .6;
+        }
+
+        .uso-item .badge-venc {
+            color: #dc3545;
+        }
+
+        /* Movimientos CM */
+        tr.tx-primera {
+            --bs-table-bg: #fff3cd;
+        }
+
+        tr.tx-compraPlan {
+            --bs-table-bg: #ffe8a3;
+        }
+
+        tr.tx-compra {
+            --bs-table-bg: #ffeede;
+        }
+
+        tr.tx-recurrencia {
+            --bs-table-bg: #d1e7dd;
+        }
+
+        tr.tx-otro {
+            --bs-table-bg: #f8f9fa;
+            color: #6c757d;
+        }
+
+        tr.tx-actual {
+            box-shadow: inset 3px 0 0 var(--me-negro);
+        }
+
+        .tx-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem .9rem;
+            font-size: .72rem;
+            color: #5C5C57;
+            margin: .35rem 0 .5rem;
+        }
+
+        .tx-legend .sw {
+            display: inline-block;
+            width: .85em;
+            height: .85em;
+            border-radius: 3px;
+            border: 1px solid var(--me-borde);
+            vertical-align: -1px;
+            margin-right: .3em;
+        }
+
+        /* Tablas legibles de respuesta cruda */
+        table.tbl-datos {
+            width: 100%;
+            font-size: .77rem;
+            border-collapse: collapse;
+        }
+
+        table.tbl-datos th,
+        table.tbl-datos td {
+            border: 1px solid var(--me-borde);
+            padding: .3rem .5rem;
+            vertical-align: top;
+        }
+
+        table.tbl-datos th {
+            text-align: left;
+            background: #FAFAF7;
+            color: var(--me-suave);
+            font-weight: 600;
+            white-space: nowrap;
+            width: 230px;
+        }
+
+        table.tbl-datos td {
+            font-family: var(--me-mono);
+            word-break: break-word;
+        }
+
+        table.tbl-ciclos {
+            width: 100%;
+            font-size: .78rem;
+        }
+
+        tr.ciclo-vencido {
+            color: #9a9a95;
+        }
+
+        .ficha-cliente,
+        .crear-fijos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem .6rem;
+            font-size: .76rem;
+        }
+
+        .ficha-cliente .dato,
+        .crear-fijos .fijo {
+            border: 1px solid var(--me-borde);
+            background: #FAFAF7;
+            border-radius: .35rem;
+            padding: .2rem .5rem;
+            font-family: var(--me-mono);
+        }
+
+        .ficha-cliente .dato b,
+        .crear-fijos .fijo b {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .crear-fijos .fijo.calc {
+            background: #FFFBE6;
+            border-color: #E8D98A;
+        }
+
+        .lbl-mini {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--me-suave);
+        }
+
+        .lbl-mini .der {
+            text-transform: none;
+            letter-spacing: 0;
+            color: #9a9a94;
+        }
+
+        #crRecalc {
+            font-size: .72rem;
+            color: var(--me-ok);
+            min-height: 1rem;
+        }
+
+        tr.rec-editando {
+            box-shadow: inset 3px 0 0 var(--me-negro);
+        }
+
+        td.rec-detalles {
+            font-size: .7rem;
+            color: var(--me-suave);
+            max-width: 260px;
+        }
+
+        details.raw-json>summary {
+            cursor: pointer;
+            font-size: .78rem;
+            color: var(--me-suave);
+        }
+
+        #barraFiltros .dropdown-menu {
+            max-height: 280px;
+            overflow: auto;
+            min-width: 220px;
+        }
+
+        #barraFiltros .dropdown-item {
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--me-negro);
+            border-color: var(--me-negro);
+        }
+
+        #progresoWrap {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN (tarjetas = filtros rápidos) ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi ok kpi-click" data-fdim="estado" data-fval="ACTIVA">
+            <div class="n" id="kpiActivas">0</div>
+            <div class="lbl">Activas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro kpi-click" data-fdim="estado" data-fval="INACTIVA">
+            <div class="n" id="kpiInactivas">0</div>
+            <div class="lbl">Inactivas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi warn kpi-click" data-fdim="estado" data-fval="SUSPENDIDA">
+            <div class="n" id="kpiSuspendidas">0</div>
+            <div class="lbl">Suspendidas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="estado" data-fval="SIN_SIME">
+            <div class="n" id="kpiSinSime">0</div>
+            <div class="lbl">Sin crear en SIME<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="verif" data-fval="fail">
+            <div class="n" id="kpiDescuadre">0</div>
+            <div class="lbl">Verificación no coincide<small>filtrar ▸</small></div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión: viene abierta solo si falta alguna sesión -->
+            <section data-me-paso="1" data-me-titulo="Conexión" data-me-abierto="sin-sesion">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="me-lbl" for="cfgTokenSime">Token SIME (header <code>prf</code>)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" id="cfgTokenSime" class="form-control me-mono"
+                                placeholder="se obtiene automáticamente">
+                            <button class="btn btn-me-line" id="btnTokenSime" type="button">Obtener</button>
+                        </div>
+                        <div class="me-hint mt-1">«Obtener» usa tu sesión de Windows (NTLM). También puedes pegarlo.
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgUser">Usuario CM</label>
+                        <input type="text" id="cfgUser" class="form-control form-control-sm me-mono"
+                            autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgPass">Contraseña CM</label>
+                        <input type="password" id="cfgPass" class="form-control form-control-sm me-mono"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-1 mt-1">
+                        <button class="btn btn-sm btn-me-ink" id="btnLoginCm">Iniciar sesión CM</button>
+                        <button class="btn btn-sm btn-me-line" id="btnTestBss">Probar CM</button>
+                        <button class="btn btn-sm btn-me-line" id="btnTestSime">Probar SIME</button>
+                    </div>
+                    <div class="col-12 me-hint">Las credenciales del CM no se guardan en el archivo; se comparten con
+                        las demás herramientas mientras el navegador esté abierto.</div>
+                </div>
+            </section>
+
+            <!-- 2 · Líneas a consultar: es el paso siguiente natural -->
+            <section data-me-paso="2" data-me-titulo="Líneas a consultar" data-me-abierto="con-sesion">
+                <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Cargar archivo Excel o CSV">
+                    <div class="icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                    <p><strong>Arrastra el Excel (.xlsx) o CSV</strong><br>o haz clic para elegirlo.</p>
+                    <input type="file" id="inputArchivo" accept=".xlsx,.xls,.csv" hidden>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <div class="file-info text-muted flex-grow-1" id="fileInfo"></div>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="btnQuitarArchivo"
+                        title="Quitar el archivo cargado">✕</button>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="me-lbl" for="selHoja">Hoja</label>
+                        <select class="form-select form-select-sm me-mono" id="selHoja" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="selColumna">Columna de líneas</label>
+                        <select class="form-select form-select-sm me-mono" id="selColumna" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="inputLineas">O escribe las líneas</label>
+                        <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="1"
+                            placeholder="301... 302... 303... 304..."></textarea>
+                        <div class="me-hint">Acepta espacios, tabulaciones, saltos de línea, coma, punto y coma.</div>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="cfgParalelo">En paralelo</label>
+                        <input type="number" id="cfgParalelo" class="form-control form-control-sm me-mono" value="10"
+                            min="1" max="100">
+                    </div>
+                    <div class="col-7 d-flex align-items-end">
+                        <button class="btn btn-me w-100" id="btnConsultar">Consultar</button>
+                    </div>
+                </div>
+
+                <div id="progresoWrap" class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="me-mono" id="progresoTexto">Consultando…</small>
+                        <small class="me-mono" id="progresoPct">0%</small>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3 · Registro de la consulta -->
+            <section data-me-paso="3" data-me-titulo="Registro de la consulta" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+                <!-- lo conserva el JS existente para el sello de generación -->
+                <div class="me-hint mt-2 me-mono" id="fechaReporte"></div>
+                <div id="estadoSesion" hidden></div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: filtros + tabla ================= -->
+        <div class="me-trabajo-datos">
+
+            <div class="me-filtros" id="barraFiltros" hidden>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFEstado">Estado SIME</button>
+                    <ul class="dropdown-menu p-2" id="fEstado"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFPestana">Pestaña</button>
+                    <ul class="dropdown-menu p-2" id="fPestana"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFEstadoBss">Estado CM</button>
+                    <ul class="dropdown-menu p-2" id="fEstadoBss"></ul>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFVerif">Verificación</button>
+                    <ul class="dropdown-menu p-2" id="fVerif"></ul>
+                </div>
+                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar filtros <i
+                        class="bi bi-x-circle"></i></button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"><i class="bi bi-layout-three-columns"></i> Columnas</button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2" id="menuColumnas"></ul>
+                </div>
+                <button class="btn btn-sm btn-me-line" id="btnVerOcultas"
+                    title="Mostrar u ocultar las líneas ya revisadas">👁 Ver ocultas (0)</button>
+                <button class="btn btn-sm btn-me-line d-none" id="btnRestaurarOcultas">Restaurar todas</button>
+
+                <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button class="btn btn-sm btn-me-line" id="btnCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+                    <button class="btn btn-sm btn-me-line" id="btnXLSX"><i class="bi bi-file-earmark-excel"></i>
+                        Excel</button>
+                    <button class="btn btn-sm btn-me-line" id="btnJSON"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaLineas" class="table table-striped table-hover align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th>Acción</th>
+                            <th>Línea (MSISDN)</th>
+                            <th>Cédula</th>
+                            <th>Estado SIME</th>
+                            <th>Pestaña</th>
+                            <th>ID suscriptor BSS</th>
+                            <th>Estado BSS</th>
+                            <th>Plan</th>
+                            <th>F. compra SIME</th>
+                            <th>F. compra BSS</th>
+                            <th>Verificación</th>
+                            <th>Periodos</th>
+                            <th>Próxima ejecución</th>
+                            <th>Comentario</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="me-hint p-2" id="msgVacio">
+                    Carga un archivo con la columna <code>linea</code> (o escribe las líneas) y presiona
+                    <strong>Consultar en SIME y CM</strong>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE (idéntico a la v8.1) ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Línea <span id="mdLinea" class="me-mono"></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdLinea"
+                                title="Copiar línea">⧉</button>
+                        </h5>
+                        <div class="mt-1" style="font-size:.8rem;opacity:.85">
+                            AccountID/SuscriptionID (BAN) <span id="mdBan" class="me-mono"></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdBan"
+                                title="Copiar BAN">⧉</button>
+                            <span class="ms-2">· Usuario creación SIME
+                                <span id="mdUsuarioCreacion" class="me-mono">—</span>
+                            </span>
+                            <span id="mdUsuarioUltModWrap" class="ms-2" style="display:none">· Última modificación
+                                <span id="mdUsuarioUltMod" class="me-mono"></span>
+                            </span>
+                        </div>
+                        <div class="mt-1" style="font-size:.8rem;opacity:.85">
+                            Cédula <span id="mdCedula" class="me-mono">—</span>
+                            <button type="button" class="btn-copy" data-copy-target="mdCedula"
+                                title="Copiar cédula">⧉</button>
+                            <span id="mdTitular" class="ms-2" style="opacity:.8"></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mdResumen" class="mb-3"></div>
+
+                    <div id="mdClienteWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Titular de la cuenta <small class="text-muted fw-normal"
+                                id="mdClienteInfo"></small></h6>
+                        <div id="mdCliente" class="ficha-cliente"></div>
+                    </div>
+
+                    <div id="mdCuentasWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Cuentas (BAN) de la línea <small class="text-muted fw-normal"
+                                id="mdCuentasInfo"></small></h6>
+                        <div style="overflow:auto">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.82rem">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>AccountID/SuscriptionID (BAN)</th>
+                                        <th>ID suscriptor</th>
+                                        <th>Estado de la línea</th>
+                                        <th>Estado BSS</th>
+                                        <th>Creado</th>
+                                        <th>Servicios</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mdCuentas"></tbody>
+                            </table>
+                        </div>
+                        <div class="me-hint mt-1">Por defecto se toman los servicios de la cuenta
+                            <strong>activa</strong>.
+                            Puedes cambiarla con «Ver servicios».
+                        </div>
+                    </div>
+
+                    <dl class="dl-grid mb-4" id="mdDatos"></dl>
+
+                    <div id="mdUsoWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Uso y Balance <small class="text-muted fw-normal"
+                                id="mdUsoInfo"></small></h6>
+                        <div id="mdUso" class="uso-grid"></div>
+                    </div>
+
+                    <div id="mdTxWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Movimientos BSS <small class="text-muted fw-normal"
+                                id="mdTxInfo"></small></h6>
+                        <div class="tx-legend">
+                            <span><span class="sw" style="background:#fff3cd"></span>1.ª compra</span>
+                            <span><span class="sw" style="background:#ffe8a3"></span>Compra de paquete</span>
+                            <span><span class="sw" style="background:#ffeede"></span>Compra / ingreso de saldo</span>
+                            <span><span class="sw" style="background:#d1e7dd"></span>Recurrencia</span>
+                            <span><span class="sw" style="background:#f8f9fa"></span>Otro ajuste</span>
+                            <span>▌ borde negro = ciclo vigente</span>
+                        </div>
+                        <div style="max-height:340px;overflow:auto">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.78rem">
+                                <thead>
+                                    <tr>
+                                        <th>Receipt</th>
+                                        <th>Adjustment type</th>
+                                        <th>Categoría</th>
+                                        <th>Fecha</th>
+                                        <th class="text-end">Monto</th>
+                                        <th>Agente</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mdTx"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="mdCrearWrap" class="mb-4">
+                        <h6 class="fw-bold mb-1">Crear en SIME <small class="text-muted fw-normal"
+                                id="mdCrearInfo"></small></h6>
+                        <div id="mdCrearAviso" class="mb-2"></div>
+                        <button class="btn btn-me btn-sm" type="button" id="btnAbrirCrear" data-bs-toggle="collapse"
+                            data-bs-target="#formCrearSime">＋ Crear en SIME</button>
+                        <div class="collapse mt-3" id="formCrearSime">
+                            <div class="lbl-mini mb-1">Valores fijos y calculados (solo lectura)</div>
+                            <div class="crear-fijos mb-3" id="mdCrearFijos"></div>
+                            <div class="row g-2">
+                                <div class="col-12">
+                                    <label class="form-label mb-1 lbl-mini">Tipo de suscripción (plan)
+                                        <span class="der">· campo maestro: al cambiarlo se recalculan canal, ID de tipo
+                                            y PLU</span></label>
+                                    <div class="input-group input-group-sm mb-1">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control form-control-sm" id="crTipoBuscar"
+                                            placeholder="Filtrar: monto, canal o texto…" autocomplete="off">
+                                        <button class="btn btn-outline-secondary" type="button"
+                                            id="btnTipoBuscarLimpiar" title="Limpiar el filtro">✕</button>
+                                    </div>
+                                    <select class="form-select form-select-sm" id="crTipoNombre"></select>
+                                    <div class="form-text d-flex flex-wrap gap-2" style="font-size:.7rem">
+                                        <span id="crTipoCount"></span><span id="crTipoHint"></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1 lbl-mini">Línea (MSISDN) a registrar</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control form-control-sm me-mono" id="crMsisdn">
+                                        <button class="btn btn-outline-secondary" type="button" id="btnMsisdnOriginal"
+                                            title="Volver a la línea consultada">↺</button>
+                                    </div>
+                                    <div class="form-text" id="crMsisdnAviso" style="font-size:.7rem"></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1 lbl-mini">Canal de venta <span class="der">· derivado
+                                            del plan</span></label>
+                                    <select class="form-select form-select-sm" id="crCanal"></select>
+                                    <div class="form-text" id="crCanalHint" style="font-size:.7rem"></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1 lbl-mini">PLU 1.ª compra <span class="der">· derivado
+                                            del plan</span></label>
+                                    <input type="number" class="form-control form-control-sm me-mono" id="crPlu"
+                                        list="dlPlu" placeholder="elige el plan o escríbelo">
+                                    <datalist id="dlPlu"></datalist>
+                                    <div class="form-text" id="crPluHint" style="font-size:.7rem"></div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label mb-1 lbl-mini">ID suscripción Optiva</label>
+                                    <input type="text" class="form-control form-control-sm me-mono" id="crOptiva">
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label mb-1 lbl-mini">Fecha y hora de compra <span
+                                            class="text-muted">(hora Colombia)</span></label>
+                                    <input type="datetime-local" step="1" class="form-control form-control-sm me-mono"
+                                        id="crFechaCompra">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <div class="form-check mb-1">
+                                        <input class="form-check-input" type="checkbox" id="crRecurrente" checked>
+                                        <label class="form-check-label lbl-mini" for="crRecurrente">Recurrente</label>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="crTipoId">
+                                <input type="hidden" id="crUsuario">
+                            </div>
+                            <div id="crRecalc" class="mt-1"></div>
+                            <details class="raw-json mt-3">
+                                <summary>Ver JSON que se enviará</summary>
+                                <pre class="json me-mono mt-2" id="crPayload" style="max-height:220px"></pre>
+                            </details>
+                            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                                <button class="btn btn-me btn-sm" type="button" id="btnCrearSime">Registrar en
+                                    SIME</button>
+                                <span id="crEstado" style="font-size:.82rem"></span>
+                            </div>
+                            <div id="crResultado" class="mt-2"></div>
+                        </div>
+                    </div>
+
+                    <div id="mdRecWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1 d-flex flex-wrap align-items-center gap-2">
+                            <span>Recurrencias de la suscripción</span>
+                            <small class="text-muted fw-normal" id="mdRecInfo"></small>
+                            <button class="btn btn-sm btn-me-line ms-auto" type="button" id="btnRecCargar"
+                                title="Volver a leerlas de SIME">↻ Cargar / actualizar</button>
+                        </h6>
+                        <div id="mdRecAviso" class="form-text" style="font-size:.72rem"></div>
+                        <div style="max-height:300px;overflow:auto">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.78rem">
+                                <thead>
+                                    <tr>
+                                        <th>Nº</th>
+                                        <th>ID recurrencia</th>
+                                        <th>Próxima ejecución</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">PLU</th>
+                                        <th>Inicio / fin ejecución</th>
+                                        <th>Planifica</th>
+                                        <th>Modificaciones</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mdRec"></tbody>
+                            </table>
+                        </div>
+                        <div class="collapse mt-3" id="formEditarRec">
+                            <div class="lbl-mini mb-1">Valores fijos y calculados (solo lectura)</div>
+                            <div class="crear-fijos mb-3" id="mdRecFijos"></div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1 lbl-mini">Próxima ejecución <span
+                                            class="text-muted">(hora Colombia)</span></label>
+                                    <input type="datetime-local" step="1" class="form-control form-control-sm me-mono"
+                                        id="reFecha">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label mb-1 lbl-mini">Nº de recurrencia</label>
+                                    <input type="number" min="1" step="1" class="form-control form-control-sm me-mono"
+                                        id="reNumero">
+                                    <div class="form-text" id="reNumeroAviso" style="font-size:.7rem"></div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label mb-1 lbl-mini">Qué se va a cambiar</label>
+                                    <div class="form-text mt-0" id="reDiff" style="font-size:.72rem"></div>
+                                </div>
+                            </div>
+                            <details class="raw-json mt-3">
+                                <summary>Ver JSON que se enviará</summary>
+                                <pre class="json me-mono mt-2" id="rePayload" style="max-height:200px"></pre>
+                            </details>
+                            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                                <button class="btn btn-me btn-sm" type="button" id="btnGuardarRec">Guardar
+                                    recurrencia</button>
+                                <button class="btn btn-me-line btn-sm" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#formEditarRec">Cancelar</button>
+                                <span id="reEstado" style="font-size:.82rem"></span>
+                            </div>
+                            <div id="reResultado" class="mt-2"></div>
+                        </div>
+                    </div>
+
+                    <details id="mdCiclosWrap" style="display:none" class="mb-4">
+                        <summary class="fw-bold">Ciclos del plan <small class="text-muted fw-normal"
+                                id="mdCiclosInfo"></small></summary>
+                        <div style="overflow:auto" class="mt-2">
+                            <table class="table table-sm table-bordered mb-0 tbl-ciclos">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Compra</th>
+                                        <th>Cobertura</th>
+                                        <th class="text-end">Monto</th>
+                                        <th>Mes del plan</th>
+                                        <th class="text-end">Consumidos</th>
+                                        <th class="text-end">Restantes</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mdCiclos"></tbody>
+                            </table>
+                        </div>
+                    </details>
+
+                    <h6 class="fw-bold">Respuesta SIME <small
+                            class="text-muted fw-normal">(GetSuscripcionPresentePaginador)</small></h6>
+                    <div id="mdTablaSime" class="mb-2"></div>
+                    <details class="raw-json mb-4">
+                        <summary>Ver JSON crudo de SIME</summary>
+                        <pre class="json me-mono mt-2" id="mdJsonSime"></pre>
+                    </details>
+
+                    <h6 class="fw-bold">Respuesta BSS <small class="text-muted fw-normal">(/api/v1/subscribers)</small>
+                    </h6>
+                    <div id="mdTablaBss" class="mb-2"></div>
+                    <details class="raw-json">
+                        <summary>Ver JSON crudo de BSS</summary>
+                        <pre class="json me-mono mt-2" id="mdJsonBss"></pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+    <!-- 1 · Shell común: se monta antes que todo lo demás -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "prepagadas",
+            version: "9.3",
+            doc: "../doc/reporte-prepagadas/README.md",
+            titulo: "Prepagadas · SIME ⇄ CM",
+            descripcion: "Verificación cruzada y alta de suscripciones",
+            sesiones: ["sime", "cm"],
+            instrucciones: [
+                "1 · Conexión: si los chips de arriba están en verde ya hay sesión. Si no, obtén el token de SIME e inicia sesión en el CM.",
+                "2 · Líneas: arrastra el Excel (o pega las líneas separadas por coma, espacio, «;» o «|») y presiona Consultar.",
+                "3 · Revisa la tabla: haz clic en una fila para ver el detalle, crear la suscripción en SIME o editar recurrencias.",
+                "4 · Usa las tarjetas de arriba y los filtros para acotar, y exporta con CSV / Excel / JSON lo que quede a la vista.",
+                "Atajo: Enter en el campo de líneas lanza la consulta."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM (compartido con las otras herramientas) -->
+    <script src="../assets/me-api.js"></script>
+
+    <!-- 3 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-prepagadas.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-prepagadas-puente.js"></script>
+</body>
+
+</html>

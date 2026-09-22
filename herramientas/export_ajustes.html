@@ -1,0 +1,329 @@
+<!-- export_ajustes.html · v2.1.0
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js      marco visual, tablas, registro,
+                                        exportación
+       assets/me-api.js                 Keycloak, auth y GET al CM
+       assets/logica-ajustes.js         consulta, catálogos y columnas
+       assets/me-ajustes-puente.js      enganche con el shell
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Ajustes y paquetes</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
+
+        /* Etiquetas de estado / actividad dentro de las tablas */
+        .tag {
+            font-size: .7rem;
+            padding: .1rem .5rem;
+            border-radius: 999px;
+            border: 1px solid;
+            display: inline-block;
+            line-height: 1.6;
+            white-space: nowrap;
+        }
+
+        .tag.up,
+        .tag.ok {
+            color: var(--me-ok);
+            border-color: #A9D3C3;
+            background: #EEF7F3;
+        }
+
+        .tag.down,
+        .tag.bad {
+            color: var(--me-err);
+            border-color: #E5BBAE;
+            background: #FBF0EC;
+        }
+
+        .tag.mid {
+            color: #8A6D1F;
+            border-color: #E2CF9C;
+            background: #FDF7E6;
+        }
+
+        td.num {
+            text-align: right;
+        }
+
+        /* Pestañas Dinero / Paquetes */
+        .me-tabs {
+            border-bottom: 1px solid var(--me-borde);
+            gap: .2rem;
+        }
+
+        .me-tabs .nav-link {
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: .45rem .45rem 0 0;
+            color: var(--me-suave);
+            font-weight: 600;
+            font-size: .86rem;
+            padding: .4rem .9rem;
+        }
+
+        .me-tabs .nav-link.active {
+            background: #fff;
+            border-color: var(--me-borde);
+            color: var(--me-tinta);
+        }
+
+        /* Editor de catálogos */
+        .catalogo {
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            background: #FBFAF6;
+            padding: .5rem;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi ok" style="cursor:default">
+            <div class="n" id="cMoney">0</div>
+            <div class="lbl">Ajustes de dinero</div>
+        </div>
+        <div class="me-kpi neutro" style="cursor:default">
+            <div class="n" id="cBundle">0</div>
+            <div class="lbl">Ajustes de paquetes</div>
+        </div>
+        <div class="me-kpi warn" style="cursor:default">
+            <div class="n" id="sumaCop" style="font-size:1.3rem">$0</div>
+            <div class="lbl">Suma de los ajustes de dinero</div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión -->
+            <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="user">Usuario</label>
+                        <input class="form-control form-control-sm me-mono" id="user" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="pass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="pass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
+                    </div>
+                    <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas: si
+                        ya iniciaste sesión en otra pestaña, llegan solas.</div>
+                </div>
+            </section>
+
+            <!-- 2 · Qué se descarga -->
+            <section data-me-paso="2" data-me-titulo="Qué se descarga" data-me-abierto="con-sesion">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="fromDate">Desde</label>
+                        <input id="fromDate" type="date" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="toDate">Hasta</label>
+                        <input id="toDate" type="date" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="statusId">Estado</label>
+                        <select id="statusId" class="form-select form-select-sm">
+                            <option value="">Todos los estados</option>
+                            <option value="APPROVED">APPROVED</option>
+                            <option value="REJECTED">REJECTED</option>
+                            <option value="CREATED">CREATED</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="FAILED">FAILED</option>
+                            <option value="PENDING_APPROVAL">PENDING APPROVAL</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="offset">Offset inicial</label>
+                        <input id="offset" type="number" min="1" value="1" class="form-control form-control-sm me-mono">
+                        <div class="me-hint">1 = primero. Sirve para reanudar una descarga interrumpida.</div>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="limit">Límite (1–100)</label>
+                        <input id="limit" type="number" min="1" max="100" value="100"
+                            class="form-control form-control-sm me-mono">
+                    </div>
+                    <div class="col-7">
+                        <label class="me-lbl" for="pageMode">Páginas</label>
+                        <select id="pageMode" class="form-select form-select-sm">
+                            <option value="all">Todas las páginas</option>
+                            <option value="one">Solo una página</option>
+                        </select>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="maxPages">Máx. páginas</label>
+                        <input id="maxPages" type="number" min="1" value="50"
+                            class="form-control form-control-sm me-mono">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="resolveMsisdn" checked>
+                            <label class="form-check-label small" for="resolveMsisdn">Consultar número y CC de cada
+                                cuenta</label>
+                        </div>
+                        <div class="me-hint">Resuelve la línea y sube por la cadena de cuentas hasta encontrar el
+                            documento del titular. Con muchos registros la descarga tarda más.</div>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-1 mt-1">
+                        <button id="btnMoney" class="btn btn-sm btn-me" type="button">Descargar ajustes de
+                            dinero</button>
+                        <button id="btnBundle" class="btn btn-sm btn-me-ink" type="button">Descargar paquetes</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3 · Catálogos -->
+            <section data-me-paso="3" data-me-titulo="Catálogos de códigos" data-me-abierto="nunca">
+                <div class="me-hint mb-2">Traducen los códigos que devuelve el CM en las columnas «Motivo del ajuste»,
+                    «Tipo» y «Categoría». Se guardan en este navegador.</div>
+
+                <label class="me-lbl">Motivo (reasonCode)</label>
+                <div id="editorReason" class="catalogo"></div>
+                <button type="button" class="btn btn-sm btn-me-line mt-1 w-100"
+                    onclick="addCatalogRow('reason')">+ Agregar motivo</button>
+
+                <label class="me-lbl mt-3">Tipo (type)</label>
+                <div id="editorType" class="catalogo"></div>
+                <button type="button" class="btn btn-sm btn-me-line mt-1 w-100"
+                    onclick="addCatalogRow('type')">+ Agregar tipo</button>
+
+                <label class="me-lbl mt-3">Categoría (category)</label>
+                <div id="editorCategory" class="catalogo"></div>
+                <button type="button" class="btn btn-sm btn-me-line mt-1 w-100"
+                    onclick="addCatalogRow('category')">+ Agregar categoría</button>
+
+                <div class="d-flex gap-1 mt-3">
+                    <button class="btn btn-sm btn-me" id="btnApplyMaps" type="button">Guardar catálogos</button>
+                    <button class="btn btn-sm btn-me-line" id="btnResetMaps" type="button">Restaurar</button>
+                </div>
+            </section>
+
+            <!-- 4 · Registro -->
+            <section data-me-paso="4" data-me-titulo="Registro de la descarga" data-me-abierto="nunca">
+                <div id="log" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: tablas ================= -->
+        <div class="me-trabajo-datos">
+
+            <ul class="nav me-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tabMoney" data-bs-toggle="tab" data-bs-target="#paneMoney"
+                        type="button" role="tab">Ajustes de dinero</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tabBundle" data-bs-toggle="tab" data-bs-target="#paneBundle"
+                        type="button" role="tab">Paquetes</button>
+                </li>
+                <li class="nav-item ms-auto d-flex align-items-center gap-1">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button id="btnCsv" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-csv"></i>
+                        CSV</button>
+                    <button id="btnXlsx" class="btn btn-sm btn-me-line" type="button"><i
+                            class="bi bi-file-earmark-excel"></i> Excel</button>
+                    <button id="btnJson" class="btn btn-sm btn-me-line" type="button"><i
+                            class="bi bi-filetype-json"></i> JSON</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="paneMoney" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblMoney" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioMoney">
+                            Elige el rango en el paso <strong>2</strong> y presiona <strong>Descargar ajustes de
+                                dinero</strong>. Se exporta lo que quede en esta pestaña.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="paneBundle" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblBundle" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioBundle">
+                            Presiona <strong>Descargar paquetes</strong>. Si dejas marcada la casilla del número, se
+                            consulta la línea de cada cuenta y la descarga tarda más.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "ajustes",
+            version: "2.1.0",
+            doc: "../doc/reporte-ajustes/README.md",
+            titulo: "Ajustes y paquetes",
+            descripcion: "Reporte de ajustes del CM · Optiva",
+            sesiones: ["cm"],
+            instrucciones: [
+                "1 · Conexión: el chip de arriba muestra la sesión del CM. Si está en gris, inicia sesión en el paso 1.",
+                "2 · Elige el rango de fechas y el estado, y descarga «ajustes de dinero» o «paquetes».",
+                "3 · Los catálogos traducen los códigos de motivo, tipo y categoría; puedes editarlos y quedan guardados.",
+                "4 · Exporta con CSV / Excel / JSON: se exporta la pestaña que estés viendo.",
+                "Número y CC requieren consultas adicionales por cuenta: desmárcalo si solo necesitas los montos."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM (compartido con las otras herramientas) -->
+    <script src="../assets/me-api.js"></script>
+
+    <!-- 3 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-ajustes.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-ajustes-puente.js"></script>
+</body>
+
+</html>

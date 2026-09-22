@@ -1,0 +1,808 @@
+<!-- reporte_consumos.html · v1.7.0
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js      marco visual, sesión, registro,
+                                        tablas, importación y exportación
+       assets/me-api.js                 Keycloak, auth y consultas al CM
+       assets/logica-consumos.js        reglas de negocio de esta herramienta
+       assets/me-consumos-puente.js     enganche entre la lógica y el shell
+
+     A diferencia de reporte_prepagadas.html, esta herramienta NO habla con
+     SIME: solo consulta el CM (Optiva) para traer datos de la línea, sus
+     paquetes (uso y balance) y el histórico de consumo (CDR) por rango de
+     fechas, con gráficas y exportación.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Consumos y Paquetes · CM</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Sistema de diseño común a las herramientas -->
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    <style>
+        /* ---------------------------------------------------------------
+           Estilos propios de ESTA herramienta.
+           Todo lo estructural (shell, tablas, pasos, log) vive en me-ui.css.
+        --------------------------------------------------------------- */
+
+        .me-kpi.kpi-activo {
+            box-shadow: inset 0 0 0 2px var(--me-negro);
+        }
+
+        .badge-estado {
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border-radius: .35rem;
+            padding: .3em .55em;
+            white-space: nowrap;
+        }
+
+        .badge-estado.ok {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .badge-estado.off {
+            background: #ECECEA;
+            color: var(--me-off);
+        }
+
+        .badge-estado.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .badge-estado.info {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .badge-estado.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .badge-estado.neutro {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        .dropzone {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: 1.1rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .dropzone .icon {
+            font-size: 1.4rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+            font-size: .8rem;
+            color: #5C5C57;
+        }
+
+        .file-info {
+            font-family: var(--me-mono);
+            font-size: .74rem;
+        }
+
+        td.col-accion {
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        /* Modal de detalle */
+        .modal-header {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .modal-header .modal-title {
+            font-weight: 800;
+        }
+
+        .modal-header .modal-title span {
+            color: var(--me-amarillo);
+        }
+
+        .dl-grid {
+            display: grid;
+            grid-template-columns: 210px 1fr;
+            gap: .25rem .9rem;
+            font-size: .82rem;
+        }
+
+        .dl-grid dt {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .dl-grid dd {
+            font-family: var(--me-mono);
+            margin: 0;
+            word-break: break-all;
+        }
+
+        /* Paquetes (uso y balance) — mismo lenguaje visual que Prepagadas */
+        .uso-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: .6rem;
+        }
+
+        .uso-grupo {
+            grid-column: 1/-1;
+            font-weight: 700;
+            font-size: .82rem;
+            margin: .4rem 0 -.15rem;
+            display: flex;
+            gap: .5rem;
+            align-items: center;
+        }
+
+        .uso-grupo .uso-tot {
+            font-weight: 400;
+            color: var(--me-suave);
+            font-size: .76rem;
+        }
+
+        .uso-item {
+            border: 1px solid var(--me-borde);
+            border-radius: .5rem;
+            padding: .6rem .7rem;
+            background: #fff;
+        }
+
+        .uso-item .uso-name {
+            font-size: .82rem;
+            font-weight: 600;
+            display: block;
+        }
+
+        .uso-item .uso-val {
+            font-family: var(--me-mono);
+            font-size: .82rem;
+        }
+
+        .uso-item .uso-val .rem {
+            font-weight: 700;
+        }
+
+        .uso-item .uso-val .lim {
+            color: var(--me-suave);
+        }
+
+        .uso-item .uso-lbl {
+            font-size: .62rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #9a9a94;
+        }
+
+        .uso-item .bar {
+            height: 7px;
+            border-radius: 4px;
+            background: #EBEAE4;
+            overflow: hidden;
+            margin: .4rem 0 .25rem;
+        }
+
+        .uso-item .bar .fill {
+            height: 100%;
+        }
+
+        .uso-item .fill.lvl-ok {
+            background: #198754;
+        }
+
+        .uso-item .fill.lvl-mid {
+            background: #fd7e14;
+        }
+
+        .uso-item .fill.lvl-hi {
+            background: #dc3545;
+        }
+
+        .uso-celda-disp {
+            font-size: .72rem;
+            font-family: var(--me-mono);
+            color: var(--me-suave);
+        }
+
+        .uso-nota {
+            font-size: .68rem;
+            color: var(--me-suave);
+        }
+
+        .uso-item .uso-disp {
+            font-size: .78rem;
+            font-family: var(--me-mono);
+            margin-bottom: .15rem;
+        }
+
+        .uso-item .uso-disp strong {
+            font-weight: 700;
+        }
+
+        .uso-item .uso-sub {
+            font-size: .7rem;
+            color: var(--me-suave);
+            font-family: var(--me-mono);
+            display: flex;
+            justify-content: space-between;
+            gap: .5rem;
+        }
+
+        .uso-item.vencido {
+            opacity: .6;
+        }
+
+        .uso-item .badge-venc {
+            color: #dc3545;
+        }
+
+        /* Histórico de consumo */
+        .lbl-mini {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--me-suave);
+        }
+
+        .lbl-mini .der {
+            text-transform: none;
+            letter-spacing: 0;
+            color: #9a9a94;
+        }
+
+        .hist-tipo-btn.active {
+            background: var(--me-negro);
+            color: #fff;
+            border-color: var(--me-negro);
+        }
+
+        #tablaHistorico tr.shown td {
+            box-shadow: inset 0 -1px 0 var(--me-borde);
+        }
+
+        #tablaHistorico tr.child td {
+            background: #FAFAF7;
+            padding: .7rem .9rem;
+        }
+
+        /* Movimientos (compras, paquetes, recurrencias) */
+        tr.tx-primera {
+            --bs-table-bg: #fff3cd;
+        }
+
+        tr.tx-compraPlan {
+            --bs-table-bg: #ffe8a3;
+        }
+
+        tr.tx-compra {
+            --bs-table-bg: #ffeede;
+        }
+
+        tr.tx-recurrencia {
+            --bs-table-bg: #d1e7dd;
+        }
+
+        tr.tx-otro {
+            --bs-table-bg: #f8f9fa;
+            color: #6c757d;
+        }
+
+        tr.tx-vigente {
+            box-shadow: inset 3px 0 0 var(--me-negro);
+        }
+
+        .tx-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem .9rem;
+            font-size: .72rem;
+            color: #5C5C57;
+            margin: .35rem 0 .5rem;
+        }
+
+        .tx-legend .sw {
+            display: inline-block;
+            width: .85em;
+            height: .85em;
+            border-radius: 3px;
+            border: 1px solid var(--me-borde);
+            vertical-align: -1px;
+            margin-right: .3em;
+        }
+
+        .chip-vigencia {
+            display: inline-block;
+            font-size: .66rem;
+            font-weight: 600;
+            border-radius: 999px;
+            padding: .1em .55em;
+            white-space: nowrap;
+        }
+
+        .chip-vigencia.mes {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .chip-vigencia.vigente {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .cdr-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: .6rem;
+            margin: .8rem 0;
+        }
+
+        .cdr-kpi {
+            border: 1px solid var(--me-borde);
+            border-radius: .5rem;
+            padding: .55rem .75rem;
+            background: #fff;
+        }
+
+        .cdr-kpi .n {
+            font-size: 1.2rem;
+            font-weight: 800;
+            font-family: var(--me-mono);
+            display: block;
+        }
+
+        .cdr-kpi .lbl {
+            font-size: .68rem;
+            color: var(--me-suave);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .cdr-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .cdr-chart-wrap {
+            position: relative;
+            height: 230px;
+            border: 1px solid var(--me-borde);
+            border-radius: .5rem;
+            padding: .6rem;
+            background: #fff;
+        }
+
+        #barraFiltros .dropdown-menu {
+            max-height: 280px;
+            overflow: auto;
+            min-width: 220px;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--me-negro);
+            border-color: var(--me-negro);
+        }
+
+        #progresoWrap {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN (tarjetas = filtros rápidos) ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi neutro" style="cursor:default">
+            <div class="n" id="kpiTotal">0</div>
+            <div class="lbl">Líneas consultadas</div>
+        </div>
+        <div class="me-kpi ok kpi-click" data-fdim="estado" data-fval="Activo">
+            <div class="n" id="kpiActivas">0</div>
+            <div class="lbl">Activas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro kpi-click" data-fdim="estado" data-fval="SIN_CM">
+            <div class="n" id="kpiSinCm">0</div>
+            <div class="lbl">Sin datos en el CM<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err kpi-click" data-fdim="estado" data-fval="ERROR,INVALID">
+            <div class="n" id="kpiErrores">0</div>
+            <div class="lbl">Errores<small>filtrar ▸</small></div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión (solo CM: esta herramienta no usa SIME) -->
+            <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="user">Usuario</label>
+                        <input class="form-control form-control-sm me-mono" id="user" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="pass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="pass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
+                    </div>
+                    <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas: si
+                        ya iniciaste sesión en otra pestaña, llegan solas.</div>
+                </div>
+            </section>
+
+            <!-- 2 · Líneas a consultar -->
+            <section data-me-paso="2" data-me-titulo="Líneas a consultar" data-me-abierto="con-sesion">
+                <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Cargar archivo Excel o CSV">
+                    <div class="icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                    <p><strong>Arrastra el Excel (.xlsx) o CSV</strong><br>o haz clic para elegirlo.</p>
+                    <input type="file" id="inputArchivo" accept=".xlsx,.xls,.csv" hidden>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <div class="file-info text-muted flex-grow-1" id="fileInfo"></div>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="btnQuitarArchivo"
+                        title="Quitar el archivo cargado">✕</button>
+                </div>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="me-lbl" for="selHoja">Hoja</label>
+                        <select class="form-select form-select-sm me-mono" id="selHoja" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="selColumna">Columna de líneas</label>
+                        <select class="form-select form-select-sm me-mono" id="selColumna" disabled>
+                            <option value="">— carga un archivo —</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="inputLineas">O escribe las líneas</label>
+                        <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="1"
+                            placeholder="301... 302... 303... 304..."></textarea>
+                        <div class="me-hint">Acepta espacios, tabulaciones, saltos de línea, coma o punto y coma.</div>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="cfgParalelo">En paralelo</label>
+                        <input type="number" id="cfgParalelo" class="form-control form-control-sm me-mono" value="8"
+                            min="1" max="15">
+                    </div>
+                    <div class="col-7 d-flex align-items-end">
+                        <button class="btn btn-me w-100" id="btnConsultar">Consultar</button>
+                    </div>
+                </div>
+
+                <div id="progresoWrap" class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="me-mono" id="progresoTexto">Consultando…</small>
+                        <small class="me-mono" id="progresoPct">0%</small>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3 · Registro -->
+            <section data-me-paso="3" data-me-titulo="Registro de la consulta" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: filtros + tabla ================= -->
+        <div class="me-trabajo-datos">
+
+            <div class="me-filtros" id="barraFiltros" hidden>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside" id="btnFEstado">Estado</button>
+                    <ul class="dropdown-menu p-2" id="fEstado"></ul>
+                </div>
+                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar filtros <i
+                        class="bi bi-x-circle"></i></button>
+
+                <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button class="btn btn-sm btn-me-line" id="btnCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+                    <button class="btn btn-sm btn-me-line" id="btnXLSX"><i class="bi bi-file-earmark-excel"></i>
+                        Excel</button>
+                    <button class="btn btn-sm btn-me-line" id="btnJSON"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaLineas" class="table table-striped table-hover align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th>Línea (MSISDN)</th>
+                            <th>Estado</th>
+                            <th>Identificación</th>
+                            <th>Titular</th>
+                            <th>SubscriptionID</th>
+                            <th>Cuenta (BAN)</th>
+                            <th>Price Plan</th>
+                            <th>Paquetes activos</th>
+                            <th>Datos (consumido / total)</th>
+                            <th>Voz (consumido / total)</th>
+                            <th>SMS (consumido / total)</th>
+                            <th>Consumo</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="me-hint p-2" id="msgVacio">
+                    Escribe una o varias líneas (o carga un Excel/CSV) y presiona <strong>Consultar</strong>. Se
+                    trae la línea, sus paquetes activos y — al abrir el detalle — su histórico de consumo.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdMsisdn"
+                                title="Copiar línea">⧉</button>
+                        </h5>
+                        <div class="mt-1" style="font-size:.8rem;opacity:.85">
+                            CC <span id="mdCc" class="me-mono">—</span>
+                            <button type="button" class="btn-copy" data-copy-target="mdCc"
+                                title="Copiar identificación">⧉</button>
+                            <span class="ms-3"></span>
+                            SubscriptionID <span id="mdSubId" class="me-mono">—</span>
+                            <button type="button" class="btn-copy" data-copy-target="mdSubId"
+                                title="Copiar SubscriptionID">⧉</button>
+                            <span class="ms-3">Cuenta (BAN) <span id="mdBan" class="me-mono">—</span></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdBan"
+                                title="Copiar cuenta (BAN)">⧉</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mdResumen" class="mb-3"></div>
+
+                    <h6 class="fw-bold">Datos de la línea</h6>
+                    <dl class="dl-grid mb-4" id="mdDatos"></dl>
+
+                    <div id="mdCuentasWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Otras cuentas (BAN) de la línea</h6>
+                        <div class="me-hint mb-1">Los paquetes y el histórico se muestran de la cuenta en uso.</div>
+                        <div style="overflow:auto">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.82rem">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Cuenta (BAN)</th>
+                                        <th>SubscriptionID</th>
+                                        <th>Estado</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mdCuentas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="mdUsoWrap" style="display:none" class="mb-4">
+                        <h6 class="fw-bold mb-1">Paquetes · Uso y Balance <small class="text-muted fw-normal"
+                                id="mdUsoInfo"></small></h6>
+                        <div id="mdUso" class="uso-grid"></div>
+                    </div>
+
+                    <div id="mdHistWrap" style="display:none">
+                        <h6 class="fw-bold mb-1">Movimientos y consumo del período</h6>
+                        <div class="row g-2 align-items-end mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1 lbl-mini" for="mdHistDesde">Desde <span
+                                        class="text-muted">(hora Colombia)</span></label>
+                                <input type="datetime-local" step="1" class="form-control form-control-sm me-mono"
+                                    id="mdHistDesde">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1 lbl-mini" for="mdHistHasta">Hasta <span
+                                        class="text-muted">(hora Colombia)</span></label>
+                                <input type="datetime-local" step="1" class="form-control form-control-sm me-mono"
+                                    id="mdHistHasta">
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-me btn-sm w-100" type="button" id="mdHistActualizar">↻
+                                    Consultar movimientos y consumo</button>
+                            </div>
+                        </div>
+                        <div class="me-hint mb-2">Por defecto trae el mes en curso, hasta 1.000 registros cada uno.
+                            Cambia el rango y presiona «Consultar» para actualizar los dos a la vez.</div>
+
+                        <div class="me-hint mb-3" id="mdHistEstado"></div>
+
+                        <!-- ============ MOVIMIENTOS (compras, paquetes, recurrencias) ============ -->
+                        <h6 class="fw-bold mb-1">Movimientos <small class="text-muted fw-normal">— compras,
+                                paquetes y otros ajustes (CM)</small></h6>
+                        <div class="tx-legend">
+                            <span><span class="sw" style="background:#fff3cd"></span>1.ª compra</span>
+                            <span><span class="sw" style="background:#ffe8a3"></span>Compra de paquete</span>
+                            <span><span class="sw" style="background:#ffeede"></span>Compra / ingreso</span>
+                            <span><span class="sw" style="background:#d1e7dd"></span>Recurrencia</span>
+                            <span><span class="sw" style="background:#f8f9fa"></span>Otro ajuste</span>
+                            <span>▌ borde negro = vigente (la más reciente de su categoría en el período)</span>
+                        </div>
+                        <div class="cdr-kpis">
+                            <div class="cdr-kpi"><span class="n" id="mdMovKpiTotal">—</span><span
+                                    class="lbl">Movimientos</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdMovKpiCompras">—</span><span class="lbl">Compras
+                                    / paquetes</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdMovKpiMonto">—</span><span class="lbl">Monto
+                                    total</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdMovKpiVigentes">—</span><span
+                                    class="lbl">Vigentes</span></div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <span class="lbl-mini me-auto">Detalle de movimientos</span>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-me-line dropdown-toggle" data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside">Categoría</button>
+                                <ul class="dropdown-menu p-2" id="fMovCategoria" style="max-height:280px;overflow:auto"></ul>
+                            </div>
+                            <button class="btn btn-sm btn-me-line" id="mdMovCSV" type="button"><i
+                                    class="bi bi-filetype-csv"></i> CSV</button>
+                            <button class="btn btn-sm btn-me-line" id="mdMovXLSX" type="button"><i
+                                    class="bi bi-file-earmark-excel"></i> Excel</button>
+                            <button class="btn btn-sm btn-me-line" id="mdMovJSON" type="button"><i
+                                    class="bi bi-filetype-json"></i> JSON</button>
+                        </div>
+                        <div class="me-tabla-panel mb-4" data-me-alto="fijo" style="height:30vh">
+                            <table id="tablaMovimientos" class="table table-sm table-striped table-hover w-100">
+                            </table>
+                            <div class="me-hint p-2" id="mdMovVacio">Sin movimientos en el rango / categoría
+                                elegidos.</div>
+                        </div>
+
+                        <!-- ============ CONSUMO (CDR: llamadas, datos, SMS) ============ -->
+                        <h6 class="fw-bold mb-1">Consumo <small class="text-muted fw-normal">— llamadas, datos y
+                                SMS</small></h6>
+                        <div class="lbl-mini mb-1">Resumen del período <span
+                                class="der">— filtro actual: <strong class="hist-tipo-actual">Todos</strong>,
+                                se ajusta con el filtro de abajo (afecta también las gráficas y la
+                                exportación)</span>
+                        </div>
+                        <div class="cdr-kpis">
+                            <div class="cdr-kpi"><span class="n" id="mdKpiDatos">—</span><span class="lbl">Datos
+                                    consumidos</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdKpiVoz">—</span><span class="lbl">Voz
+                                    consumida</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdKpiSms">—</span><span class="lbl">SMS
+                                    enviados</span></div>
+                            <div class="cdr-kpi"><span class="n" id="mdKpiRegistros">—</span><span
+                                    class="lbl">Registros</span></div>
+                        </div>
+
+                        <div class="cdr-charts">
+                            <div class="cdr-chart-wrap"><canvas id="mdChartBarras"></canvas></div>
+                            <div class="cdr-chart-wrap"><canvas id="mdChartTorta"></canvas></div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <span class="lbl-mini me-auto">Detalle de consumo</span>
+                            <div class="btn-group btn-group-sm" role="group" id="mdHistTipo"
+                                aria-label="Filtro por tipo — aplica a la tabla, las gráficas y la exportación">
+                                <button type="button" class="btn btn-outline-dark hist-tipo-btn active"
+                                    data-tipo="TODOS">Todos</button>
+                                <button type="button" class="btn btn-outline-dark hist-tipo-btn"
+                                    data-tipo="DATOS">Datos</button>
+                                <button type="button" class="btn btn-outline-dark hist-tipo-btn"
+                                    data-tipo="VOZ">Voz</button>
+                                <button type="button" class="btn btn-outline-dark hist-tipo-btn"
+                                    data-tipo="SMS">SMS</button>
+                            </div>
+                            <button class="btn btn-sm btn-me-line" id="mdHistCSV" type="button"><i
+                                    class="bi bi-filetype-csv"></i> CSV</button>
+                            <button class="btn btn-sm btn-me-line" id="mdHistXLSX" type="button"><i
+                                    class="bi bi-file-earmark-excel"></i> Excel</button>
+                            <button class="btn btn-sm btn-me-line" id="mdHistJSON" type="button"><i
+                                    class="bi bi-filetype-json"></i> JSON</button>
+                        </div>
+                        <div class="me-hint mb-2">El filtro por tipo, la tabla de abajo y los botones CSV / Excel /
+                            JSON siempre muestran <strong>lo mismo</strong>: lo que exportas es exactamente lo que
+                            ves.</div>
+                        <div class="me-tabla-panel" data-me-alto="fijo" style="height:38vh">
+                            <table id="tablaHistorico" class="table table-sm table-striped table-hover w-100">
+                            </table>
+                            <div class="me-hint p-2" id="mdHistVacio">Sin registros en el rango / tipo elegidos.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+
+    <!-- 1 · Shell común: se monta antes que todo lo demás -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "consumos",
+            version: "1.7.0",
+            doc: "../doc/reporte-consumos/README.md",
+            titulo: "Consumos y Paquetes · CM",
+            descripcion: "Datos de la línea, paquetes activos e histórico de consumo (CDR) por rango de fechas",
+            sesiones: ["cm"],
+            instrucciones: [
+                "1 · Conexión: el chip de arriba muestra la sesión del CM. Si está en gris, inicia sesión en el paso 1.",
+                "2 · Líneas: escribe una o varias (separadas por espacio, coma, «;» o salto de línea) o carga un Excel/CSV, y presiona Consultar.",
+                "3 · La tabla trae la línea, su cuenta y sus paquetes activos. Haz clic en una fila para ver el detalle.",
+                "4 · En el detalle: movimientos y consumo cargan por defecto el mes en curso (máx. 1.000 cada uno). Cambia el rango de fechas y presiona «Consultar» para actualizar los dos a la vez.",
+                "5 · Movimientos: compras, paquetes y otros ajustes, con el mismo color por categoría que Prepagadas. Las filas con borde negro son la más reciente de su categoría en el período (vigente); la columna Vigencia además marca las del mes en curso. Filtra por categoría con el dropdown de arriba de la tabla.",
+                "6 · Consumo: el filtro Todos / Datos / Voz / SMS está justo encima de la tabla de registros y de los botones de exportación: mueve tarjetas, gráficas, tabla y exportación a la vez, sin volver a consultar el CM.",
+                "7 · Cada registro de consumo trae origen y destino por separado, y para llamadas/SMS la dirección MO (originada por la línea) o MT (terminada en la línea). El botón 👁 de cada fila abre el detalle completo del registro.",
+                "8 · Exporta con CSV / Excel / JSON: en la barra superior exportas la tabla de líneas; dentro del detalle, movimientos y consumo tienen cada uno sus propios botones, con el filtro que tengan puesto.",
+                "Esta herramienta no consulta SIME ni recurrencias/ciclos: los movimientos se traen del mismo endpoint que \"Movimientos BSS\" de Prepagadas, pero acotados al rango de fechas elegido, no todo el historial.",
+                "Atajo: Enter en el campo de líneas lanza la consulta."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM (compartido con las otras herramientas) -->
+    <script src="../assets/me-api.js"></script>
+
+    <!-- 3 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-consumos.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-consumos-puente.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,674 @@
+<!-- reporte_casos_masivos.html · v3.2
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js     marco visual, sesión, registro,
+                                       tablas, importación y exportación
+       assets/me-api.js                Keycloak, auth y llamadas al CM
+       assets/logica-casos.js          reglas del cierre masivo
+       assets/me-casos-puente.js       enganche entre la lógica y el shell
+
+     v3.0 · La columna «Favorable» decide qué se hace con el ticket:
+            Sí → cierre favorable · No → cierre desfavorable ·
+            vacía + nota → solo se agrega la nota, sin tocar título ni estado.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Cierre masivo de casos</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
+
+        /* Celdas editables dentro de la tabla */
+        .celda-edit {
+            min-width: 150px;
+            font-size: 13px;
+            padding: .15rem .35rem;
+        }
+
+        .celda-edit.ancha {
+            min-width: 300px;
+        }
+
+        .celda-edit.editada {
+            border-color: #0d6efd;
+            background: #F2F7FF;
+        }
+
+        /* Título de una fila «solo nota»: no se toca, así que no se edita */
+        .celda-edit[readonly] {
+            background: #F5F4F0;
+            color: #75756F;
+            cursor: not-allowed;
+        }
+
+        .badge-est {
+            font-weight: 600;
+            font-size: .7rem;
+        }
+
+        tr.fila-oculta td {
+            opacity: .5;
+        }
+
+        /* Zona de carga: arrastrar y soltar */
+        .dropzone {
+            border: 2px dashed var(--me-borde-2);
+            border-radius: .5rem;
+            background: #FCFBF8;
+            padding: 1.1rem .8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag {
+            border-color: var(--me-negro);
+            background: #FFFBE6;
+        }
+
+        .dropzone .icon {
+            font-size: 1.4rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+            font-size: .8rem;
+            color: #5C5C57;
+        }
+
+        .file-info {
+            font-family: var(--me-mono);
+            font-size: .74rem;
+        }
+
+        /* Campo obligatorio todavía sin llenar (nota de un caso que sí se cierra) */
+        .celda-edit.falta {
+            border-color: var(--me-err);
+            background: #FFF6F5;
+        }
+
+        /* Vista previa del archivo */
+        #vistaPrevia {
+            max-height: 260px;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            padding: .4rem;
+        }
+
+        #vistaPrevia table {
+            font-size: 12px;
+            margin: 0;
+        }
+
+        #vistaPrevia td,
+        #vistaPrevia th {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Pestañas Casos / Informe */
+        .me-tabs {
+            border-bottom: 1px solid var(--me-borde);
+            gap: .2rem;
+        }
+
+        .me-tabs .nav-link {
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: .45rem .45rem 0 0;
+            color: var(--me-suave);
+            font-weight: 600;
+            font-size: .86rem;
+            padding: .4rem .9rem;
+        }
+
+        .me-tabs .nav-link.active {
+            background: #fff;
+            border-color: var(--me-borde);
+            color: var(--me-tinta);
+        }
+
+        .me-tabs .nav-link .badge {
+            font-weight: 600;
+        }
+
+        /* Aviso cuando la simulación está apagada */
+        #avisoReal {
+            background: #FFF4D6;
+            border: 1px solid #E8D98A;
+            border-radius: .45rem;
+            padding: .35rem .6rem;
+            font-size: .76rem;
+            color: #7A5B00;
+        }
+
+        /* Tabla de la regla del archivo, en el paso 3 */
+        .tabla-regla {
+            width: 100%;
+            font-size: .74rem;
+            border-collapse: collapse;
+        }
+
+        .tabla-regla th,
+        .tabla-regla td {
+            border: 1px solid var(--me-borde);
+            padding: .25rem .4rem;
+            vertical-align: top;
+        }
+
+        .tabla-regla th {
+            background: #FAFAF7;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .tabla-regla code {
+            font-family: var(--me-mono);
+            color: var(--me-tinta);
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN (tarjetas = filtro por estado) ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi neutro" data-festado="">
+            <div class="n" id="cTotal">0</div>
+            <div class="lbl">Casos cargados<small>ver todos ▸</small></div>
+        </div>
+        <div class="me-kpi neutro" data-festado="pendiente">
+            <div class="n" id="cPend">0</div>
+            <div class="lbl">Pendientes<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi warn" data-festado="preparado">
+            <div class="n" id="cPrep">0</div>
+            <div class="lbl">Preparadas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi ok" data-festado="cerrado">
+            <div class="n" id="cOk">0</div>
+            <div class="lbl">Cerradas<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro" data-festado="nota agregada">
+            <div class="n" id="cNota">0</div>
+            <div class="lbl">Solo con nota<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi err" data-festado="error">
+            <div class="n" id="cErr">0</div>
+            <div class="lbl">Con error<small>filtrar ▸</small></div>
+        </div>
+        <div class="me-kpi neutro" data-festado="ya cerrado">
+            <div class="n" id="cYa">0</div>
+            <div class="lbl">Ya estaban cerrados<small>filtrar ▸</small></div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión -->
+            <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgUser">Usuario del CM</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgUser" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgPass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgPass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12 d-flex gap-1">
+                        <button class="btn btn-sm btn-me-ink" id="btnConectar" type="button">Iniciar sesión</button>
+                        <button class="btn btn-sm btn-me-line" id="btnRenovar" type="button">Renovar token</button>
+                    </div>
+                    <div class="col-12 me-hint">
+                        Son las mismas credenciales del CM que usa el lanzador: si abriste desde él, llegan solas y la
+                        sesión se inicia sola. El token se renueva antes de vencer y también cuando el API responde 401.
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2 · Archivo -->
+            <section data-me-paso="2" data-me-titulo="Archivo, hoja y columnas" data-me-abierto="con-sesion">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <div class="dropzone" id="dropzone" tabindex="0" role="button"
+                            aria-label="Cargar archivo Excel o CSV">
+                            <div class="icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                            <p><strong>Arrastra el Excel (.xlsx, .xlsm, .xls) o CSV</strong><br>
+                                o haz clic para elegirlo.</p>
+                            <input type="file" id="inpArchivo" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+                        </div>
+                        <div class="file-info text-muted mt-1" id="nombreArchivo"></div>
+                    </div>
+                    <div class="col-7">
+                        <label class="me-lbl" for="selHoja">Hoja</label>
+                        <select class="form-select form-select-sm me-mono" id="selHoja" disabled></select>
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="inpFilaTitulos">Fila de títulos</label>
+                        <input class="form-control form-control-sm me-mono" id="inpFilaTitulos" type="number" min="1"
+                            value="1">
+                    </div>
+                </div>
+
+                <div id="infoArchivo" class="me-hint mt-2 d-none"></div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <span class="me-lbl mb-0">Columnas del archivo</span>
+                    <button class="btn btn-sm btn-me-line" id="btnAutoMapeo" type="button" disabled>Volver a
+                        detectar</button>
+                </div>
+                <div id="mapeo" class="row g-1 mt-1"></div>
+                <div class="me-hint mt-1">
+                    Lo único obligatorio es el <b>número de caso</b>. «Favorable» y «Nota de cierre» deciden qué
+                    se hace con cada ticket; si no las mapeas, todo queda sin acción hasta que lo llenes en la tabla.
+                </div>
+
+                <div class="me-lbl mt-3">Contenido del archivo</div>
+                <div id="vistaPrevia">
+                    <div class="me-hint p-2">Todavía no hay archivo cargado.</div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 mt-3">
+                    <button class="btn btn-me" id="btnCargarHoja" type="button" disabled>Cargar hoja a la tabla</button>
+                    <span class="me-hint">Revisa la hoja, los títulos y el contenido antes de cargar.</span>
+                </div>
+            </section>
+
+            <!-- 3 · Reglas del cierre -->
+            <section data-me-paso="3" data-me-titulo="Reglas del cierre" data-me-abierto="nunca">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <table class="tabla-regla mb-1">
+                            <thead>
+                                <tr>
+                                    <th>Columna «Favorable»</th>
+                                    <th>Qué se le hace al ticket</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>Sí</code></td>
+                                    <td>Se cierra: título + <code>/ Favorable</code>, estado final y nota.</td>
+                                </tr>
+                                <tr>
+                                    <td><code>No</code></td>
+                                    <td>Se cierra: título + <code>/ Desfavorable</code>, estado final y nota.</td>
+                                </tr>
+                                <tr>
+                                    <td>vacía <b>con</b> nota</td>
+                                    <td>Solo se agrega la nota. El título y el estado quedan como están.</td>
+                                </tr>
+                                <tr>
+                                    <td>vacía <b>sin</b> nota</td>
+                                    <td>No se envía nada: la fila queda como <i>omitida</i>.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgEstado">Estado final</label>
+                        <select class="form-select form-select-sm" id="cfgEstado">
+                            <option value="resolved" selected>resolved</option>
+                            <option value="closed">closed</option>
+                            <option value="cancelled">cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgSep">Separador del título</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgSep" value=" / ">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgTxtFav">Texto favorable</label>
+                        <input class="form-control form-control-sm" id="cfgTxtFav" value="Favorable ❤️">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgTxtDesf">Texto desfavorable</label>
+                        <input class="form-control form-control-sm" id="cfgTxtDesf" value="Desfavorable💔">
+                    </div>
+                    <div class="col-4">
+                        <label class="me-lbl" for="cfgHilos">En paralelo</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgHilos" type="number" min="1" max="16"
+                            value="20">
+                    </div>
+                    <div class="col-4">
+                        <label class="me-lbl" for="cfgReintentos">Reintentos</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgReintentos" type="number" min="0"
+                            max="5" value="1">
+                    </div>
+                    <div class="col-4">
+                        <label class="me-lbl" for="cfgPerPage">Por búsqueda</label>
+                        <input class="form-control form-control-sm me-mono" id="cfgPerPage" type="number" min="1"
+                            max="50" value="10">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-check-sm">
+                            <input class="form-check-input" type="checkbox" id="cfgTraerVarios" checked>
+                            <label class="form-check-label small" for="cfgTraerVarios">Traer todos los tickets del
+                                caso</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfgAgregarResultado" checked>
+                            <label class="form-check-label small" for="cfgAgregarResultado">Agregar el resultado al
+                                título nuevo</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfgCreador">
+                            <label class="form-check-label small" for="cfgCreador">Consultar quién creó el
+                                ticket</label>
+                        </div>
+                    </div>
+                    <div class="col-12 me-hint">
+                        El PATCH manda la lista de adjuntos vacía, igual que el frontend del CM: enviarla completa
+                        devuelve <span class="me-mono">422 · Attachment needs 'mime-type'</span> porque el gateway
+                        exige un dato que él mismo no guarda. Los adjuntos del ticket no se tocan.
+                    </div>
+                    <div class="col-12 me-hint">
+                        Siempre se aplican, y no se pueden apagar: solo se toca el ticket cuyo número coincide
+                        exacto; sin resultado el caso <b>no se cierra</b> ni se le cambia el título; y no se cierra
+                        ningún caso sin nota.
+                    </div>
+                    <!-- Fijos del proceso: no se editan a mano -->
+                    <input id="cfgNoteType" value="Updates" hidden>
+                    <input id="cfgNoteSub" value="Case Updates" hidden>
+                    <div class="col-12 me-hint">
+                        Cuando sí hay resultado, el título nuevo se arma con el título actual del CM (sin un resultado
+                        anterior) más el resultado. Puedes editarlo caso por caso en la tabla.
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4 · Ejecución -->
+            <section data-me-paso="4" data-me-titulo="Ejecución y progreso" data-me-abierto="siempre">
+                <div id="avisoReal" class="d-none mb-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i> La simulación está apagada: los cierres y las
+                    notas se envían al CM y no se deshacen desde aquí.
+                </div>
+
+                <div class="me-hint mb-2">Los dos pasos van separados a propósito: se busca, se revisa en la
+                    tabla y solo entonces se envía.</div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <button class="btn btn-sm btn-me-ink" id="btnBuscar" type="button" disabled
+                        title="Marca en la tabla los casos que quieras buscar">1 · Buscar tickets</button>
+                    <button class="btn btn-sm btn-me" id="btnCerrar" type="button" disabled
+                        title="Primero busca los tickets: solo se envía lo que ya se consultó en el CM">2 · Cerrar
+                        casos</button>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-3">
+                    <button class="btn btn-sm btn-me-line" id="btnPausa" type="button" disabled>Pausar</button>
+                    <button class="btn btn-sm btn-outline-danger" id="btnCancelar" type="button"
+                        disabled>Cancelar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnReintentar" type="button" disabled
+                        title="No hay casos con error">Reintentar los que fallaron</button>
+                </div>
+
+                <div class="progress mb-2" style="height:20px">
+                    <div class="progress-bar bg-dark" id="barra" style="width:0%">0%</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 me-hint">
+                    <span>Marcadas: <b id="cSel">0</b></span>
+                    <span>·</span>
+                    <span id="chipTiempo">—</span>
+                </div>
+                <div class="me-hint mt-2">
+                    «Cerrar casos» envía las dos cosas: cierra las filas con resultado y agrega la nota a las que
+                    no lo tienen. El botón muestra cuántas van de cada tipo.
+                </div>
+            </section>
+
+            <!-- 5 · Registro -->
+            <section data-me-paso="5" data-me-titulo="Registro de eventos" data-me-abierto="nunca">
+                <div id="consola" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: tablas ================= -->
+        <div class="me-trabajo-datos">
+
+            <ul class="nav me-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#paneCasos" type="button"
+                        role="tab">Casos y edición</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#paneInforme" type="button"
+                        role="tab">Informe y exportación</button>
+                </li>
+                <li class="nav-item ms-auto d-flex align-items-center">
+                    <button class="btn btn-sm btn-me-line" id="btnModoSim" type="button">Simulación: ON</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+
+                <!-- ---------- Pestaña: casos ---------- -->
+                <div class="tab-pane fade show active" id="paneCasos" role="tabpanel">
+                    <div class="me-filtros mt-2">
+                        <select class="form-select form-select-sm" id="fEstado" style="width:auto">
+                            <option value="">Estado del proceso: todos</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="fAccion" style="width:auto">
+                            <option value="">Acción: todas</option>
+                            <option value="cierre">Cierre</option>
+                            <option value="nota">Solo nota</option>
+                            <option value="__nada">Sin acción</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="fEstadoArchivo" style="width:auto">
+                            <option value="">Estado (archivo): todos</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="fFavorable" style="width:auto">
+                            <option value="">Resultado: todos</option>
+                            <option value="favorable">Favorable</option>
+                            <option value="desfavorable">Desfavorable</option>
+                            <option value="__vacio">Sin definir</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="fSel" style="width:auto">
+                            <option value="">Todas las filas</option>
+                            <option value="si">Solo marcadas</option>
+                            <option value="no">Solo sin marcar</option>
+                        </select>
+                        <input class="form-control form-control-sm" id="fTexto" style="width:190px"
+                            placeholder="Contiene: número, título…">
+                        <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros" type="button">Limpiar filtros <i
+                                class="bi bi-x-circle"></i></button>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-me-line dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" data-bs-auto-close="outside"><i
+                                    class="bi bi-layout-three-columns"></i> Columnas</button>
+                            <div class="dropdown-menu p-2" id="menuColumnas" style="max-height:340px;overflow:auto">
+                            </div>
+                        </div>
+
+                        <div class="me-filtros-der">
+                            <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar
+                                visibles</button>
+                            <button class="btn btn-sm btn-me-line" id="btnDesmarcarVisibles"
+                                type="button">Desmarcar</button>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-me-line dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" data-bs-auto-close="outside">Ocultar</button>
+                                <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:230px">
+                                    <button class="btn btn-sm btn-me-line w-100 mb-1" id="btnOcultarSel"
+                                        type="button">Ocultar marcadas</button>
+                                    <button class="btn btn-sm btn-me-line w-100 mb-1" id="btnOcultarNoSel"
+                                        type="button">Ocultar no marcadas</button>
+                                    <button class="btn btn-sm btn-me-line w-100 mb-2" id="btnRestaurarOcultas"
+                                        type="button">Restaurar ocultas</button>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="chkVerOcultas">
+                                        <label class="form-check-label small" for="chkVerOcultas">Ver filas ocultas
+                                            (<span id="numOcultas">0</span>)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="me-hint" id="resumenSeleccion"></span>
+                        </div>
+                    </div>
+
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tablaCasos" class="table table-sm table-hover table-striped w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioCasos">
+                            Carga el archivo en el paso <strong>2</strong> y presiona <strong>Cargar hoja a la
+                                tabla</strong> para ver aquí los casos.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ---------- Pestaña: informe ---------- -->
+                <div class="tab-pane fade" id="paneInforme" role="tabpanel">
+                    <div class="me-filtros mt-2">
+                        <select class="form-select form-select-sm" id="rEstado" style="width:auto">
+                            <option value="">Estado del proceso: todos</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="rAccion" style="width:auto">
+                            <option value="">Acción: todas</option>
+                            <option value="cierre">Cierre</option>
+                            <option value="nota">Solo nota</option>
+                            <option value="__nada">Sin acción</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="rEstadoCM" style="width:auto">
+                            <option value="">Estado en el CM: todos</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="rFavorable" style="width:auto">
+                            <option value="">Resultado: todos</option>
+                            <option value="favorable">Favorable</option>
+                            <option value="desfavorable">Desfavorable</option>
+                            <option value="__vacio">Sin definir</option>
+                        </select>
+                        <input class="form-control form-control-sm" id="rTexto" style="width:190px"
+                            placeholder="Contiene: número, ticket…">
+                        <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltrosRep" type="button">Limpiar filtros
+                            <i class="bi bi-x-circle"></i></button>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-me-line dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" data-bs-auto-close="outside"><i
+                                    class="bi bi-layout-three-columns"></i> Columnas</button>
+                            <div class="dropdown-menu p-2" id="menuColumnasRep" style="max-height:340px;overflow:auto">
+                            </div>
+                        </div>
+
+                        <div class="me-filtros-der">
+                            <select class="form-select form-select-sm" id="expAlcance" style="width:auto">
+                                <option value="informe" selected>Lo que muestra esta tabla</option>
+                                <option value="filtradas">Lo visible en la tabla de casos</option>
+                                <option value="todas">Todas las filas</option>
+                                <option value="marcadas">Solo las marcadas</option>
+                                <option value="cerradas">Solo las cerradas</option>
+                                <option value="notas">Solo las que recibieron nota sin cerrar</option>
+                                <option value="yacerradas">Solo las que ya estaban cerradas</option>
+                                <option value="error">Solo las que fallaron u omitidas</option>
+                            </select>
+                            <div class="form-check me-1">
+                                <input class="form-check-input" type="checkbox" id="expOriginal" checked>
+                                <label class="form-check-label small" for="expOriginal">Con columnas del
+                                    archivo</label>
+                            </div>
+                            <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                            <button class="btn btn-sm btn-me-line" id="btnExportCsv" type="button"><i
+                                    class="bi bi-filetype-csv"></i> CSV</button>
+                            <button class="btn btn-sm btn-me-line" id="btnExportXlsx" type="button"><i
+                                    class="bi bi-file-earmark-excel"></i> Excel</button>
+                            <button class="btn btn-sm btn-me-line" id="btnExportJson" type="button"><i
+                                    class="bi bi-filetype-json"></i> JSON</button>
+                        </div>
+                    </div>
+
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tablaResultados" class="table table-sm table-hover table-striped w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioRep">
+                            El informe lleva el ticket encontrado, la acción aplicada, el estado que tenía en el CM,
+                            el título anterior, el nuevo, la nota enviada, si se cerró y el mensaje del API. Aparece
+                            al cargar los casos.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitulo">Detalle del caso</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalCuerpo"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+    <!-- 1 · Shell común: se monta antes que todo lo demás -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "casos",
+            version: "3.2",
+            doc: "../doc/cerrar-casos/README.md",
+            titulo: "Cierre masivo de casos",
+            descripcion: "Búsqueda, cierre y notas de tickets en el CM",
+            sesiones: ["cm"],
+            instrucciones: [
+                "1 · Conexión: el chip de arriba muestra la sesión del CM. Si está en gris o rojo, inicia sesión en el paso 1.",
+                "2 · Archivo: carga el Excel, elige la hoja y confirma a qué columna corresponde cada dato; luego «Cargar hoja a la tabla».",
+                "3 · Marca en la tabla los casos que vas a trabajar y ajusta resultado, título nuevo y nota.",
+                "4 · «Buscar tickets» trae el título y el estado actual del CM; «Cerrar casos» envía el PATCH.",
+                "Regla del archivo: «Sí» cierra como favorable, «No» como desfavorable, y la casilla vacía solo agrega la nota (sin tocar título ni estado).",
+                "Una fila sin resultado y sin nota no tiene nada que enviar: queda como omitida.",
+                "5 · Exporta desde la pestaña «Informe» con CSV / Excel / JSON.",
+                "La simulación arranca ENCENDIDA: hace todo menos el PATCH, para revisar los cuerpos con el botón «Ver» de cada fila."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM (compartido con las otras herramientas) -->
+    <script src="../assets/me-api.js"></script>
+
+    <!-- 3 · Reglas de negocio de esta herramienta -->
+    <script src="../assets/logica-casos.js"></script>
+
+    <!-- 4 · Enganche entre la lógica y el shell -->
+    <script src="../assets/me-casos-puente.js"></script>
+</body>
+
+</html>
