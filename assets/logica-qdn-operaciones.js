@@ -500,10 +500,6 @@ function payloadOperacion(op, f) {
 --------------------------------------------------------------------- */
 function usuarioOperador() {
     const st = MEUI.sesion.estado("cm");
-
-    console.log("st:", st);
-    console.log("st.usuario:", st?.usuario);
-
     return st?.usuario || "sin sesión identificada";
 }
 
@@ -748,15 +744,15 @@ function listaOperacionesHTML(contexto, f) {
         <summary class="op-grupo-tit"><i class="bi bi-lock"></i> Bloqueos <span class="text-muted fw-normal">(${bloqueos.length / 2} tipos)</span></summary>
         <div class="op-familias">
             ${FAMILIAS_BLOQUEO.map(fam => {
-                const par = bloqueos.filter(o => o.familia === fam.nombre);
-                if (!par.length) return "";
-                return `<div class="op-familia">
+        const par = bloqueos.filter(o => o.familia === fam.nombre);
+        if (!par.length) return "";
+        return `<div class="op-familia">
                     <div class="op-familia-nom"><i class="bi ${MEUI.esc(fam.icono)}"></i> ${MEUI.esc(fam.nombre)}</div>
                     <div class="op-familia-par">
                         ${par.map(op => botonOperacionHTML(op, contexto, op.corto || op.etiqueta, impedimentoDe(op))).join("")}
                     </div>
                 </div>`;
-            }).join("")}
+    }).join("")}
         </div>
     </details>`;
 

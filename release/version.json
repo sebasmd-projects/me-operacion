@@ -1,7 +1,7 @@
 {
-    "version":  "2.4.0",
-    "zip":  "me-operacion-2.4.0.zip",
-    "sha256":  "E8FBD5C704FE83A6AE3D8B7D35F2C5C302B73A1DBE3A8D6D4A6061DD32F819BA",
-    "generado":  "2026-09-21T09:18:13",
-    "notas":  ""
+    "version":  "2.5.0",
+    "zip":  "me-operacion-2.5.0.zip",
+    "sha256":  "72EA56D9CFD67AECF36EE53A111E88DBCEC22249D0FCA595AD9E0DA1FEB8D82E",
+    "generado":  "2026-09-22T16:21:09",
+    "notas":  "feat: Acciones múltiples en HLR claro (Aprovisionar y Conciliar)"
 }

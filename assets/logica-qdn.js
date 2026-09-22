@@ -984,27 +984,39 @@ function construirDataTable() {
         const fila = dataTable.row(this).data();
         if (fila && fila.msisdn) abrirDetalle(fila.msisdn);
     });
-    // Marcado por fila: origen de las líneas objetivo de Conciliación y
-    // Aprovisionar en el menú masivo (logica-qdn-operaciones.js), no de
-    // bloqueos/desbloqueos, que siguen usando todo lo filtrado.
-    dataTable.on("click", "input.chk-fila, input.chk-todas", e => e.stopPropagation());
-    dataTable.on("change", "input.chk-fila", function () {
-        const f = filaDe(this.dataset.msisdn);
-        if (!f) return;
-        f.sel = this.checked;
-        sincronizarCasillaTodas();
-        if (typeof actualizarConteoMasivo === "function") actualizarConteoMasivo();
-    });
-    dataTable.on("change", "input.chk-todas", function () {
-        const marcar = this.checked;
-        dataTable.rows({ search: "applied" }).every(function () {
-            const f = this.data();
-            if (f) f.sel = marcar;
-        });
-        render();
-    });
+    // chk-fila vive en el <tbody> real (dataTable.on() sí lo alcanza, como
+    // btn-detalle arriba): solo hace falta que el clic no abra el detalle.
+    // chk-todas, en cambio, va en la CABECERA -y con scrollX/scrollY activo
+    // (MEUI.opcionesTabla) DataTables la CLONA a una tabla aparte para el
+    // encabezado fijo: esa clonada ya no es descendiente del <table> real al
+    // que apunta dataTable.on(), así que un "change" ahí nunca llegaría. Por
+    // eso el marcado se maneja aparte, a nivel de documento (ver más abajo).
+    dataTable.on("click", "input.chk-fila", e => e.stopPropagation());
     MEUI.registrarTabla(dataTable);
 }
+
+/** Marcado por checkbox (fila y "todas"): a nivel de documento, no de la
+ *  DataTable, precisamente porque chk-todas puede vivir en la cabecera
+ *  clonada por scrollX/scrollY (ver el comentario en construirDataTable).
+ *  Se registra UNA sola vez al cargar el script (mismo patrón que
+ *  logica-casos.js), así que también sirve para la pestaña Claro de
+ *  hlr_hss.html, donde este archivo se carga una sola vez aunque la
+ *  plantilla se monte y desmonte varias veces. */
+document.addEventListener("change", (ev) => {
+    const el = ev.target;
+    if (!el.classList) return;
+    if (el.classList.contains("chk-fila")) {
+        const f = filaDe(el.dataset.msisdn);
+        if (!f) return;
+        f.sel = el.checked;
+        sincronizarCasillaTodas();
+        if (typeof actualizarConteoMasivo === "function") actualizarConteoMasivo();
+    } else if (el.classList.contains("chk-todas")) {
+        const marcar = el.checked;
+        filas.filter(filaPasaFiltros).forEach(f => { f.sel = marcar; });
+        render();
+    }
+});
 
 function render() {
     MEUI.prepararTabla("#tablaResultados");
