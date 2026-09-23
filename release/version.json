@@ -1,7 +1,7 @@
 {
-    "version":  "2.5.0",
-    "zip":  "me-operacion-2.5.0.zip",
-    "sha256":  "72EA56D9CFD67AECF36EE53A111E88DBCEC22249D0FCA595AD9E0DA1FEB8D82E",
-    "generado":  "2026-09-22T16:21:09",
-    "notas":  "feat: Acciones múltiples en HLR claro (Aprovisionar y Conciliar)"
+    "version": "2.6.1",
+    "zip": "me-operacion-2.6.1.zip",
+    "sha256": "775E6793A032A2B359F7A7A5771C3720BAE787D7525624990054655654CC0EE5",
+    "generado": "2026-09-23T10:24:10",
+    "notas": "feat:Agregar bundles && fix: Los registros al agregar un paquete también se actualizan"
 }
