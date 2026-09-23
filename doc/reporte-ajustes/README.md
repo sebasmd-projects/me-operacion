@@ -7,6 +7,12 @@ Herramienta para consultar y exportar los **ajustes** que se hacen en el CM (Opt
 
 > Todo corre en el navegador del analista. No hay backend propio: la página habla directamente con Keycloak y con el API gateway del CM.
 
+> **Relacionado (análisis, no implementado):**
+> [`recarga-de-paquetes-cm.md`](recarga-de-paquetes-cm.md) documenta el flujo
+> del CM para **agregar** paquetes a una línea (carrito + orden de cambio de
+> oferta). Es material para un paso posterior y **requiere aprobación** antes
+> de implementarse.
+
 ---
 
 ## 1. Objetivos

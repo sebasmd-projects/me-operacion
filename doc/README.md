@@ -20,11 +20,11 @@ GitHub ni permisos de administrador.
 | **Prepagadas · SIME ⇄ CM** | Verificación cruzada de líneas prepagadas y alta de suscripciones en SIME. | [reporte-prepagadas](reporte-prepagadas/README.md) |
 | **Cierre masivo de casos** | Búsqueda del ticket de cada caso y cierre por lotes en el CM, con simulación previa. | [cerrar-casos](cerrar-casos/README.md) |
 | **Exportar casos · Tipificación** | Descarga masiva de casos del CRM por rango de fechas y estados. | [reporte-tipificacion](reporte-tipificacion/README.md) |
-| **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) |
+| **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) · [análisis: recarga de paquetes](reporte-ajustes/recarga-de-paquetes-cm.md) |
 | **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueo/desbloqueo/conciliación) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) |
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |
-| **Consumos y Paquetes · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. | [reporte-consumos](reporte-consumos/README.md) |
+| **Bolsillos, Paquetes, Consumos · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. Además **carga paquetes** en el CM desde el detalle de la línea. | [reporte-consumos](reporte-consumos/README.md) |
 | **Convertir audio a MP3** | Convierte localmente uno o varios audios OGG, M4A u otros formatos compatibles y genera archivos `mp3-*.mp3`. | [audio-mp3](audio-mp3/README.md) |
 
 Todas comparten una **base común** (marco visual, sesión, acceso al CM) y

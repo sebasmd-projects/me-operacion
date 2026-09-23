@@ -1,4 +1,4 @@
-<!-- reporte_consumos.html · v1.7.0
+<!-- reporte_consumos.html · v1.8.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -6,6 +6,7 @@
                                         tablas, importación y exportación
        assets/me-api.js                 Keycloak, auth y consultas al CM
        assets/logica-consumos.js        reglas de negocio de esta herramienta
+       assets/logica-paquetes-carga.js  cargar paquetes (ESCRIBE en el CM)
        assets/me-consumos-puente.js     enganche entre la lógica y el shell
 
      A diferencia de reporte_prepagadas.html, esta herramienta NO habla con
@@ -419,6 +420,337 @@
         #progresoWrap {
             display: none;
         }
+
+        /* ---------------------------------------------------------------
+           Cargar paquete — única parte de esta herramienta que ESCRIBE en
+           el CM. Se separa visualmente a propósito: fondo cálido y borde
+           marcado, para que nunca se confunda con lo que solo consulta.
+        --------------------------------------------------------------- */
+        .carga-cab {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .carga-panel {
+            border: 1px solid #E8D98A;
+            border-left: 3px solid var(--me-amarillo-2);
+            border-radius: .5rem;
+            background: #FFFDF4;
+            padding: .8rem .9rem;
+            margin-top: .6rem;
+        }
+
+        .carga-steps {
+            display: flex;
+            gap: .35rem;
+            list-style: none;
+            margin: 0 0 .7rem;
+            padding: 0;
+            flex-wrap: wrap;
+        }
+
+        .carga-steps li {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            font-size: .74rem;
+            font-weight: 600;
+            color: var(--me-suave);
+            background: #fff;
+            border: 1px solid var(--me-borde);
+            border-radius: 999px;
+            padding: .2rem .7rem .2rem .25rem;
+        }
+
+        .carga-steps li span {
+            display: inline-grid;
+            place-items: center;
+            width: 1.35rem;
+            height: 1.35rem;
+            border-radius: 50%;
+            background: #ECEAE2;
+            color: var(--me-suave);
+            font-family: var(--me-mono);
+            font-size: .7rem;
+        }
+
+        .carga-steps li.activo {
+            color: var(--me-tinta);
+            border-color: var(--me-negro);
+        }
+
+        .carga-steps li.activo span {
+            background: var(--me-negro);
+            color: var(--me-amarillo);
+        }
+
+        .carga-steps li.hecho span {
+            background: var(--me-ok);
+            color: #fff;
+        }
+
+        .carga-estado {
+            font-size: .76rem;
+            color: var(--me-suave);
+            min-height: 1.1rem;
+        }
+
+        .carga-estado.err {
+            color: var(--me-err);
+            font-weight: 600;
+        }
+
+        .carga-lista {
+            max-height: 230px;
+            overflow: auto;
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            background: #fff;
+            margin-top: .5rem;
+        }
+
+        .carga-item {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            border-bottom: 1px solid var(--me-borde);
+            background: transparent;
+            padding: .4rem .6rem;
+            font-size: .8rem;
+        }
+
+        .carga-item:last-child {
+            border-bottom: 0;
+        }
+
+        .carga-item:hover {
+            background: #FFFBE6;
+        }
+
+        .carga-item.elegido {
+            background: #FFF6CC;
+        }
+
+        .carga-item-n {
+            flex: 1 1 auto;
+            font-weight: 600;
+        }
+
+        .carga-item-tags {
+            display: flex;
+            gap: .25rem;
+            flex-wrap: wrap;
+        }
+
+        .carga-item-marca {
+            width: 1.2rem;
+            text-align: center;
+            font-weight: 800;
+            color: var(--me-suave);
+        }
+
+        .carga-item.elegido .carga-item-marca {
+            color: var(--me-ok);
+        }
+
+        .carga-tag {
+            font-family: var(--me-mono);
+            font-size: .64rem;
+            border-radius: .3rem;
+            padding: .1em .4em;
+            background: #F0F0EC;
+            color: var(--me-suave);
+            white-space: nowrap;
+        }
+
+        .carga-tag.precio {
+            background: #FBEED8;
+            color: var(--me-warn);
+            font-weight: 700;
+        }
+
+        .carga-tag.ya {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .carga-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            margin-top: .5rem;
+            min-height: 1.6rem;
+        }
+
+        .carga-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            background: var(--me-negro);
+            color: #fff;
+            border-radius: 999px;
+            padding: .15rem .3rem .15rem .6rem;
+            font-size: .74rem;
+        }
+
+        .carga-chip small {
+            font-family: var(--me-mono);
+            color: var(--me-amarillo);
+        }
+
+        .carga-chip-x {
+            border: 0;
+            background: rgba(255, 255, 255, .15);
+            color: #fff;
+            border-radius: 50%;
+            width: 1.05rem;
+            height: 1.05rem;
+            line-height: 1;
+            font-size: .62rem;
+        }
+
+        .carga-chip-x:hover {
+            background: var(--me-err);
+        }
+
+        .carga-vacio {
+            font-size: .74rem;
+            color: var(--me-suave);
+            padding: .4rem .6rem;
+        }
+
+        .carga-linea {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .2rem 1.1rem;
+            font-size: .74rem;
+            color: var(--me-suave);
+            margin-bottom: .5rem;
+        }
+
+        .carga-tabla-wrap {
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            overflow: auto;
+            background: #fff;
+            max-height: 240px;
+        }
+
+        .carga-tabla {
+            font-size: .78rem;
+            margin: 0;
+        }
+
+        .carga-tabla tr.nochange {
+            color: var(--me-suave);
+        }
+
+        .carga-acc {
+            font-family: var(--me-mono);
+            font-size: .64rem;
+            font-weight: 700;
+            border-radius: .3rem;
+            padding: .1em .4em;
+        }
+
+        .carga-acc.add {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .carga-acc.nc {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        .carga-alerta {
+            border-radius: .45rem;
+            padding: .45rem .65rem;
+            font-size: .77rem;
+            margin-top: .6rem;
+        }
+
+        .carga-alerta.warn {
+            background: #FFF4D6;
+            border: 1px solid #E8D98A;
+            color: #7A5B00;
+        }
+
+        .carga-alerta.err {
+            background: #FBE2DF;
+            border: 1px solid #F0B9B2;
+            color: var(--me-err);
+        }
+
+        .carga-alerta.ok {
+            background: #E2F2E8;
+            border: 1px solid #B6DCC5;
+            color: var(--me-ok);
+        }
+
+        .carga-json summary {
+            font-size: .74rem;
+            color: var(--me-suave);
+            cursor: pointer;
+        }
+
+        .carga-json pre {
+            max-height: 200px;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            padding: .5rem .6rem;
+            font-size: .7rem;
+            margin: .4rem 0 0;
+        }
+
+        .carga-tl {
+            display: flex;
+            align-items: baseline;
+            gap: .5rem;
+            font-size: .78rem;
+            padding: .18rem 0;
+        }
+
+        .carga-tl .ic {
+            width: 1.1rem;
+            text-align: center;
+            font-weight: 800;
+            color: var(--me-off);
+        }
+
+        .carga-tl .dt {
+            font-family: var(--me-mono);
+            font-size: .7rem;
+            color: var(--me-suave);
+        }
+
+        .carga-tl.curso .ic {
+            color: var(--me-info);
+        }
+
+        .carga-tl.ok .ic {
+            color: var(--me-ok);
+        }
+
+        .carga-tl.err .ic {
+            color: var(--me-err);
+        }
+
+        .carga-tl.pendiente .ic {
+            color: var(--me-warn);
+        }
+
+        .carga-tl.espera {
+            opacity: .55;
+        }
     </style>
 </head>
 
@@ -639,7 +971,72 @@
                         <div id="mdUso" class="uso-grid"></div>
                     </div>
 
-                    <div id="mdHistWrap" style="display:none">
+                    <!-- ============ CARGAR PAQUETE (escribe en el CM) ============ -->
+            <div id="mdCargaWrap" style="display:none" class="mb-4">
+                <div class="carga-cab">
+                    <h6 class="fw-bold mb-0">Cargar paquete <small class="text-muted fw-normal">— agrega
+                            paquetes a esta línea en el CM</small></h6>
+                    <button class="btn btn-sm btn-me-line" type="button" id="btnCargaAbrir">
+                        <i class="bi bi-plus-circle"></i> Cargar paquete</button>
+                </div>
+
+                <div id="cargaPanel" class="carga-panel d-none">
+                    <ol class="carga-steps" id="cargaSteps">
+                        <li data-paso="1" class="activo"><span>1</span> Elegir</li>
+                        <li data-paso="2"><span>2</span> Revisar</li>
+                        <li data-paso="3"><span>3</span> Resultado</li>
+                    </ol>
+
+                    <div id="cargaEstado" class="carga-estado"></div>
+
+                    <!-- Paso 1 · Elegir -->
+                    <div class="carga-paso" data-paso="1">
+                        <label class="me-lbl" for="cargaBuscar">Buscar paquete en el catálogo de la oferta</label>
+                        <input id="cargaBuscar" class="form-control form-control-sm me-mono" autocomplete="off"
+                            placeholder="nombre, bundleId o productId…">
+                        <div class="me-hint">Se busca sobre el catálogo del plan que tiene esta línea. Haz clic
+                            en un paquete para elegirlo o quitarlo.</div>
+                        <div id="cargaLista" class="carga-lista"></div>
+                        <div id="cargaSel" class="carga-chips"></div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-me" type="button" id="btnCargaRevisar" disabled>Revisar
+                                envío →</button>
+                            <button class="btn btn-sm btn-me-line" type="button" id="btnCargaCancelar">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <!-- Paso 2 · Revisar -->
+                    <div class="carga-paso d-none" data-paso="2">
+                        <div class="carga-alerta warn mb-2"><i class="bi bi-exclamation-triangle-fill"></i>
+                            Lo de abajo se envía al CM como una orden de cambio de oferta y <b>no se deshace
+                                desde aquí</b>. Revísalo antes de confirmar.</div>
+                        <div id="cargaResumen"></div>
+                        <details class="carga-json mt-2">
+                            <summary>Ver el cuerpo exacto del carrito que se enviará</summary>
+                            <pre id="cargaJson" class="me-mono"></pre>
+                        </details>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-me-line" type="button" id="btnCargaVolver">←
+                                Volver</button>
+                            <button class="btn btn-sm btn-warning fw-bold" type="button" id="btnCargaEnviar">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Confirmar y cargar en el CM</button>
+                        </div>
+                    </div>
+
+                    <!-- Paso 3 · Resultado -->
+                    <div class="carga-paso d-none" data-paso="3">
+                        <div id="cargaTimeline"></div>
+                        <div id="cargaSalida"></div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-me-line" type="button" id="btnCargaOtro">Cargar otro
+                                paquete</button>
+                            <button class="btn btn-sm btn-me-line" type="button" id="btnCargaCerrar">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="mdHistWrap" style="display:none">
                         <h6 class="fw-bold mb-1">Movimientos y consumo del período</h6>
                         <div class="row g-2 align-items-end mb-2">
                             <div class="col-md-4">
@@ -775,7 +1172,7 @@
     <script>
         MEUI.init({
             app: "consumos",
-            version: "1.7.0",
+            version: "1.8.0",
             doc: "../doc/reporte-consumos/README.md",
             titulo: "Consumos y Paquetes · CM",
             descripcion: "Datos de la línea, paquetes activos e histórico de consumo (CDR) por rango de fechas",
@@ -789,6 +1186,9 @@
                 "6 · Consumo: el filtro Todos / Datos / Voz / SMS está justo encima de la tabla de registros y de los botones de exportación: mueve tarjetas, gráficas, tabla y exportación a la vez, sin volver a consultar el CM.",
                 "7 · Cada registro de consumo trae origen y destino por separado, y para llamadas/SMS la dirección MO (originada por la línea) o MT (terminada en la línea). El botón 👁 de cada fila abre el detalle completo del registro.",
                 "8 · Exporta con CSV / Excel / JSON: en la barra superior exportas la tabla de líneas; dentro del detalle, movimientos y consumo tienen cada uno sus propios botones, con el filtro que tengan puesto.",
+                "9 · Cargar paquete (dentro del detalle, debajo de «Uso y Balance»): es lo único de esta herramienta que ESCRIBE en el CM. Va en tres pasos — elegir del catálogo del plan, revisar lo que se enviará (incluido el cuerpo exacto) y confirmar. Al terminar muestra el número de orden y verifica contra el CM que el paquete quedó activo.",
+                "Solo carga paquetes de precio 0: si la selección tiene costo, el botón queda bloqueado. El cobro no está verificado y cargarlo a ciegas le cobraría mal al cliente.",
+                "La orden no se reintenta sola: si falla con respuesta incierta, revisa en el CM antes de volver a enviar — el CM no deduplica.",
                 "Esta herramienta no consulta SIME ni recurrencias/ciclos: los movimientos se traen del mismo endpoint que \"Movimientos BSS\" de Prepagadas, pero acotados al rango de fechas elegido, no todo el historial.",
                 "Atajo: Enter en el campo de líneas lanza la consulta."
             ]
@@ -800,6 +1200,9 @@
 
     <!-- 3 · Reglas de negocio de esta herramienta -->
     <script src="../assets/logica-consumos.js"></script>
+
+    <!-- 3b · Carga de paquetes (única parte que ESCRIBE en el CM) -->
+    <script src="../assets/logica-paquetes-carga.js"></script>
 
     <!-- 4 · Enganche entre la lógica y el shell -->
     <script src="../assets/me-consumos-puente.js"></script>

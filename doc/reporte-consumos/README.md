@@ -1,9 +1,11 @@
 # Consumos y Paquetes (CM) — Documentación técnica
 
-> **Versión: v1.7.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.8.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
-Herramienta de solo lectura para traer, por línea, **datos básicos de la línea**, sus **paquetes activos** (uso y balance), sus **movimientos** (compras, paquetes, recurrencias) y su **histórico de consumo** (llamadas, datos y SMS) desde el CM (Optiva), con filtros, paginación, gráficas y exportación.
+Herramienta para traer, por línea, **datos básicos de la línea**, sus **paquetes activos** (uso y balance), sus **movimientos** (compras, paquetes, recurrencias) y su **histórico de consumo** (llamadas, datos y SMS) desde el CM (Optiva), con filtros, paginación, gráficas y exportación.
+
+> **Desde v1.8.0 deja de ser solo lectura en un punto concreto:** dentro del detalle de una línea hay una sección **«Cargar paquete»** que agrega paquetes en el CM. Es lo único que escribe, vive en su propio archivo (`assets/logica-paquetes-carga.js`) y tiene su propio paso de revisión y confirmación. Todo lo demás sigue siendo consulta.
 
 > A diferencia de "Prepagadas · SIME ⇄ CM", esta herramienta **no consulta SIME**: no verifica suscripciones, no cuenta periodos ni recurrencias — los movimientos que trae son los mismos que "Movimientos BSS" de Prepagadas, pero acotados al rango de fechas elegido, sin el cálculo de ciclos/cobertura. Tampoco es "Ajustes y paquetes" (que exporta el histórico **completo** de ajustes de dinero y de paquetes por rango, sin ligarlos a una línea puntual): esta trae, **por línea**, tanto los movimientos como los **eventos de consumo real** (CDR) y el balance vigente de los paquetes.
 
@@ -27,6 +29,7 @@ Herramienta de solo lectura para traer, por línea, **datos básicos de la líne
 |---|---|
 | `reporte_consumos.html` | Solo marcado: KPIs, pasos, tabla principal y modal de detalle (paquetes + histórico + gráficas). |
 | `assets/logica-consumos.js` | Reglas de negocio: consultas al CM, clasificación del histórico, tabla, filtros, gráficas y exportación. |
+| `assets/logica-paquetes-carga.js` | **Cargar paquete**: única parte que escribe en el CM (catálogo de la oferta, carrito, orden y verificación). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
 | `assets/me-consumos-puente.js` | Enganche con el shell: sesión del CM, credenciales compartidas y exportación. |
 | `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las herramientas de esta suite. |
 
@@ -60,6 +63,24 @@ Herramienta de solo lectura para traer, por línea, **datos básicos de la líne
 | `GET` | `/api/v1/subscription/bundleBalance?subscriptionID={id}` | Paquetes activos y su balance (mismo endpoint que "Uso y Balance" de Prepagadas). |
 | `GET` | `/api/v1/subscription/{id}/detailedSubscriptionTransaction?limit&isAscending&start&end&nextPageKey` | **Movimientos**: compras, paquetes, recurrencias y otros ajustes. Mismo endpoint que "Movimientos BSS" de Prepagadas, pero acotado al rango de fechas del histórico (no todo el historial desde 2020). Paginado por `paginarHistorico()` (ver abajo). |
 | `GET` | `/api/v1/listDetailedCallDetailsWithBundles?subscriptionID&limit&isAscending&start&end&nextPageKey` | **Histórico de consumo** (CDR): un registro por evento (llamada, sesión de datos, SMS). Paginado por `paginarHistorico()` (ver abajo). |
+
+### Endpoints de «Cargar paquete» (escritura)
+
+Solo se usan desde la sección «Cargar paquete» del detalle. El flujo completo, con los cuerpos reales y la captura de la que salió, está en [`doc/reporte-ajustes/recarga-de-paquetes-cm.md`](../reporte-ajustes/recarga-de-paquetes-cm.md).
+
+| Método | Endpoint | Para qué |
+|---|---|---|
+| `GET` | `/api/v1/subscriberProfile?identifier={subscriptionId}` | Cuenta, MSISDN, ICCID, `spid`, `paidType`, plan y **`enabledOptionalBundles`**. Es la foto del «antes» y la que verifica el «después». |
+| `GET` | `/api/v1/productOffering?offeringType=PRICE_PLAN&primaryPricePlanId={n}` | Traduce el plan de la línea a su **oferta** (`productOfferingId`), llave de todo lo demás. |
+| `POST` | `/api/v1/productOffering/{offeringId}/selectableProducts` | Catálogo, en dos pasos encadenados: `PROD_COMP_TPS` (servicios obligatorios) y luego `PROD_COMP_BDLE` arrastrando esa selección (los ~469 paquetes). |
+| ⚠️ `POST` | `/api/v1/shoppingCart` | Crea el carrito: obligatorios en `NO_CHANGE` y lo elegido en `ADD`. Devuelve `cartId` y el `noteId`. |
+| ⚠️ `POST` | `/api/v1/productOrder` | Confirma la orden (`ChangeOffer`), con cabecera `Transaction-Id`. Devuelve el número `SOI…`. |
+| ⚠️ `DELETE` | `/api/v1/shoppingCart/{cartId}` | Limpia el carrito. Se ejecuta **siempre**, salga bien o mal la orden. |
+
+Dos cosas que no son obvias y están así a propósito:
+
+- **Los paquetes que la línea ya tiene activos no se reenvían.** Solo van los componentes obligatorios de la oferta (`NO_CHANGE`) y los nuevos (`ADD`); los activos sobreviven igual. Verificado contra la captura.
+- **La orden se arma desde la respuesta del carrito**, no se vuelve a construir a mano: se cambia `MODIFY` por `CHANGE`, se ordenan los componentes por id y se añaden `AMOUNT`, `AMOUNT_PAID` y `PAYMENT_METHOD`. Lo que el CM devolvió es lo que el CM espera de vuelta.
 
 Movimientos e histórico se piden **juntos, en paralelo**, bajo demanda (al abrir el detalle de una línea o al presionar «Consultar»), no en la consulta masiva: son las únicas llamadas que pueden paginar varias veces y encarecer una carga de muchas líneas. Comparten el mismo rango de fechas (`mdHistDesde`/`mdHistHasta`); si la consulta de movimientos falla, se avisa y el histórico de consumo sigue mostrándose igual (y viceversa).
 
@@ -169,6 +190,33 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
   - **Un único filtro Todos / Datos / Voz / SMS**, ubicado justo encima de la tabla de detalle y los botones de exportación: recalcula tarjetas, gráficas, tabla **y** exportación **a la vez** y **sin volver a consultar el CM** (es un filtro sobre lo ya traído). Se puso ahí a propósito — lo que exportas es exactamente lo que ves en la tabla.
   - Tabla de detalle: fecha, tipo (con dirección MO/MT cuando aplica), **origen y destino en columnas separadas**, uso (duración `hh:mm:ss` o datos, según el tipo), bundle, monto e ID. Botón **👁 Detalle** por fila: despliega una ficha con los campos crudos relevantes del registro (cuenta, línea, fechas de evento/registro, regla de tarifa, cargo, balance tras el evento, plan y bundle), sin los códigos internos de facturación que no tienen catálogo.
 
+### Cargar paquete (v1.8.0) — lo único que escribe en el CM
+
+Vive dentro del detalle, **debajo de «Paquetes · Uso y Balance»**, porque ese es el sitio donde el analista acaba de ver lo que la línea tiene: agregar es el paso natural siguiente. Está plegada por defecto (la herramienta sigue abriéndose como consulta) y se despliega con el botón **Cargar paquete**.
+
+Son tres pasos, con el mismo lenguaje visual que los pasos de la columna izquierda:
+
+**1 · Elegir.** Al desplegar, se resuelve la línea (perfil, titular y oferta del plan) y se trae el catálogo de esa oferta. El buscador filtra por **nombre, `bundleId` o `productId`** sobre los ~469 paquetes; cada resultado muestra sus dos identificadores, el precio si lo tiene y una marca **«ya activo»** si la línea ya lo trae. Se eligen con un clic y quedan como chips quitables. El catálogo se cachea **por oferta**, así que abrir otra línea del mismo plan no lo vuelve a pedir.
+
+**2 · Revisar.** Tabla de exactamente lo que se va a enviar: los componentes obligatorios en `NO_CHANGE` y lo elegido en `ADD`, con precio y total. Un `<details>` muestra el **cuerpo JSON exacto** del carrito, igual que la simulación de "Cierre masivo de casos". Si algún paquete elegido ya está activo, se avisa; si el total es distinto de 0, **el botón de enviar queda bloqueado** (ver Riesgos).
+
+**3 · Resultado.** Línea de tiempo de las cuatro operaciones (carrito → orden → limpieza → verificación) con su estado y su detalle, el número de orden `SOI…` copiable, y el **antes / después** de los paquetes de la línea. Si el CM todavía no refleja el cambio —tarda unos segundos— hay un botón **Verificar de nuevo** en vez de darlo por fallido.
+
+**Qué se actualiza al terminar.** Una compra no mueve solo los paquetes, así que al quedar la orden aplicada se vuelve a leer del CM y se repinta todo lo que cambia:
+
+| Se refresca | Con qué |
+|---|---|
+| «Paquetes · Uso y Balance» del detalle | `subscription/bundleBalance` |
+| Tabla principal y sus tarjetas resumen (paquetes activos, datos/voz/SMS) | lo anterior, repintado |
+| «Movimientos» del detalle y sus tarjetas — **la compra es un movimiento nuevo** | `detailedSubscriptionTransaction` |
+| «Consumo» y sus gráficas | `listDetailedCallDetailsWithBundles` (viene en la misma consulta) |
+
+Nada se parchea en memoria con lo que «debería» haber quedado: todo se vuelve a leer, para que la pantalla diga lo que el CM tiene y no lo que esperábamos.
+
+Movimientos y consumo se rehacen **solo si el rango de fechas que está en pantalla llega hasta hoy** — que es el caso normal, porque arranca en el mes en curso. Si el analista está mirando un período pasado, la compra no cabe ahí: en vez de pagar una consulta paginada para traer lo mismo, se avisa junto al rango que hay que llevar «Hasta» hasta hoy y volver a consultar. El paso «Resultado» no dice «Listo» hasta que ese refresco terminó; si falla, lo dice en vez de dejar datos viejos en pantalla sin avisar.
+
+Todo queda escrito en el registro del paso 3 de la izquierda: la selección enviada, el `cartId`, el `Transaction-Id`, el número de orden y el resultado de la verificación.
+
 ### Exportación
 
 Barra superior: la **tabla de líneas** (lo que quede tras los filtros), en CSV / Excel / JSON. Dentro del detalle, movimientos y consumo **exportan por separado**, cada uno con su propio filtro aplicado (categoría en movimientos; Todos/Datos/Voz/SMS en consumo) — lo que exportas es exactamente lo que ves en esa tabla.
@@ -202,6 +250,12 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 ## 7. Riesgos
 
 - **Transporte HTTP plano** hacia el CM y Keycloak; el token queda en memoria del navegador.
+- **«Cargar paquete» escribe de verdad y no se deshace desde aquí.** Una orden creada no tiene botón de reversa en esta herramienta; para revertir hay que ir al CM.
+- **Solo paquetes de precio 0.** Es una guarda deliberada: la captura que sirvió de base agrega paquetes sin costo, y cómo se arma el cobro (`AMOUNT`, `AMOUNT_PAID`, `PAYMENT_METHOD`) cuando el paquete sí vale no está verificado. Adivinarlo sería cobrarle mal a un cliente, así que la selección con costo queda bloqueada hasta tener esa captura.
+- **La orden no se reintenta sola.** El CM **no deduplica**: un reintento automático sobre una respuesta incierta cargaría el paquete dos veces. Si falla, la herramienta lo dice y para; verificar en el CM antes de volver a enviar es parte del procedimiento.
+- **Quitar paquetes no está implementado.** El `action` del carrito admite `ADD` y `NO_CHANGE`; el valor para retirar no está confirmado en la captura, así que la herramienta solo agrega.
+- **El carrito se borra siempre, pero puede fallar.** Si el `DELETE` no pasa, el carrito queda pegado al cliente y hay que borrarlo desde el CM. Se avisa en el registro con el `cartId`.
+- **Re-agregar un paquete ya activo** está permitido (el CM los marca `Repurchaseable`) y se advierte en la revisión, pero su efecto exacto —renovar la vigencia o sumar otra instancia— no está verificado.
 - **Clasificación por tipo**: cuatro códigos de `callType` están confirmados con datos reales (ver sección 4); un tipo de tráfico nuevo puede caer en "Otro" hasta que se agregue al catálogo.
 - **Dirección (MO/MT)**: depende de que el registro traiga `ChargedParty` o un `RatingRule` con "MO"/"MT" reconocible; si no trae ninguno de los dos, la columna queda en blanco (no se supone MO ni MT).
 - **Deduplicación por `identifier`**: si el CM alguna vez reutiliza un `identifier` para dos eventos distintos (no debería, pero no está garantizado), uno de los dos se perdería. No se ha visto este caso.
@@ -218,6 +272,7 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 
 | Versión | Cambios |
 |---|---|
+| **1.8.0** | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. Al quedar aplicada se refrescan paquetes, tabla principal, movimientos y consumo con datos nuevos del CM. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
 | **1.7.0** | La identificación aparece en la cabecera del detalle con botón de copia rápida. La resolución del titular incorpora dos respaldos confirmados con el flujo de Postman: `individual.fullName` y el `id` de la cuenta como posible `individualID` cuando falta la relación `Individual`, conservando la búsqueda multinivel existente. |
 | 1.6 | **Corrige un recorte introducido en la 1.5** y agrega reintentos. (1) El paginador usaba el tamaño de la página para decidir si quedaban más registros; como el CM no devuelve páginas de tamaño constante, cualquier página más corta que la anterior se tomaba por la última y la consulta terminaba antes de tiempo —trayendo **menos** registros que antes de la 1.5—. Ahora la única condición de fin es que una página no aporte **nada nuevo**. (2) Cuando el CM responde 500 en una página, ya no se corta la paginación con un aviso: se **reintenta** la misma petición (2 veces, con espera creciente) y, si sigue fallando, se vuelve a pedir la misma ventana con **la mitad de registros** hasta un piso de 50 — el tamaño reducido se mantiene para las páginas siguientes. Solo si se agota todo eso se da por perdida, devolviendo igual lo ya traído. (3) Una falla total de los movimientos ya no se muestra como "0 movimientos": queda marcada como incompleta. |
 | 1.5 | **Se quita el tope de registros del resultado.** El `limit=500` es de la API (el CM rechaza más), no del resultado: ahora el rango de fechas elegido se trae completo, sin límite de registros — el paginador solo para cuando el CM da la lista por terminada. Queda una única guarda anti-bucle (1.000 páginas = 500.000 registros por línea y rango), que con datos normales no se alcanza y que si salta se reporta como error. Como un rango grande son varias páginas seguidas, el modal muestra el **conteo en vivo** mientras las trae. |
