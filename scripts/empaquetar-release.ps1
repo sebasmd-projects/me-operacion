@@ -1,7 +1,7 @@
 <#
     empaquetar-release.ps1
     -----------------------------------------------------------------------
-    Arma el paquete que hay que subir a https://sebasmd.com/me/operacion/
+    Arma el paquete que hay que subir a https://sebasmd.com/me/operacion-qa/
     para que "dame click.bat" detecte la version nueva y se actualice solo
     en cada equipo. No usa git, GitHub ni Python: solo PowerShell nativo
     (Compress-Archive).
@@ -41,11 +41,20 @@
     O con un archivo .pfx suelto:
         scripts\empaquetar-release.bat -CertPfx C:\ruta\certificado.pfx
 
+    ENTORNO: QA. Esta rama empaqueta la copia del laboratorio, y por eso
+    el .zip lleva otro nombre y va a OTRA carpeta del servidor. Nunca se
+    sube a la de produccion: un equipo de produccion que descargue este
+    paquete queda apuntando al laboratorio sin que nadie lo note.
+
     Que genera, dentro de .\release\ (en la raiz del proyecto):
-        me-operacion-<version>.zip   <- subir a sebasmd.com/me/operacion/
-        version.json                 <- subir a sebasmd.com/me/operacion/
-                                         (reemplaza el que ya este ahi;
-                                         incluye el sha256 del .zip)
+        me-operacion-qa-<version>.zip <- subir a sebasmd.com/me/operacion-qa/
+        version.json                  <- subir a sebasmd.com/me/operacion-qa/
+                                          (reemplaza el que ya este ahi;
+                                          incluye el sha256 del .zip)
+
+    OJO: .\release\ puede traer todavia los .zip y el version.json de
+    produccion que vienen heredados de master. Sube SOLO los dos archivos
+    que este script nombra al terminar.
 
     Estructura del .zip generado (coincide con la del proyecto):
         index.html, assets\, herramientas\, doc\, dame click.bat, actualizar.bat
@@ -228,7 +237,7 @@ if ($CertThumbprint -or $CertPfx) {
 $salidaDir = Join-Path $raiz $Salida
 if (-not (Test-Path $salidaDir)) { New-Item -ItemType Directory -Path $salidaDir | Out-Null }
 
-$nombreZip = "me-operacion-{0}.zip" -f $versionNueva
+$nombreZip = "me-operacion-qa-{0}.zip" -f $versionNueva
 $rutaZip = Join-Path $salidaDir $nombreZip
 if (Test-Path $rutaZip) { Remove-Item $rutaZip -Force }
 
@@ -240,7 +249,7 @@ if (Test-Path $rutaZip) { Remove-Item $rutaZip -Force }
 # copia temporal con la estructura EXACTA que debe tener el paquete, y se
 # comprime esa carpeta completa (mismo resultado que antes para los items
 # que ya eran carpetas: assets\, herramientas\, doc\).
-$staging = Join-Path $env:TEMP ("me-operacion-staging-{0}" -f $versionNueva)
+$staging = Join-Path $env:TEMP ("me-operacion-qa-staging-{0}" -f $versionNueva)
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory -Path $staging | Out-Null
 
@@ -294,7 +303,8 @@ Write-Host ("  OK  version.json generado (sha256 {0}...)" -f $hashZip.Substring(
 
 # ---------- 7. Instrucciones ----------
 Write-Host ""
-Write-Host "  Listo. Sube estos dos archivos a https://sebasmd.com/me/operacion/ :" -ForegroundColor Yellow
+Write-Host "  Listo. Sube estos dos archivos a https://sebasmd.com/me/operacion-qa/ :" -ForegroundColor Yellow
+Write-Host "  (QA, NO la carpeta de produccion)" -ForegroundColor Red
 Write-Host ("    - {0}" -f $rutaJson)
 Write-Host ("    - {0}" -f $rutaZip)
 Write-Host ""

@@ -200,7 +200,9 @@ $credCm = $null; $credSime = $null; $prf = $null; $urls = @()
 #  Flags:
 #    /sinupdate   -> no consulta si hay version nueva esta vez
 # =======================================================================
-$UPDATE_BASE   = 'https://sebasmd.com/me/operacion'
+# ENTORNO: QA. El aviso de version mira la carpeta de QA, no la de
+# produccion: si no, avisaria de versiones que no son de esta copia.
+$UPDATE_BASE   = 'https://sebasmd.com/me/operacion-qa'
 $VERSION_URL   = "$UPDATE_BASE/version.json"
 # VERSION vive junto a los scripts (scripts\VERSION), no en la raiz del
 # proyecto: es un dato de version del propio mecanismo de actualizacion.

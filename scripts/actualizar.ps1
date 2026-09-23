@@ -72,7 +72,7 @@ function Obtener-JsonUtf8($uri, $timeoutSec) {
   $request.Method = 'GET'
   $request.Timeout = $timeoutSec * 1000
   $request.ReadWriteTimeout = $timeoutSec * 1000
-  $request.UserAgent = 'me-operacion-actualizador'
+  $request.UserAgent = 'me-operacion-qa-actualizador'
 
   $response = $null
   $stream = $null
@@ -95,7 +95,9 @@ function Obtener-JsonUtf8($uri, $timeoutSec) {
   }
 }
 
-$UPDATE_BASE   = 'https://sebasmd.com/me/operacion'
+# ENTORNO: QA. Carpeta propia en el servidor: si apuntara a la de
+# produccion, "actualizar" convertiria esta copia en la de produccion.
+$UPDATE_BASE   = 'https://sebasmd.com/me/operacion-qa'
 $VERSION_URL   = "$UPDATE_BASE/version.json"
 # VERSION vive junto a los scripts (scripts\VERSION), no en la raiz del
 # proyecto.
@@ -142,8 +144,8 @@ try {
   $zipUrl = [string]$info.zip
   if ($zipUrl -notmatch '^https?://') { $zipUrl = "$UPDATE_BASE/$zipUrl" }
 
-  $zipTmp = Join-Path $env:TEMP ("me-operacion-{0}.zip" -f $verRemota)
-  $exTmp  = Join-Path $env:TEMP ("me-operacion-{0}-extract" -f $verRemota)
+  $zipTmp = Join-Path $env:TEMP ("me-operacion-qa-{0}.zip" -f $verRemota)
+  $exTmp  = Join-Path $env:TEMP ("me-operacion-qa-{0}-extract" -f $verRemota)
   if (Test-Path $exTmp) { Remove-Item $exTmp -Recurse -Force -ErrorAction SilentlyContinue }
   if (Test-Path $zipTmp) { Remove-Item $zipTmp -Force -ErrorAction SilentlyContinue }
 

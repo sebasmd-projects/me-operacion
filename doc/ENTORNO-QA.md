@@ -76,7 +76,29 @@ Un analista no debería poder confundirse:
 
 ---
 
-## 5. Mantenimiento
+## 5. Publicación y actualización
+
+QA se publica en **su propia carpeta del servidor**, nunca en la de producción:
+
+| | Producción (`master`) | QA (esta rama) |
+|---|---|---|
+| Carpeta publicada | `https://sebasmd.com/me/operacion/` | **`https://sebasmd.com/me/operacion-qa/`** |
+| Nombre del ZIP | `me-operacion-<version>.zip` | **`me-operacion-qa-<version>.zip`** |
+| `version.json` | el de producción | el de QA, en su carpeta |
+
+- `scripts/empaquetar-release.ps1` genera el ZIP ya con el nombre de QA y al
+  terminar dice a qué carpeta subirlo.
+- `scripts/actualizar.ps1` y el aviso de versión de `lanzador.ps1` consultan
+  `operacion-qa`. Si apuntaran a producción, «actualizar» convertiría la
+  copia de QA en la de producción sin avisar.
+
+> **Cuidado con `release/`.** Esa carpeta viene de `master` y puede tener
+> todavía los ZIP y el `version.json` de producción. Sube **solo** los dos
+> archivos que nombra el script al terminar, nunca lo que haya suelto ahí.
+
+---
+
+## 6. Mantenimiento
 
 Para traer cambios nuevos de producción:
 
@@ -97,3 +119,6 @@ grep -rn "exito-prod\|296vnext02" assets/ scripts/ herramientas/
 ```
 
 No debe devolver nada.
+
+Y la copia de QA **no se fusiona a `master`**: el flujo es en un solo sentido,
+de `master` hacia aquí.
