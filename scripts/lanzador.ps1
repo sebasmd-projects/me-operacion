@@ -48,10 +48,23 @@ $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 
 # ---------- Parametros del entorno ----------
-$SIME_WEB  = 'http://296vnext02.grupo-exito.com/SIME/Web'
-$KC_BASE   = 'http://keycloak.exito-prod.movil-exito.internal'
+#  ENTORNO: QA. Esta copia apunta al laboratorio, NO a produccion.
+#
+#  El CM de QA usa un usuario por defecto del laboratorio, igual para
+#  todos: no se pide por consola, no se lee del archivo cifrado y no se
+#  guarda nada. Asi no puede colarse una credencial de produccion a QA,
+#  ni alguien probar en QA creyendo que va con su usuario real.
+#
+#  SIME es distinto a proposito: ahi el usuario sigue siendo el de
+#  siempre (dominio\usuario de @grupo-exito.com), solo que contra el
+#  SIME de QA, asi que se sigue pidiendo y guardando como antes.
+$ENTORNO   = 'QA'
+$SIME_WEB  = 'http://296vnextqa02/SIMEPRB/Web'
+$KC_BASE   = 'http://keycloak.exito-lab-1.movil-exito.internal'
 $KC_REALM  = 'optiva'
 $KC_CLIENT = 'optiva'
+$CM_USER   = 'optiva'
+$CM_PASS   = 'optiva'
 
 # $args (automatica de PowerShell) trae cada token que no coincidio con un
 # parametro con nombre; como este script no declara ninguno, ahi caen los
@@ -80,10 +93,14 @@ if ([string]::IsNullOrWhiteSpace($scriptsDir)) { $scriptsDir = (Get-Location).Pa
 $carpeta = Split-Path -Parent $scriptsDir
 $htmlReporte = Join-Path $carpeta 'herramientas\reporte_prepagadas.html'
 $htmlCasos   = Join-Path $carpeta 'herramientas\reporte_casos_masivos.html'
-$cfgDir = Join-Path $env:APPDATA 'reporte_prepagadas'
+# Carpetas propias de QA: si se usan las mismas que produccion, el token
+# de SIME y el perfil de Edge de un entorno pisan los del otro cuando se
+# abren los dos el mismo dia. $cfgCm ya no se usa (el CM es fijo) pero se
+# deja definido porque /reset y /resetcm lo siguen limpiando.
+$cfgDir = Join-Path $env:APPDATA 'reporte_prepagadas_qa'
 $cfgCm  = Join-Path $cfgDir 'credenciales_cm.xml'
 $cfgSm  = Join-Path $cfgDir 'credenciales_sime.xml'
-$perfil = Join-Path $env:TEMP 'edge_reporte_prepagadas'
+$perfil = Join-Path $env:TEMP 'edge_reporte_prepagadas_qa'
 
 function Paso($n, $t) { Write-Host ("  [{0}/6] {1}" -f $n, $t) -ForegroundColor Gray }
 function Ok($t)       { Write-Host ("        OK  {0}" -f $t) -ForegroundColor Green }
@@ -91,8 +108,8 @@ function Nota($t)     { Write-Host ("        {0}" -f $t) -ForegroundColor DarkGr
 function Aviso($t)    { Write-Host ("        {0}" -f $t) -ForegroundColor Yellow }
 
 Write-Host ''
-Write-Host '  Herramientas SIME / CM' -ForegroundColor Yellow
-Write-Host '  ----------------------'
+Write-Host '  Herramientas SIME / CM  ***  QA  ***' -ForegroundColor Yellow
+Write-Host '  --------------------------------------'
 Nota ("PowerShell {0} | carpeta: {1}" -f $PSVersionTable.PSVersion, $carpeta)
 
 # ---------------------------------------------------------------------
@@ -293,8 +310,14 @@ try {
   }
 
   # ---------- 2. Credenciales ----------
-  Paso 2 'Credenciales (archivo local cifrado)...'
-  $credCm = Leer-Credencial $cfgCm 'CM / Keycloak' ''
+  Paso 2 'Credenciales (SIME: archivo local cifrado · CM: usuario fijo de QA)...'
+  # El CM de QA no pasa por Leer-Credencial: ni se pide, ni se lee del
+  # disco, ni se guarda. Si quedaba un archivo de una version anterior de
+  # esta copia, se borra para que no siga ahi sin que nadie lo use.
+  Remove-Item $cfgCm -Force -ErrorAction SilentlyContinue
+  $credCm = New-Object System.Management.Automation.PSCredential(
+    $CM_USER, (ConvertTo-SecureString $CM_PASS -AsPlainText -Force))
+  Ok ("CM: usuario por defecto de {0} ({1}) - no se guarda en el equipo" -f $ENTORNO, $CM_USER)
   if ($abrirReporte) {
     if ($sinSesion -or (Test-Path $cfgSm)) {
       $credSime = Leer-Credencial $cfgSm 'SIME (Windows: dominio\usuario)' $env:USERNAME
@@ -374,8 +397,12 @@ try {
     if (-not $tok.access_token) { throw 'Keycloak no devolvio access_token.' }
     Ok ("Sesion CM valida para {0} (token de {1}s)" -f $credCm.UserName, $tok.expires_in)
   } catch {
-    Remove-Item $cfgCm -Force -ErrorAction SilentlyContinue
-    throw ("Keycloak rechazo el login del CM: {0}`n         Se borraron esas credenciales: vuelve a ejecutar el .bat para reingresarlas." -f $_.Exception.Message)
+    # En QA no hay nada que borrar: el usuario es fijo. Si Keycloak lo
+    # rechaza, o el laboratorio esta caido o cambio el usuario por
+    # defecto, y eso no se arregla reingresando nada.
+    $msg = "Keycloak ({0}) rechazo el login del CM con el usuario por defecto '{1}': {2}" -f $KC_BASE, $CM_USER, $_.Exception.Message
+    $msg += "`n         Revisa que el laboratorio este arriba y que ese usuario siga siendo el de QA."
+    throw $msg
   }
 
   # ---------- 5. Edge ----------

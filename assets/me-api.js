@@ -17,8 +17,15 @@
     "use strict";
 
     const CONFIG = {
-        apiBase: "http://obp-apigw.exito-prod.movil-exito.internal",
-        kcBase: "http://keycloak.exito-prod.movil-exito.internal",
+        /* ===== ENTORNO: QA ==============================================
+           Esta copia apunta al laboratorio, NO a producción. Si algún día
+           se fusiona con master sin revisar esto, las herramientas seguirán
+           escribiendo en QA aunque digan «producción»: las dos líneas de
+           abajo son la diferencia entera entre un entorno y el otro.
+           ================================================================ */
+        entorno: "QA",
+        apiBase: "http://obp-apigw.exito-lab-1.movil-exito.internal",
+        kcBase: "http://keycloak.exito-lab-1.movil-exito.internal",
         realm: "optiva",
         clientId: "optiva",
 

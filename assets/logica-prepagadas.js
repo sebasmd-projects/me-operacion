@@ -159,7 +159,7 @@ async function probarSime() {
 
 async function obtenerTokenSime() {
     log("Obteniendo token SIME con la sesión de Windows…");
-    const r = await fetch("http://296vnext02.grupo-exito.com/SIME/Web", { credentials: "include", redirect: "follow" });
+    const r = await fetch("http://296vnextqa02/SIMEPRB/Web", { credentials: "include", redirect: "follow" });
     const m = /[?&]prf=([^&#]+)/.exec(r.url || "");
     let token = m ? decodeURIComponent(m[1]) : null;
     if (!token) {

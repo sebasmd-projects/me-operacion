@@ -114,6 +114,27 @@
   const canal = ("BroadcastChannel" in global) ? new BroadcastChannel("me-ui") : null;
   const K_SES = c => "me.sesion." + c;
   const K_CRED = c => "me.cred." + c;
+
+  /* =====================================================================
+     ENTORNO: QA
+     ---------------------------------------------------------------------
+     El CM de QA se usa SIEMPRE con el usuario por defecto del laboratorio.
+     No se lee ni se guarda nada del equipo para el CM: ni lo que dejó el
+     lanzador en la URL, ni lo que otra pestaña haya compartido, ni lo que
+     quedara de una copia de producción en el mismo navegador. El riesgo
+     que se evita es concreto y en los dos sentidos: que una credencial de
+     producción entre a QA, y que alguien pruebe en QA creyendo que está
+     con su usuario real.
+
+     SIME es la excepción a propósito: ahí el usuario es el mismo de
+     siempre (el de @grupo-exito.com), solo que apuntando a QA, así que su
+     token del lanzador se comparte igual que en producción.
+  ===================================================================== */
+  const ENTORNO = {
+    nombre: "QA",
+    cm: { usuario: "optiva", clave: "optiva" }
+  };
+  let avisoCredencialesIgnoradas = false;
   const ofusca = s => { try { return btoa(unescape(encodeURIComponent(s))); } catch (e) { return ""; } };
   const desofusca = s => { try { return decodeURIComponent(escape(atob(s))); } catch (e) { return ""; } };
 
@@ -172,19 +193,30 @@
   };
 
   const cred = {
-    /** Devuelve {usuario, clave} para 'cm' o {prf} para 'sime'. */
+    /** Devuelve {usuario, clave} para 'cm' o {prf} para 'sime'.
+        En QA el CM no consulta el almacenamiento: devuelve siempre el
+        usuario por defecto del laboratorio. */
     get(c) {
+      if (c === "cm") return Object.assign({}, ENTORNO.cm);
       const v = leer(K_CRED(c));
       if (!v) return null;
       try { return JSON.parse(desofusca(v)); } catch (e) { return null; }
     },
     set(c, obj) {
       if (!obj) return;
+      // En QA lo del CM no se persiste: es fijo, guardarlo solo serviría
+      // para que una credencial equivocada sobreviviera a la recarga.
+      if (c === "cm") { difundir({ tipo: "cred", clave: c }); return; }
       guardar(K_CRED(c), ofusca(JSON.stringify(obj)));
       difundir({ tipo: "cred", clave: c });
     },
     borrar(c) { olvidar(K_CRED(c)); }
   };
+
+  /* Restos de credenciales del CM que hubiera dejado una copia de
+     producción abierta antes en este mismo navegador: se borran al
+     arrancar para que no queden ahí sin que nadie las use ni las vea. */
+  try { olvidar(K_CRED("cm")); } catch (e) { }
 
   function difundir(msg) { if (canal) { try { canal.postMessage(msg); } catch (e) { } } }
   if (canal) canal.onmessage = () => pintarSesiones();
@@ -200,10 +232,11 @@
 
     if (abierto) guardar("me.abierto", abierto);
     if (prf) cred.set("sime", { prf });
-    if (u || p) {
-      const previo = cred.get("cm") || {};
-      cred.set("cm", { usuario: u || previo.usuario || "", clave: p || previo.clave || "" });
-    }
+    // En QA `cm_user`/`cm_pass` de la URL se descartan: el usuario del CM
+    // es fijo. Se siguen leyendo arriba solo para limpiarlos de la barra
+    // de direcciones igual que el resto. El aviso se guarda y se escribe
+    // más abajo: aquí todavía no existe la caja del registro.
+    if (u || p) avisoCredencialesIgnoradas = true;
     if (prf || u || p || abierto) {
       try { history.replaceState(null, "", location.pathname); } catch (e) { location.hash = ""; }
       return true;
@@ -276,7 +309,7 @@
             <i class="bi bi-list"></i>
           </button>
           <div class="me-top-titulo">
-            <b>${esc(CFG.titulo)}</b>
+            <b>${esc(CFG.titulo)} <span class="me-entorno">${esc(ENTORNO.nombre)}</span></b>
             <small>${esc(CFG.descripcion)}</small>
           </div>
           <div class="me-top-derecha">
@@ -1113,7 +1146,7 @@
     init(opciones) {
       Object.assign(CFG, opciones || {});
       if (!CFG.descripcion) CFG.descripcion = "";
-      document.title = `${CFG.titulo} · v${CFG.version}`;
+      document.title = `[${ENTORNO.nombre}] ${CFG.titulo} · v${CFG.version}`;
       leerArranque();
       montarShell();
       iniciarPie();
@@ -1123,6 +1156,12 @@
       pintarSesiones();
       setInterval(pintarSesiones, 1000);
       api.instrucciones();
+
+      api.log(`Entorno ${ENTORNO.nombre}: el CM usa el usuario por defecto `
+        + `«${ENTORNO.cm.usuario}» y no lee ni guarda credenciales en este equipo.`, "warn");
+      if (avisoCredencialesIgnoradas) {
+        api.log("El enlace traía credenciales del CM: se ignoraron.", "warn");
+      }
 
       /* Cualquier error de JavaScript de la página (incluidos los errores
          de sintaxis del bloque de lógica) queda escrito en el registro:
