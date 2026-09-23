@@ -20,7 +20,7 @@ GitHub ni permisos de administrador.
 | **Prepagadas · SIME ⇄ CM** | Verificación cruzada de líneas prepagadas y alta de suscripciones en SIME. | [reporte-prepagadas](reporte-prepagadas/README.md) |
 | **Cierre masivo de casos** | Búsqueda del ticket de cada caso y cierre por lotes en el CM, con simulación previa. | [cerrar-casos](cerrar-casos/README.md) |
 | **Exportar casos · Tipificación** | Descarga masiva de casos del CRM por rango de fechas y estados. | [reporte-tipificacion](reporte-tipificacion/README.md) |
-| **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) |
+| **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) · [análisis: recarga de paquetes](reporte-ajustes/recarga-de-paquetes-cm.md) |
 | **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueo/desbloqueo/conciliación) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) |
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |

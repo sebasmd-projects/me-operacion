@@ -209,6 +209,11 @@ Reglas críticas:
 
 ### Documentación
 
+- `doc/reporte-ajustes/recarga-de-paquetes-cm.md`: análisis del flujo del CM
+  para **agregar** paquetes a una línea (carrito → orden `ChangeOffer` →
+  borrado del carrito), sacado de una captura HAR real. **Es análisis, no hay
+  código**: la implementación en Ajustes/Paquetes queda pendiente y
+  **requiere aprobación explícita** antes de empezar.
 - `doc/generar-rechazo/README.md` fue normalizado a la estructura común e
   incluye historial.
 - Todos los encabezados y documentos deben usar la convención X.Y.Z.
