@@ -579,9 +579,25 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
                 pintarTimeline(pasosPintados);
             }
             pintarSalida(ultimaSalida);
-            if (!faltan.length && typeof alAplicar === "function") alAplicar();
+            if (!faltan.length) await refrescarPantalla();
         } catch (e) {
             MEUI.toast("No se pudo verificar: " + e.message, "err");
+        }
+    }
+
+    /** Devuelve el control a la herramienta para que repinte paquetes, tabla
+        principal y movimientos con datos frescos del CM. Si falla, se dice:
+        la orden ya salió y el analista tiene que saber que lo que ve en
+        pantalla puede estar viejo. */
+    async function refrescarPantalla() {
+        if (typeof alAplicar !== "function") return;
+        estado("Actualizando los datos de la línea…", "info");
+        try {
+            await alAplicar();
+        } catch (e) {
+            log("⚠ La orden salió, pero no se pudo refrescar la pantalla: " + e.message
+                + ". Vuelve a consultar la línea.", "warn");
+            estado("La orden salió, pero la pantalla no se pudo actualizar. Vuelve a consultar la línea.", "err");
         }
     }
 
@@ -650,9 +666,13 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
             pintarSalida(ultimaSalida);
             if (!ultimaSalida.error) {
                 ctx.bundlesActivos = ultimaSalida.despues || ctx.bundlesActivos;
-                estado("Listo. Revisa el resultado y el registro.", "");
                 MEUI.toast(`Orden ${ultimaSalida.orden?.id || ""} creada.`, "ok");
-                if (typeof alAplicar === "function") alAplicar();
+                // Se espera a que la pantalla quede al día antes de decir
+                // «listo»: la compra mueve paquetes, tabla principal y
+                // movimientos, y dejarlos viejos es peor que tardar dos
+                // segundos más.
+                await refrescarPantalla();
+                estado("Listo. Revisa el resultado y el registro.", "");
             } else {
                 estado("La carga falló. Revisa el registro antes de reintentar.", "err");
                 MEUI.toast("No se cargó el paquete. Mira el registro.", "err");

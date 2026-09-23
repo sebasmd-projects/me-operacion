@@ -998,19 +998,60 @@ function pintarPaquetes(f) {
     }
 }
 
-/** Vuelve a leer los paquetes de la línea y repinta, sin rehacer toda la
-    consulta. Lo usa la carga de paquetes (logica-paquetes-carga.js) cuando
-    una orden queda aplicada: lo que se acaba de cargar tiene que verse en
-    «Uso y Balance» sin que el analista consulte otra vez. */
-async function recargarUsoLinea(f) {
+/** ¿El rango que hay en pantalla alcanza hasta ahora? Si no, la compra que
+    se acaba de hacer cae FUERA de él y volver a pedir movimientos sería pagar
+    una consulta paginada para traer exactamente lo mismo.
+
+    Se miran los INPUTS y no el rango de la última consulta a propósito: es lo
+    que `cargarHistorico()` va a usar, así que la decisión y la consulta miran
+    el mismo dato. */
+function rangoEnPantallaCubreAhora() {
+    const desde = MEUI.$("#mdHistDesde"), hasta = MEUI.$("#mdHistHasta");
+    if (!desde || !hasta || !desde.value || !hasta.value) return false;
+    const ahora = isoLocalSinZ(new Date());
+    return ahora >= normalizarLocalISO(desde.value) && ahora <= normalizarLocalISO(hasta.value);
+}
+
+/** Repinta la línea completa después de cargar un paquete, sin rehacer la
+    consulta de todas las líneas. Lo usa logica-paquetes-carga.js cuando una
+    orden queda aplicada.
+
+    Se refresca TODO lo que el paquete nuevo mueve, no solo los paquetes:
+
+      · «Uso y Balance» del detalle          (bundleBalance)
+      · tabla principal y sus tarjetas       (paquetes activos, datos/voz/SMS)
+      · «Movimientos» del detalle            (la compra es un movimiento nuevo)
+      · «Consumo» y sus gráficas             (vienen en la misma consulta)
+
+    Todo se vuelve a leer del CM: no se parchea el estado en memoria con lo
+    que «debería» haber quedado, porque entonces la pantalla diría lo que
+    esperamos y no lo que el CM tiene. */
+async function recargarLineaTrasCarga(f) {
     if (!f || !f.cm || !f.cm.subscriberId) return;
+
     try {
         f.cm.uso = await cmBundleBalance(f.cm.subscriberId);
         pintarPaquetes(f);
-        render();
+        render();                       // tabla principal + tarjetas resumen
         MEUI.log(`Paquetes de ${f.msisdn} actualizados tras la carga.`, "ok");
     } catch (e) {
         MEUI.log("⚠ No se pudieron refrescar los paquetes: " + e.message, "warn");
+    }
+
+    // Movimientos y consumo comparten consulta y rango. Solo vale la pena
+    // rehacerla si el rango llega hasta hoy; si el analista está mirando un
+    // período pasado, la compra no va a estar ahí y hay que decírselo en vez
+    // de dejar la tabla igual sin explicación.
+    if (!f.movimientos) return;
+    if (rangoEnPantallaCubreAhora()) {
+        await cargarHistorico(f);
+        MEUI.log(`Movimientos y consumo de ${f.msisdn} actualizados tras la carga.`, "ok");
+    } else {
+        const aviso = "La compra que acabas de hacer no entra en el rango de fechas de abajo: "
+            + "lleva «Hasta» hasta hoy y presiona «Consultar movimientos y consumo» para verla.";
+        const el = MEUI.$("#mdHistEstado");
+        if (el) el.innerHTML = `<span class="text-warning-emphasis">⚠ ${MEUI.esc(aviso)}</span>`;
+        MEUI.log("⚠ " + aviso, "warn");
     }
 }
 
@@ -1472,7 +1513,7 @@ function abrirDetalle(msisdn) {
     // Sección «Cargar paquete»: vive en logica-paquetes-carga.js porque es
     // la única que escribe en el CM. Si ese archivo no está enlazado, la
     // herramienta sigue funcionando en modo solo lectura.
-    if (window.MEPAQ) MEPAQ.montar(f, { recargar: () => recargarUsoLinea(f) });
+    if (window.MEPAQ) MEPAQ.montar(f, { recargar: () => recargarLineaTrasCarga(f) });
 
     if (f.cm) {
         MEUI.$("#mdHistWrap").style.display = "block";

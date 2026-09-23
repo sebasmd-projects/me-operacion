@@ -200,7 +200,20 @@ Son tres pasos, con el mismo lenguaje visual que los pasos de la columna izquier
 
 **2 · Revisar.** Tabla de exactamente lo que se va a enviar: los componentes obligatorios en `NO_CHANGE` y lo elegido en `ADD`, con precio y total. Un `<details>` muestra el **cuerpo JSON exacto** del carrito, igual que la simulación de "Cierre masivo de casos". Si algún paquete elegido ya está activo, se avisa; si el total es distinto de 0, **el botón de enviar queda bloqueado** (ver Riesgos).
 
-**3 · Resultado.** Línea de tiempo de las cuatro operaciones (carrito → orden → limpieza → verificación) con su estado y su detalle, el número de orden `SOI…` copiable, y el **antes / después** de los paquetes de la línea. Si el CM todavía no refleja el cambio —tarda unos segundos— hay un botón **Verificar de nuevo** en vez de darlo por fallido. Cuando la verificación sale limpia, «Uso y Balance» se refresca solo.
+**3 · Resultado.** Línea de tiempo de las cuatro operaciones (carrito → orden → limpieza → verificación) con su estado y su detalle, el número de orden `SOI…` copiable, y el **antes / después** de los paquetes de la línea. Si el CM todavía no refleja el cambio —tarda unos segundos— hay un botón **Verificar de nuevo** en vez de darlo por fallido.
+
+**Qué se actualiza al terminar.** Una compra no mueve solo los paquetes, así que al quedar la orden aplicada se vuelve a leer del CM y se repinta todo lo que cambia:
+
+| Se refresca | Con qué |
+|---|---|
+| «Paquetes · Uso y Balance» del detalle | `subscription/bundleBalance` |
+| Tabla principal y sus tarjetas resumen (paquetes activos, datos/voz/SMS) | lo anterior, repintado |
+| «Movimientos» del detalle y sus tarjetas — **la compra es un movimiento nuevo** | `detailedSubscriptionTransaction` |
+| «Consumo» y sus gráficas | `listDetailedCallDetailsWithBundles` (viene en la misma consulta) |
+
+Nada se parchea en memoria con lo que «debería» haber quedado: todo se vuelve a leer, para que la pantalla diga lo que el CM tiene y no lo que esperábamos.
+
+Movimientos y consumo se rehacen **solo si el rango de fechas que está en pantalla llega hasta hoy** — que es el caso normal, porque arranca en el mes en curso. Si el analista está mirando un período pasado, la compra no cabe ahí: en vez de pagar una consulta paginada para traer lo mismo, se avisa junto al rango que hay que llevar «Hasta» hasta hoy y volver a consultar. El paso «Resultado» no dice «Listo» hasta que ese refresco terminó; si falla, lo dice en vez de dejar datos viejos en pantalla sin avisar.
 
 Todo queda escrito en el registro del paso 3 de la izquierda: la selección enviada, el `cartId`, el `Transaction-Id`, el número de orden y el resultado de la verificación.
 
@@ -259,7 +272,7 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 
 | Versión | Cambios |
 |---|---|
-| **1.8.0** | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
+| **1.8.0** | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. Al quedar aplicada se refrescan paquetes, tabla principal, movimientos y consumo con datos nuevos del CM. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
 | **1.7.0** | La identificación aparece en la cabecera del detalle con botón de copia rápida. La resolución del titular incorpora dos respaldos confirmados con el flujo de Postman: `individual.fullName` y el `id` de la cuenta como posible `individualID` cuando falta la relación `Individual`, conservando la búsqueda multinivel existente. |
 | 1.6 | **Corrige un recorte introducido en la 1.5** y agrega reintentos. (1) El paginador usaba el tamaño de la página para decidir si quedaban más registros; como el CM no devuelve páginas de tamaño constante, cualquier página más corta que la anterior se tomaba por la última y la consulta terminaba antes de tiempo —trayendo **menos** registros que antes de la 1.5—. Ahora la única condición de fin es que una página no aporte **nada nuevo**. (2) Cuando el CM responde 500 en una página, ya no se corta la paginación con un aviso: se **reintenta** la misma petición (2 veces, con espera creciente) y, si sigue fallando, se vuelve a pedir la misma ventana con **la mitad de registros** hasta un piso de 50 — el tamaño reducido se mantiene para las páginas siguientes. Solo si se agota todo eso se da por perdida, devolviendo igual lo ya traído. (3) Una falla total de los movimientos ya no se muestra como "0 movimientos": queda marcada como incompleta. |
 | 1.5 | **Se quita el tope de registros del resultado.** El `limit=500` es de la API (el CM rechaza más), no del resultado: ahora el rango de fechas elegido se trae completo, sin límite de registros — el paginador solo para cuando el CM da la lista por terminada. Queda una única guarda anti-bucle (1.000 páginas = 500.000 registros por línea y rango), que con datos normales no se alcanza y que si salta se reporta como error. Como un rango grande son varias páginas seguidas, el modal muestra el **conteo en vivo** mientras las trae. |

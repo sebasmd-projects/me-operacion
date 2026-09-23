@@ -465,6 +465,12 @@ a pedir el número. Respeta la arquitectura de tres capas de la suite:
 - **La verificación es contra `subscriberProfile`**, no contra el `200` de la
   orden. Si el CM aún no refleja el cambio, ofrece verificar de nuevo en vez
   de darlo por fallido.
+- **Al terminar se repinta con datos nuevos del CM**, no con el estado que
+  «debería» haber quedado: paquetes (`bundleBalance`), tabla principal y
+  —porque la compra es un movimiento nuevo— movimientos y consumo
+  (`detailedSubscriptionTransaction` y `listDetailedCallDetailsWithBundles`).
+  Estos dos solo si el rango en pantalla llega hasta hoy; si no, se avisa en
+  vez de pagar una consulta paginada que traería lo mismo.
 
 ### Cómo se validó
 

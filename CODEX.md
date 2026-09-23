@@ -218,6 +218,10 @@ Reglas críticas:
   reales, en `doc/reporte-ajustes/recarga-de-paquetes-cm.md`. **Leer eso antes
   de tocar el carrito o la orden**: la orden se arma desde la RESPUESTA del
   carrito a propósito, y los paquetes ya activos no se reenvían.
+- Tras una carga aplicada se refrescan **paquetes, tabla principal,
+  movimientos y consumo** (`recargarLineaTrasCarga` en `logica-consumos.js`),
+  releyendo del CM. Movimientos/consumo solo si el rango en pantalla llega
+  hasta hoy; si se toca `cargarHistorico`, revisar también esa función.
 - Guardas que no se quitan sin una captura que las reemplace: solo precio 0,
   sin reintento de `productOrder` (el CM no deduplica), carrito borrado
   siempre, verificación contra `subscriberProfile` y no contra el `200`.
