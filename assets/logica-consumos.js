@@ -998,6 +998,22 @@ function pintarPaquetes(f) {
     }
 }
 
+/** Vuelve a leer los paquetes de la línea y repinta, sin rehacer toda la
+    consulta. Lo usa la carga de paquetes (logica-paquetes-carga.js) cuando
+    una orden queda aplicada: lo que se acaba de cargar tiene que verse en
+    «Uso y Balance» sin que el analista consulte otra vez. */
+async function recargarUsoLinea(f) {
+    if (!f || !f.cm || !f.cm.subscriberId) return;
+    try {
+        f.cm.uso = await cmBundleBalance(f.cm.subscriberId);
+        pintarPaquetes(f);
+        render();
+        MEUI.log(`Paquetes de ${f.msisdn} actualizados tras la carga.`, "ok");
+    } catch (e) {
+        MEUI.log("⚠ No se pudieron refrescar los paquetes: " + e.message, "warn");
+    }
+}
+
 function pintarCuentas(f) {
     const wrap = MEUI.$("#mdCuentasWrap");
     const cuentas = (f.cm && f.cm.cuentas) || [];
@@ -1453,6 +1469,10 @@ function abrirDetalle(msisdn) {
     pintarCabeceraModal(f);
     pintarPaquetes(f);
     pintarCuentas(f);
+    // Sección «Cargar paquete»: vive en logica-paquetes-carga.js porque es
+    // la única que escribe en el CM. Si ese archivo no está enlazado, la
+    // herramienta sigue funcionando en modo solo lectura.
+    if (window.MEPAQ) MEPAQ.montar(f, { recargar: () => recargarUsoLinea(f) });
 
     if (f.cm) {
         MEUI.$("#mdHistWrap").style.display = "block";

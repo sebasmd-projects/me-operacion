@@ -96,6 +96,16 @@
     if (el("btnJSON") && esFn("filasParaExportar"))
         el("btnJSON").addEventListener("click", () => MEUI.exportarJSON(filasParaExportar(), base));
 
+    /* --- 4b · Carga de paquetes (opcional) ----------------------------
+       La herramienta funciona sin ella, en modo solo lectura: si el archivo
+       no está enlazado, la sección «Cargar paquete» simplemente no aparece
+       y conviene que eso quede dicho en el registro y no se descubra a mitad
+       de un caso. */
+    if (!window.MEPAQ) {
+        MEUI.log("Sin assets/logica-paquetes-carga.js: la herramienta queda en modo "
+            + "solo consulta (no aparece «Cargar paquete» en el detalle).", "warn");
+    }
+
     /* --- 5 · Retroalimentación visible -------------------------------- */
     MEUI.autoSpinner("#btnConsultar", "Consultando CM…");
 

@@ -1,10 +1,12 @@
 # Recarga / agregado de paquetes (bundles) en el CM — análisis del flujo
 
-> **Estado: ANÁLISIS. No implementado.** Este documento describe el flujo real
-> que usa el front del CM (`obp-cms-frontend`) para agregar paquetes a una
-> línea prepagada. Se deja escrito para implementarlo **después**, dentro de
-> la herramienta **Ajustes y paquetes** (`export_ajustes.html`), en un paso
-> aparte **que requiere aprobación explícita** antes de escribir código.
+> **Estado: IMPLEMENTADO en «Bolsillos, Paquetes, Consumos»** (`reporte_consumos.html`
+> v1.8.0, sección «Cargar paquete» del detalle de la línea · lógica en
+> `assets/logica-paquetes-carga.js`). Este documento sigue siendo la
+> referencia del flujo: describe el comportamiento real del front del CM
+> (`obp-cms-frontend`) y es contra él que se validó la implementación.
+> La sección 6 (preguntas abiertas) **sigue abierta** y explica por qué la
+> herramienta solo carga paquetes de precio 0 y por qué no retira paquetes.
 >
 > Fuente: captura HAR `recargar_bundles.har` (23/09/2026, 13:46–13:49 UTC ·
 > 08:46–08:49 hora Colombia), 179 peticiones, de las cuales 40 van al gateway
@@ -422,54 +424,56 @@ con otra captura antes de escribir código:
 
 ---
 
-## 7. Propuesta de implementación *(pendiente de aprobación)*
+## 7. Cómo quedó implementado
 
-**No ejecutar sin visto bueno explícito.** Se deja escrito para que la decisión
-sea sobre algo concreto.
-
-### Dónde
-
-Dentro de **Ajustes y paquetes** (`export_ajustes.html`), como una pestaña
-nueva **«Cargar paquete»**, separada de las dos pestañas de consulta. Respeta
-la arquitectura de tres capas de la suite:
+Quedó en **«Bolsillos, Paquetes, Consumos»** (`reporte_consumos.html`), no en
+Ajustes: esa herramienta ya resuelve la línea y ya muestra sus paquetes
+activos, así que agregar uno es el paso natural siguiente y no hay que volver
+a pedir el número. Respeta la arquitectura de tres capas de la suite:
 
 | Capa | Archivo | Qué le toca |
 |---|---|---|
-| Marcado | `herramientas/export_ajustes.html` | Pestaña nueva: línea, buscador de paquetes, resumen y confirmación. Sin reglas. |
-| Lógica | `assets/logica-ajustes.js` (o `assets/logica-paquetes-carga.js` si crece) | Resolución de la línea, catálogo, armado de carrito y orden, verificación. |
-| Puente | `assets/me-ajustes-puente.js` | Enganche con el shell, pasos y sesión. |
-| Común | `assets/me-api.js` | **Sin cambios.** `MEAPI.api()` ya cubre `POST`/`DELETE` y las cabeceras; el único extra es `Transaction-Id`, que va en `headers` de la llamada. |
+| Marcado | `herramientas/reporte_consumos.html` | Sección «Cargar paquete» dentro del modal de detalle: pasos, buscador, revisión y resultado. Sin reglas. |
+| Lógica | `assets/logica-paquetes-carga.js` | Todo el flujo: perfil, oferta, catálogo, carrito, orden, limpieza y verificación. Archivo propio, porque es lo único que escribe. |
+| Consulta | `assets/logica-consumos.js` | Solo dos enganches: monta la sección al abrir el detalle y refresca «Uso y Balance» cuando una orden queda aplicada. |
+| Común | `assets/me-api.js` | **Sin cambios.** `MEAPI.api()` ya cubre `POST`/`DELETE` y las cabeceras; `Transaction-Id` va en `headers` de esa llamada. |
 
-### Cómo, por pasos de interfaz
+> `logica-paquetes-carga.js` va dentro de un IIFE y expone solo `window.MEPAQ`.
+> Es obligatorio: se carga en la misma página que `logica-consumos.js`, y dos
+> scripts clásicos no pueden declarar `CONFIG`, `auth` o `getJson` dos veces.
 
-1. **Paso «Línea»** — se escribe el MSISDN o el `subscriptionId`; se resuelve
-   `subscriberProfile` y se muestra titular, plan, estado y **los paquetes ya
-   activos** (traduciendo `enabledOptionalBundles` con el catálogo).
-2. **Paso «Paquete»** — se resuelve la oferta (`primaryPricePlanId` →
-   `productOfferingId`), se carga `addOn` una sola vez, se cachea, y se ofrece
-   un buscador sobre los 469 bundles (por nombre, `bundleId` o `productId`).
-   Se marca visualmente el que ya esté activo.
-3. **Paso «Revisar»** — tabla con lo que se va a enviar: obligatorios en
-   `NO_CHANGE`, elegidos en `ADD`, precio de cada uno y total. **Si el total es
-   distinto de 0, bloquear** hasta que se resuelva el punto 1 de la sección 6.
-4. **Paso «Confirmar»** — botón explícito, con doble confirmación. Encadena
-   `POST shoppingCart` → `POST productOrder` → `DELETE shoppingCart`.
-5. **Paso «Verificar»** — reconsulta `subscriberProfile` y compara el antes y
-   el después; muestra el `SOI…` y el resultado, y lo deja exportable.
+### Diferencias deliberadas con la captura
 
-### Guardas mínimas, no negociables
+| La captura hace | La herramienta hace | Por qué |
+|---|---|---|
+| `GET /addOn` (≈475 KB) **y** tres `POST selectableProducts` | Solo dos `POST selectableProducts` (`PROD_COMP_TPS` y `PROD_COMP_BDLE`) | El `addOn` y el tercer `POST` (`PROD_COMP_PACKAGE`) solo alimentan pantallas del asistente del CM que aquí no existen. Los dos que quedan son los que dicen qué es obligatorio y cuáles son los bundles elegibles. |
+| Deja el `itemGroupId` que generó su front | Genera uno propio (4 dígitos) por envío | No viene del API: lo inventa el cliente y se usa además como prefijo de `{grupo}_MSISDN` e `{grupo}_ICCID`. |
+| Manda los componentes de la orden ordenados por id | Igual | Se copió el detalle para que el cuerpo salga idéntico y no quede una diferencia sin explicar. |
 
-- **Simulación primero** (como ya hace Cierre masivo de casos): armar y mostrar
-  el cuerpo del carrito sin enviarlo.
-- **Una línea a la vez** en la primera versión. Nada de cargas masivas hasta
-  que el flujo esté probado.
-- **Registro completo** en el log del paso 4 de la herramienta: cada llamada,
-  su cuerpo, el `cartId`, el `SOI…` y el resultado de la verificación.
-- **Borrar siempre el carrito**, incluso si la orden falla, para no dejar
-  basura pegada al cliente.
-- **No reintentar automáticamente** `POST /productOrder`. Ante un error de red
-  con respuesta incierta, consultar antes de volver a enviar (ver punto 6 de la
-  sección anterior).
+### Guardas implementadas
+
+- **Revisión obligatoria antes de enviar**, con el cuerpo JSON exacto del
+  carrito a la vista (mismo criterio que la simulación de Cierre masivo).
+- **Una línea a la vez.** No hay carga masiva.
+- **Solo precio 0**: cualquier selección con costo bloquea el botón de enviar.
+- **Registro completo** en el log de la herramienta: selección, `cartId`,
+  `Transaction-Id`, número de orden y resultado de la verificación.
+- **El carrito se borra siempre**, haya fallado o no la orden; si el `DELETE`
+  falla se avisa con el `cartId` para borrarlo desde el CM.
+- **La orden no se reintenta.** El CM no deduplica: ante una respuesta
+  incierta la herramienta para y lo dice.
+- **La verificación es contra `subscriberProfile`**, no contra el `200` de la
+  orden. Si el CM aún no refleja el cambio, ofrece verificar de nuevo en vez
+  de darlo por fallido.
+
+### Cómo se validó
+
+Sin CM de pruebas, se validó **contra la propia captura**: se monta el marcado
+real en un DOM, se le devuelven como CM las mismas respuestas del HAR y se
+comparan el carrito y la orden que produce contra los cuerpos que el front del
+CM envió de verdad — salen idénticos, salvo el `itemGroupId`, que es aleatorio
+por diseño. También se ejercitó el camino de error (orden que falla): una sola
+llamada a `productOrder`, carrito borrado igual, sin verificación ni refresco.
 
 ---
 
@@ -495,4 +499,5 @@ la arquitectura de tres capas de la suite:
 
 | Fecha | Cambio |
 |---|---|
+| 2026-09-23 | Implementado en `reporte_consumos.html` v1.8.0 («Cargar paquete»). La sección 7 pasa de propuesta a cómo quedó; las preguntas abiertas de la sección 6 siguen abiertas. |
 | 2026-09-23 | Documento inicial. Análisis del HAR `recargar_bundles.har`. Sin implementación. |

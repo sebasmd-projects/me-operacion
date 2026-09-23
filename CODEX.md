@@ -44,6 +44,7 @@ assets/
   me-ui.js / me-ui.css             shell, pasos, tablas, exportación, copiar
   me-api.js                        Keycloak y acceso común al CM
   logica-<modulo>.js               reglas, consultas y transformación
+  logica-paquetes-carga.js         carga de paquetes en el CM (escritura)
   me-<modulo>-puente.js            eventos entre shell, HTML y lógica
 doc/<modulo>/README.md              documentación e historial
 release/                            artefactos que se suben al servidor
@@ -59,7 +60,7 @@ Regla arquitectónica: conservar la separación **HTML = marcado**, **lógica =
 |---|---|---|---|
 | Inicio | `index.html` | `assets/logica-inicio.js` | Catálogo y descarga de herramientas. |
 | Prepagadas | `reporte_prepagadas.html` | `logica-prepagadas.js` | Cruce SIME ⇄ CM. |
-| Consumos | `reporte_consumos.html` | `logica-consumos.js` | Línea, titular, paquetes, movimientos y CDR. |
+| Consumos | `reporte_consumos.html` | `logica-consumos.js` + `logica-paquetes-carga.js` | Línea, titular, paquetes, movimientos y CDR. **Carga de paquetes** (única escritura) en el segundo archivo. |
 | Ajustes/Paquetes | `export_ajustes.html` | `logica-ajustes.js` | Ajustes de dinero y paquetes del CM. |
 | Tipificación | `export_tipificacion.html` | `logica-tipificacion.js` | Exportación de casos. |
 | Casos masivos | `reporte_casos_masivos.html` | `logica-casos.js` | Cierre/anotación masiva. |
@@ -207,13 +208,23 @@ Reglas críticas:
 - `me-ui.js` delega `.btn-copy` y soporta `data-copy-target` o
   `data-copy-text`, con fallback para `file://`/HTTP sin Clipboard API.
 
-### Documentación
+### Carga de paquetes (Consumos 1.8.0)
 
-- `doc/reporte-ajustes/recarga-de-paquetes-cm.md`: análisis del flujo del CM
-  para **agregar** paquetes a una línea (carrito → orden `ChangeOffer` →
-  borrado del carrito), sacado de una captura HAR real. **Es análisis, no hay
-  código**: la implementación en Ajustes/Paquetes queda pendiente y
-  **requiere aprobación explícita** antes de empezar.
+- Es **la única escritura de toda la suite** fuera de Casos y HLR Claro, y vive
+  aparte en `assets/logica-paquetes-carga.js` (IIFE, expone `window.MEPAQ`);
+  no puede declarar globales sueltas porque comparte página con
+  `logica-consumos.js`.
+- El flujo del CM está documentado endpoint por endpoint, con los cuerpos
+  reales, en `doc/reporte-ajustes/recarga-de-paquetes-cm.md`. **Leer eso antes
+  de tocar el carrito o la orden**: la orden se arma desde la RESPUESTA del
+  carrito a propósito, y los paquetes ya activos no se reenvían.
+- Guardas que no se quitan sin una captura que las reemplace: solo precio 0,
+  sin reintento de `productOrder` (el CM no deduplica), carrito borrado
+  siempre, verificación contra `subscriberProfile` y no contra el `200`.
+- Sigue pendiente: cómo se arma el cobro cuando el paquete tiene precio y qué
+  `action` retira un paquete (sección 6 de ese documento).
+
+### Documentación
 - `doc/generar-rechazo/README.md` fue normalizado a la estructura común e
   incluye historial.
 - Todos los encabezados y documentos deben usar la convención X.Y.Z.
