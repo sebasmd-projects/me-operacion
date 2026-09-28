@@ -136,16 +136,35 @@ const identDeIndividual = ind =>
  * usa el CM: la consulta simple, el filtro «todo en uno» y la búsqueda
  * por ID de cuenta (las relaciones traen el ID, que no siempre es el
  * externalID).
+ *
+ * Los dos primeros caminos EXIGEN que la cuenta devuelta sea la pedida.
+ * `billingAccount?externalID=X` no es una consulta de igualdad —el mismo
+ * parámetro admite un filtro compuesto por `%3B` sobre varios campos—, así
+ * que puede devolver otra cuenta parecida. Antes se tomaba `lista[0]` a
+ * ciegas y con `limit=1`, y se acababa usando una cuenta que ni siquiera
+ * era de la línea: eso es lo que después hacía fallar la orden en el CM
+ * (500 al eliminar paquetes) y lo que desviaba la búsqueda del titular.
+ * Se pide `limit=10` y se acepta solo la coincidencia exacta; si no la
+ * hay, se sigue con el camino siguiente en vez de devolver una ajena.
+ *
+ * El tercer camino (GET por id) se deja tal cual: ahí la ruta ya
+ * identifica el recurso, no hay ambigüedad que validar.
  */
 async function buscarBillingAccount(externalID) {
     const norm = r => Array.isArray(r) ? r : (r?.billingAccounts || r?.results || []);
+    const clave = String(externalID);
+    // Exacta por externalID o por id: las relaciones entre cuentas traen el
+    // id, así que las dos formas cuentan como «es la cuenta que pedí».
+    const exacta = lista => lista.find(a =>
+        String(a?.externalID || "") === clave || String(a?.id || "") === clave) || null;
 
     let lista = norm(await getJson(`${CONFIG.apiBase}/api/v1/billingAccount`,
-        { externalID, offset: 0, limit: 1 }).catch(() => null));
-    if (lista.length) return lista[0];
+        { externalID, offset: 0, limit: 10 }).catch(() => null));
+    let elegida = exacta(lista);
+    if (elegida) return elegida;
 
     const filtro = [
-        String(externalID),
+        clave,
         `id=${externalID}`,
         `contact.contactMedium.characteristic.emailAddress=${externalID}`,
         `contact.contactMedium.characteristic.phoneNumber=${externalID}`,
@@ -153,7 +172,8 @@ async function buscarBillingAccount(externalID) {
     ].join("%3B");
     lista = norm(await getJson(
         `${CONFIG.apiBase}/api/v1/billingAccount?externalID=${filtro}&offset=0&limit=10`).catch(() => null));
-    if (lista.length) return lista[0];
+    elegida = exacta(lista);
+    if (elegida) return elegida;
 
     const porId = await getJson(
         `${CONFIG.apiBase}/api/v1/billingAccount/${encodeURIComponent(externalID)}`).catch(() => null);

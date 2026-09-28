@@ -248,6 +248,32 @@ const PROYECTOS = [
         ]
     },
     {
+        id: "plu",
+        numero: 10,
+        nombre: "Aplicar PLU de paquete",
+        descripcion: "Aplica un PLU de paquete en Tulio (RecargaPaquete) sobre una línea y verifica contra el CM qué quedó: por cada paquete nuevo o con saldo sumado muestra el total, el valor anterior y cuánto se sumó. Queda de solo consulta para quien no esté autorizado. Porte de la consola local consola_bundles_movil_exito, sin su servidor Python.",
+        estado: "Operación",
+        abrir: "herramientas/aplicar_plu.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. La recarga escribe en produccion y solo esta habilitada para los usuarios de USUARIO_AGREGAR_PLU con sesion del CM vigente.",
+                archivos: [
+                    { nombre: "aplicar_plu.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/aplicar_plu.html" },
+                    { nombre: "logica-plu.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-plu.js" },
+                    { nombre: "me-plu-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-plu-puente.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "Endpoints de Tulio, eleccion de cuenta de la linea, el cuadro de «cuanto se sumo» y riesgos.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/aplicar-plu/README.md" }
+                ]
+            }
+        ]
+    },
+    {
         id: "base",
         numero: 0,
         nombre: "Base compartida",
