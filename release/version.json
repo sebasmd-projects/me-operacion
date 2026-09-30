@@ -1,7 +1,7 @@
 {
-    "version":  "2.6.1",
-    "zip":  "me-operacion-2.6.1.zip",
-    "sha256":  "FDDDCC62EC9FA77FB11D3741216E346E4D0509BDC8205F207FA0FCB63745F6CA",
-    "generado":  "2026-09-23T10:34:32",
-    "notas": "feat:Agregar bundles && fix: Los registros al agregar un paquete también se actualizan"
+    "version":  "2.9.0",
+    "zip":  "me-operacion-2.9.0.zip",
+    "sha256":  "10981CEB65CB56D0CD15D4AF5C02F6E46084606E1E5CF1EC1ECB3DCB3EAAF71C",
+    "generado":  "2026-09-30T08:44:46",
+    "notas":  ""
 }

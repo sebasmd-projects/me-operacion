@@ -718,6 +718,12 @@ async function cmEsperarOrden(ban, ordenId, alProgresar) {
     return { estado: "Order Pending", ok: false, motivo: "el CM no dio un estado final en 30 s", orden: ultima };
 }
 
+/** Cuerpo de un error del CM para la evidencia: el JSON si lo es, o el texto. */
+function respuestaDeError(e) {
+    const crudo = String(e?.cuerpo || "");
+    try { return JSON.parse(crudo); } catch (x) { return { httpStatus: e?.status || null, text: crudo || (e?.message || String(e)) }; }
+}
+
 /* Máximo de productos que se agregan al carrito por dependencias que el
    propio CM reclama (ver crearCarrito). Es un tope, no un objetivo: si
    hacen falta más de estos, algo más grande está mal. */
@@ -748,17 +754,25 @@ async function crearCarrito(items, ctx, res, aviso) {
     const agregados = [];
 
     for (let intento = 1; intento <= MAX_DEPENDENCIAS + 1; intento++) {
+        // Se guarda la petición y la respuesta del ÚLTIMO intento: es la
+        // que va a la evidencia (Excel), también cuando falla.
+        const pedido = {
+            relatedParty: ctx.parte,
+            cartItem: [{
+                action: "MODIFY", id: "00001", index: 0, itemGroupId: ctx.grupo,
+                productOffering: { id: ctx.oferta, quantity: 1, includedItems: lista.slice() },
+                note: [{ text: "", author: "" }]
+            }],
+            userData: ctx.userData, channel: [{ id: "DCRM" }]
+        };
+        res.evidencia = res.evidencia || {};
+        res.evidencia.cart = { request: pedido };
         try {
-            return await postCm("/api/v1/shoppingCart", {
-                relatedParty: ctx.parte,
-                cartItem: [{
-                    action: "MODIFY", id: "00001", index: 0, itemGroupId: ctx.grupo,
-                    productOffering: { id: ctx.oferta, quantity: 1, includedItems: lista },
-                    note: [{ text: "", author: "" }]
-                }],
-                userData: ctx.userData, channel: [{ id: "DCRM" }]
-            });
+            const r = await postCm("/api/v1/shoppingCart", pedido);
+            res.evidencia.cart.response = r;
+            return r;
         } catch (e) {
+            res.evidencia.cart.response = respuestaDeError(e);
             const cuerpo = String(e.cuerpo || e.message || "");
             const m = /Missing dependent product[^]*?product id\s*:\s*(\d+)/i.exec(cuerpo);
             if (!m) throw e;                       // otro error: sube tal cual
@@ -919,7 +933,7 @@ async function eliminarPaquetes(fila, esperados, alPaso) {
         }
 
         aviso("Enviando la orden de eliminación…");
-        const orden = await postCm("/api/v1/productOrder", {
+        const pedidoOrden = {
             notificationContact: "", channel: [{ id: "DCRM" }],
             relatedParty: carrito.relatedParty,
             productOrderItem: JSON.parse(JSON.stringify(carrito.cartItem)),
@@ -930,7 +944,16 @@ async function eliminarPaquetes(fila, esperados, alPaso) {
                 { name: "PAYMENT_METHOD", value: "" }
             ]),
             type: "ChangeOffer", atuBssTokenID: ""
-        }, { "Transaction-Id": idTransaccion() });
+        };
+        res.evidencia.order = { request: pedidoOrden };
+        let orden;
+        try {
+            orden = await postCm("/api/v1/productOrder", pedidoOrden, { "Transaction-Id": idTransaccion() });
+            res.evidencia.order.response = orden;
+        } catch (e) {
+            res.evidencia.order.response = respuestaDeError(e);
+            throw e;
+        }
 
         if (!orden?.id) {
             res.detalle = "la respuesta del CM no confirmó una orden: revisa el estado antes de repetir";
@@ -940,6 +963,7 @@ async function eliminarPaquetes(fila, esperados, alPaso) {
 
         aviso(`Orden ${res.ordenId}: esperando su estado…`);
         const fin = await cmEsperarOrden(fila.ban, res.ordenId, e => aviso(`Orden ${res.ordenId}: ${e}…`));
+        if (fin.orden) res.evidencia.finalOrder = fin.orden;
         res.estado = fin.estado;
         res.ok = fin.ok;
         res.detalle = fin.ok
@@ -981,11 +1005,21 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
         estado: "corriendo", paso: "", cambios: [], omitidos: [], restantes: [],
         inicio: Date.now()
     };
-    const aviso = p => { r.paso = p; if (alPaso) alPaso(r); };
+    /* Cada aviso dice en qué ETAPA va (índice de ETAPAS_PLU) y, opcional,
+       cuánto de esa etapa lleva (0..1). Sin etapa se queda en la actual:
+       así los avisos internos de la eliminación o de las esperas avanzan
+       la barra dentro de la misma etapa sin tener que conocerla. */
+    const aviso = (p, etapa, fraccion) => {
+        r.paso = p;
+        if (etapa != null && etapa !== r.etapa) { r.etapa = etapa; r.fraccion = 0; }
+        if (fraccion != null) r.fraccion = Math.max(r.fraccion || 0, Math.min(1, fraccion));
+        if (alPaso) alPaso(r);
+    };
+    r.etapa = 0; r.fraccion = 0;
 
     try {
         // 1 · estado actual
-        aviso("Consultando estado actual");
+        aviso("Consultando estado actual", 0);
         const antes = await consultarLinea(fila.msisdn);
         if (antes.estado === "ERROR" || antes.estado === "NO_EXISTE") {
             throw new Error("no se pudo consultar la línea: " + (antes.detalle || "sin detalle"));
@@ -993,16 +1027,16 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
         r.antes = antes;
 
         // 2 · aplicar el PLU
-        aviso("Aplicando el PLU en Tulio");
+        aviso("Aplicando el PLU en Tulio", 1);
         const tulio = await aplicarPlu(fila.msisdn, item.plu, item.costo, item.canal);
         r.httpStatus = tulio.httpStatus; r.codigo = tulio.codigo; r.evidencia = tulio.evidencia;
         if (!tulio.ok) throw new Error(tulio.detalle);
 
         // 3 · evidencia de lo que entró
-        aviso("Esperando a que el CM muestre los bolsillos");
+        aviso("Esperando a que el CM muestre los bolsillos", 2);
         await espera(CONFIG.esperaCmMs);
         const est = await esperarEstable(fila.msisdn, huellaPaquetes(antes),
-            (i, n) => aviso(`Esperando al CM (${i}/${n})`));
+            (i, n) => aviso(`Esperando al CM (${i}/${n})`, 2, i / n));
         const despues = est.fila || antes;
         r.despues = despues;
         r.estable = est.estable;
@@ -1020,6 +1054,7 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
         if (cancelado && cancelado()) { r.estado = "cancelado"; r.detalle = "Secuencia detenida antes de eliminar."; return r; }
 
         // 4 · eliminar los bolsillos de ESTE PLU
+        r.etapa = 3; r.fraccion = 0;
         const objetivo = r.cambios.map(c => c.bundleId);
         const hayQueBorrar = (despues.paquetes || []).some(esEliminable);
         if (!hayQueBorrar) {
@@ -1028,19 +1063,22 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
                 + "(no eliminables u obligatorios del plan).";
             return r;
         }
-        aviso("Eliminando los bolsillos del PLU");
+        aviso("Eliminando los bolsillos del PLU", 3);
+        // La eliminación tiene unos siete avisos propios (plan, productos,
+        // carrito, orden, estado…): cada uno avanza un tramo de la etapa.
+        let subpasos = 0;
         const borrado = await eliminarPaquetes(despues,
             [...new Set((despues.paquetes || []).map(b => b.bundleId))],
-            p => aviso(p));
+            p => aviso(p, 3, Math.min(0.95, ++subpasos / 8)));
         r.orden = borrado;
         r.omitidos = borrado.omitidos || [];
         if (!borrado.ok) throw new Error(borrado.detalle || "la eliminación no se confirmó");
 
         // 5 · verificar
-        aviso("Verificando que ya no estén");
+        aviso("Verificando que ya no estén", 4);
         await espera(CONFIG.esperaCmMs);
         const verif = await esperarEstable(fila.msisdn, huellaPaquetes(despues),
-            (i, n) => aviso(`Verificando (${i}/${n})`));
+            (i, n) => aviso(`Verificando (${i}/${n})`, 4, i / n));
         const final = verif.fila || despues;
         r.final = final;
         const activos = new Set((final.paquetes || []).map(b => b.bundleId));
@@ -1070,6 +1108,100 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
 }
 
 /* =====================================================================
+   10b · PINTADO DE LA SECUENCIA: barra por etapas y bolsillos plegables
+===================================================================== */
+const ETAPAS_PLU = ["Consultar", "Aplicar PLU", "Evidencia", "Eliminar", "Verificar"];
+
+/**
+ * Barra del título de un PLU, un tramo por etapa. Se llena según el aviso
+ * en curso: las etapas ya pasadas completas, la actual hasta su fracción
+ * (p. ej. «Esperando al CM (6/15)» = 40 %), y el final se pinta según cómo
+ * terminó: todo verde si salió bien; si no, en rojo (error), ámbar
+ * (novedad) o gris (cancelado) el tramo donde se detuvo.
+ */
+function barraEtapasHTML(r) {
+    const est = r.estado || "espera";
+    const actual = r.etapa == null ? -1 : r.etapa;
+    const tramos = ETAPAS_PLU.map((nombre, i) => {
+        let clase = "", ancho = 0;
+        if (est === "ok") { clase = "hecho"; ancho = 100; }
+        else if (est === "espera") { ancho = 0; }
+        else if (i < actual) { clase = "hecho"; ancho = 100; }
+        else if (i === actual) {
+            if (est === "corriendo") { clase = "curso"; ancho = Math.round((r.fraccion || 0) * 100); }
+            else { clase = est === "error" ? "fallo" : est === "aviso" ? "novedad" : "parado"; ancho = 100; }
+        }
+        const estado = clase === "hecho" ? "hecho" : clase === "curso" ? `en curso ${ancho}%`
+            : clase ? "se detuvo aquí" : "pendiente";
+        return `<span class="etapa ${clase}" title="${escHtml(`${i + 1}. ${nombre}: ${estado}`)}">
+            <span class="etapa-fill" style="width:${ancho}%"></span></span>`;
+    }).join("");
+
+    const n = est === "ok" ? ETAPAS_PLU.length : est === "espera" ? 0 : actual + 1;
+    const rotulo = est === "espera" ? "en cola"
+        : est === "ok" ? "completo"
+            : `${Math.min(n, ETAPAS_PLU.length)}/${ETAPAS_PLU.length} · ${ETAPAS_PLU[Math.max(0, actual)]}`;
+    return `<span class="etapas" role="progressbar" aria-valuemin="0" aria-valuemax="${ETAPAS_PLU.length}"
+        aria-valuenow="${Math.min(n, ETAPAS_PLU.length)}" aria-label="Avance del PLU">${tramos}</span>
+        <span class="etapas-rotulo">${escHtml(rotulo)}</span>`;
+}
+
+/**
+ * Barra del título del panel: un tramo por PLU, con el color de cómo
+ * terminó y el que está corriendo lleno según su avance por etapas.
+ */
+function barraSecuenciaHTML(items) {
+    const total = items.length;
+    const hechos = items.filter(r => ["ok", "aviso", "error", "cancelado"].includes(r.estado)).length;
+    const tramos = items.map((r, i) => {
+        const est = r.estado || "espera";
+        let clase = "", ancho = 0;
+        if (est === "ok") { clase = "hecho"; ancho = 100; }
+        else if (est === "error") { clase = "fallo"; ancho = 100; }
+        else if (est === "aviso") { clase = "novedad"; ancho = 100; }
+        else if (est === "cancelado") { clase = "parado"; ancho = 100; }
+        else if (est === "corriendo") {
+            clase = "curso";
+            ancho = Math.round((((r.etapa || 0) + (r.fraccion || 0)) / ETAPAS_PLU.length) * 100);
+        }
+        return `<span class="etapa ${clase}" title="${escHtml(`PLU ${r.plu}`)}">
+            <span class="etapa-fill" style="width:${ancho}%"></span></span>`;
+    }).join("");
+    return `<span class="etapas etapas-seq" role="progressbar" aria-valuemin="0"
+        aria-valuemax="${total}" aria-valuenow="${hechos}" aria-label="Avance de la secuencia">${tramos}</span>
+        <span class="etapas-rotulo">${hechos}/${total} PLU</span>`;
+}
+
+/** Cantidad corta para el resumen plegado: en datos, directo en MB/GB. */
+function cantidadCorta(valor, unitType) {
+    const legible = fmtCantidadLegible(valor, unitType);
+    const m = /\(([^)]+)\)\s*$/.exec(legible);
+    return m ? m[1] : legible;
+}
+
+/**
+ * Bolsillos de un PLU, plegables. El resumen dice cuántos y cuánto sumó
+ * cada uno sin abrirlo; los cuadros completos (total / anterior /
+ * agregado) quedan adentro. Plegado por defecto: en una secuencia de
+ * muchos PLU los cuadros abiertos empujan la lista fuera de la pantalla.
+ */
+function bolsillosPlegablesHTML(r, i, abierto) {
+    const cambios = r.cambios || [];
+    if (!cambios.length) return "";
+    const resumen = cambios.map(c => `${c.bundleId} +${cantidadCorta(c.agregado, c.unitType)}`).join(" · ");
+    const restantes = new Set(r.restantes || []);
+    const quedaron = cambios.filter(c => restantes.has(c.bundleId)).length;
+    return `<details class="seq-paquetes" data-idx="${i}" ${abierto ? "open" : ""}>
+        <summary>
+            <span class="seq-paquetes-n">${cambios.length} bolsillo${cambios.length === 1 ? "" : "s"}</span>
+            <span class="seq-paquetes-res">${escHtml(resumen)}</span>
+            ${quedaron ? `<span class="seq-paquetes-alerta">${quedaron} siguió activo</span>` : ""}
+        </summary>
+        <div class="plu-cambios mt-2">${cambios.map(cuadroCambioHTML).join("")}</div>
+    </details>`;
+}
+
+/* =====================================================================
    11 · EXPORTACIÓN
 ===================================================================== */
 const CABECERA_EXPORT = ["MSISDN", "Estado", "SubscriptionID", "Cuenta (BAN)", "Cuenta CRM",
@@ -1083,6 +1215,174 @@ function filasExport(filas) {
             f.titular || "", (f.paquetes || []).length, (f.avisos || []).join(" · ")
         ])
     };
+}
+
+/* =====================================================================
+   11b · EVIDENCIA EN EXCEL (mismo formato que la consola)
+   ---------------------------------------------------------------------
+   `evidencias_plu_AAAAMMDD_HHMM.xlsx`, igual que el que descargaba la
+   consola `consola_bundles_movil_exito` (exportEvidence de su app.js):
+
+     Resumen           una fila por PLU
+     «NN PLU xxxx»     una hoja por PLU: datos, paquetes activados (con el
+                       asignado antes), eliminados (valores al momento de
+                       eliminar), no eliminables, activos en cada fase y el
+                       request/response de Tulio y del CM
+
+   Mismas columnas, mismos títulos de bloque y mismos anchos. Datos en kb
+   y voz en minutos, como la tabla del CM. Las cabeceras con token o API
+   key no se guardan: solo van los cuerpos.
+===================================================================== */
+const GRUPO_XLS = { "0": "Voz", "1": "Datos", "2": "SMS" };
+const UNIDAD_XLS = { "0": "minutos", "1": "kb", "2": "mensajes", "3": "unidades", "4": "unidades" };
+const ETIQUETA_XLS = { espera: "En cola", corriendo: "En curso", ok: "Correcto", aviso: "Con novedad", error: "Error", cancelado: "Cancelado" };
+
+const fechaXls = x => {
+    if (!x) return "";
+    const d = new Date(x);
+    return isNaN(d) ? String(x) : new Intl.DateTimeFormat("es-CO",
+        { dateStyle: "medium", timeStyle: "medium", timeZone: "America/Bogota" }).format(d);
+};
+
+/** Un renglón por saldo de cada paquete, en las unidades de la tabla del CM. */
+function saldosXls(fila) {
+    return (fila?.paquetes || []).flatMap(b => (b.balances?.length ? b.balances : [{}]).map(bal => {
+        const suma = (a, c) => enUnidad(Number(bal[a] || 0) + Number(bal[c] || 0), b.unitType);
+        return {
+            b, grupo: GRUPO_XLS[b.unitType] || "Otro", unidad: UNIDAD_XLS[b.unitType] || b.unitType || "—",
+            asignado: suma("personalLimit", "groupLimit"), usado: suma("personalUsed", "groupUsed"),
+            disponible: suma("personalBalance", "groupBalance"),
+            rollAsignado: enUnidad(bal.rolloverLimit, b.unitType), rollUsado: enUnidad(bal.rolloverUsed, b.unitType),
+            rollDisponible: enUnidad(bal.rolloverBalance, b.unitType)
+        };
+    }));
+}
+
+/** Lo que va a las hojas de un PLU, derivado de su renglón de la secuencia. */
+function datosEvidencia(r) {
+    const cargados = new Set((r.cambios || []).map(c => c.bundleId));
+    const tipoCarga = Object.fromEntries((r.cambios || []).map(c => [c.bundleId, c.tipo === "NUEVO" ? "Nuevo" : "Se sumó saldo"]));
+    const antesPorId = new Map((r.antes?.paquetes || []).map(b => [b.bundleId, b]));
+    const tras = saldosXls(r.despues);
+
+    const activados = tras.filter(x => cargados.has(x.b.bundleId)).map(x => {
+        const previo = antesPorId.get(x.b.bundleId);
+        return Object.assign({}, x, {
+            carga: tipoCarga[x.b.bundleId] || "",
+            asignadoAntes: previo ? enUnidad(totalAsignado(previo), previo.unitType) : null
+        });
+    });
+    // Eliminados: los que estaban tras el PLU y ya no están tras eliminar.
+    const quedan = new Set((r.final?.paquetes || []).map(b => b.bundleId));
+    const eliminados = r.final ? tras.filter(x => !quedan.has(x.b.bundleId)) : [];
+    const noElim = new Set(r.noEliminables || []);
+    const conservados = saldosXls(r.final).filter(x => noElim.has(x.b.bundleId));
+
+    const tulio = r.evidencia || {}, cm = r.orden?.evidencia || {};
+    const intercambios = [
+        ["Tulio · RecargaPaquete · Request", tulio.request], ["Tulio · RecargaPaquete · Response", tulio.response],
+        ["CM · shoppingCart · Request", cm.cart?.request], ["CM · shoppingCart · Response", cm.cart?.response],
+        ["CM · productOrder · Request", cm.order?.request], ["CM · productOrder · Response", cm.order?.response],
+        ["CM · Orden final (estado e historial)", cm.finalOrder]
+    ].filter(([, d]) => d !== undefined);
+    return { cargados, activados, eliminados, conservados, intercambios };
+}
+
+function textoTulio(r) {
+    const e = r.evidencia?.response?.cabeceraSalida?.estado;
+    return e ? `${e.estado} · ${e.descripcion || ""}` : "";
+}
+function textoOrden(r) {
+    if (r.orden?.ordenId) return `${r.orden.ordenId} · ${r.orden.estado || ""}`;
+    const f = r.orden?.evidencia?.finalOrder;
+    return f ? `${f.id} · ${f.state || ""}` : "";
+}
+const pasoConFalla = r => r.estado === "error" ? (ETAPAS_PLU[r.etapa] || "") : "";
+const duracionS = r => r.inicio ? Math.round(((r.fin || Date.now()) - r.inicio) / 1000) : "";
+const listaPaquetes = xs => xs.map(x => `${x.b.bundleId} ${x.b.nombre}`).join("; ");
+
+/**
+ * Arma y descarga el libro. `items` son los renglones de la secuencia
+ * (los de correrPluSecuencia) y `linea` la línea sobre la que corrió.
+ */
+function descargarEvidenciaXlsx(linea, items) {
+    if (typeof XLSX === "undefined") throw new Error("no cargó la librería de Excel (SheetJS)");
+    const resumen = [["#", "Línea", "PLU", "Costo", "Canal", "Estado", "Paso con falla", "Detalle", "Inicio", "Fin",
+        "Duración (s)", "Suscripción", "Respuesta Tulio", "Paquetes activados", "Detalle de activados",
+        "Paquetes eliminados", "Detalle de eliminados", "No eliminables", "Orden de eliminación", "Paquetes remanentes"]];
+    items.forEach((r, i) => {
+        const d = datosEvidencia(r);
+        resumen.push([i + 1, linea, r.plu, Number(r.costo), r.canal, ETIQUETA_XLS[r.estado] || r.estado || "",
+            pasoConFalla(r), r.detalle || "", fechaXls(r.inicio), fechaXls(r.fin), duracionS(r),
+            r.antes?.subscriberId || "", textoTulio(r),
+            r.cambios ? d.activados.length : "", listaPaquetes(d.activados),
+            r.final ? d.eliminados.length : "", listaPaquetes(d.eliminados), listaPaquetes(d.conservados),
+            textoOrden(r), (r.restantes || []).join("; ")]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const hojaRes = XLSX.utils.aoa_to_sheet(resumen);
+    hojaRes["!cols"] = [4, 12, 10, 8, 14, 10, 14, 50, 22, 22, 11, 16, 26, 10, 60, 10, 60, 30, 26, 30].map(wch => ({ wch }));
+    XLSX.utils.book_append_sheet(wb, hojaRes, "Resumen");
+    const usados = new Set(["Resumen"]);
+
+    const COLS_SALDO = ["Asignado", "Usado", "Disponible", "Rollover asignado", "Rollover usado", "Rollover disponible", "Unidad", "Inicio", "Fin"];
+    const saldo = x => [x.asignado, x.usado, x.disponible, x.rollAsignado, x.rollUsado, x.rollDisponible, x.unidad,
+        fechaXls(x.b.inicio), fechaXls(x.b.fin)];
+
+    items.forEach((r, i) => {
+        if (!r.antes) return;                    // no se llegó ni a consultar
+        const d = datosEvidencia(r);
+        const aoa = [
+            ["Línea", linea], ["PLU", r.plu], ["Costo", Number(r.costo)], ["Canal", r.canal],
+            ["Estado", ETIQUETA_XLS[r.estado] || r.estado || ""], ["Paso con falla", pasoConFalla(r)],
+            ["Detalle", r.detalle || ""], ["Suscripción", r.antes.subscriberId || ""],
+            ["Inicio", fechaXls(r.inicio)], ["Fin", fechaXls(r.fin)],
+            ["Respuesta Tulio", textoTulio(r)], ["Orden de eliminación", textoOrden(r)], [],
+            ["PAQUETES ACTIVADOS POR EL PLU"],
+            ["Carga", "ID paquete", "Paquete", "Tipo", "Asignado antes", ...COLS_SALDO]
+        ];
+        d.activados.forEach(x => aoa.push([x.carga, x.b.bundleId, x.b.nombre, x.grupo, x.asignadoAntes ?? "", ...saldo(x)]));
+        if (!d.activados.length) aoa.push(["", "", "Sin paquetes activados"]);
+
+        aoa.push([], ["PAQUETES ELIMINADOS (valores al momento de eliminar)"], ["ID paquete", "Paquete", "Tipo", ...COLS_SALDO]);
+        d.eliminados.forEach(x => aoa.push([x.b.bundleId, x.b.nombre, x.grupo, ...saldo(x)]));
+        if (!d.eliminados.length) aoa.push(["", "Sin paquetes eliminados"]);
+
+        if (d.conservados.length) {
+            aoa.push([], ["PAQUETES NO ELIMINABLES (el CM no permite darlos de baja; siguen activos)"],
+                ["ID paquete", "Paquete", "Tipo", ...COLS_SALDO]);
+            d.conservados.forEach(x => aoa.push([x.b.bundleId, x.b.nombre, x.grupo, ...saldo(x)]));
+        }
+
+        aoa.push([], ["PAQUETES ACTIVOS POR FASE"],
+            ["Fase", "Activado por el PLU", "ID paquete", "Paquete", "Tipo", ...COLS_SALDO]);
+        [["Consulta inicial", r.antes], ["Tras aplicar el PLU", r.despues], ["Tras eliminar", r.final]].forEach(([fase, fila]) => {
+            if (!fila) { aoa.push([fase, "", "", "No se llegó a este paso"]); return; }
+            const filas = saldosXls(fila);
+            if (!filas.length) aoa.push([fase, "", "", "Sin paquetes activos"]);
+            filas.forEach(x => aoa.push([fase, d.cargados.has(x.b.bundleId) ? "Sí" : "No", x.b.bundleId, x.b.nombre, x.grupo, ...saldo(x)]));
+        });
+
+        aoa.push([], ["REQUEST / RESPONSE"]);
+        if (!d.intercambios.length) aoa.push(["Sin llamadas registradas"]);
+        d.intercambios.forEach(([titulo, datos]) => {
+            aoa.push([], [titulo]);
+            JSON.stringify(datos, null, 2).split("\n").forEach(l => aoa.push([l]));
+        });
+
+        const hoja = XLSX.utils.aoa_to_sheet(aoa);
+        hoja["!cols"] = [22, 12, 34, 10, 12, 12, 10, 12, 12, 12, 12, 10, 22, 22].map(wch => ({ wch }));
+        let nombre = `${String(i + 1).padStart(2, "0")} PLU ${r.plu}`.slice(0, 31);
+        while (usados.has(nombre)) nombre = nombre.slice(0, 29) + "_" + usados.size;
+        usados.add(nombre);
+        XLSX.utils.book_append_sheet(wb, hoja, nombre);
+    });
+
+    const ahora = new Date(), dd = x => String(x).padStart(2, "0");
+    const archivo = `evidencias_plu_${ahora.getFullYear()}${dd(ahora.getMonth() + 1)}${dd(ahora.getDate())}_${dd(ahora.getHours())}${dd(ahora.getMinutes())}.xlsx`;
+    XLSX.writeFile(wb, archivo);
+    return { archivo, hojas: wb.SheetNames };
 }
 
 /** Evidencia de una secuencia: una fila por cada bolsillo que cambió. */

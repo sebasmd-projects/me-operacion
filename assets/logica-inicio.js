@@ -274,6 +274,60 @@ const PROYECTOS = [
         ]
     },
     {
+        id: "estado-lineas",
+        numero: 11,
+        nombre: "Estado de líneas",
+        descripcion: "Bloquea o inactiva líneas en el CM, en masivo: tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, y estado real de cada línea tras la orden. Al inactivar, la IMSI pasa a HELD y hay que liberarla en el BSS.",
+        estado: "Operación",
+        abrir: "herramientas/estado_lineas.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Estado de líneas y Cambio de IMSI.",
+                archivos: [
+                    { nombre: "estado_lineas.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/estado_lineas.html" },
+                    { nombre: "logica-estado-lineas.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-estado-lineas.js" },
+                    { nombre: "me-estado-lineas-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-estado-lineas-puente.js" },
+                    { nombre: "cm-lineas.js", tipo: "JS · operaciones de línea (compartido)", icono: "bi-filetype-js", ruta: "assets/cm-lineas.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "Orden ChangeSubscriptionState, estados de la línea y de la IMSI, y el paso manual de HELD a disponible.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/estado-lineas/README.md" }
+                ]
+            }
+        ]
+    },
+    {
+        id: "cambio-imsi",
+        numero: 12,
+        nombre: "Cambio de IMSI",
+        descripcion: "Cambia la SIM (IMSI) de líneas en el CM, en masivo, desde renglones línea;imsi_nueva: valida que la línea esté activa y la IMSI nueva disponible, exige nota y confirma contra el CM que la línea quedó con la SIM nueva.",
+        estado: "Operación",
+        abrir: "herramientas/cambio_imsi.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Estado de líneas y Cambio de IMSI.",
+                archivos: [
+                    { nombre: "cambio_imsi.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/cambio_imsi.html" },
+                    { nombre: "logica-cambio-imsi.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-cambio-imsi.js" },
+                    { nombre: "me-cambio-imsi-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-cambio-imsi-puente.js" },
+                    { nombre: "cm-lineas.js", tipo: "JS · operaciones de línea (compartido)", icono: "bi-filetype-js", ruta: "assets/cm-lineas.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "Orden ChangeSim (carrito + orden), validaciones de la IMSI nueva y verificación posterior.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/cambio-imsi/README.md" }
+                ]
+            }
+        ]
+    },
+    {
         id: "base",
         numero: 0,
         nombre: "Base compartida",

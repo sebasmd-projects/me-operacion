@@ -72,7 +72,9 @@
       grupo: "Operaciones", items: [
         { id: "casos", titulo: "Cierre masivo de casos", icono: "bi-check2-square", url: "reporte_casos_masivos.html" },
         { id: "rechazo", titulo: "Generar archivo de rechazo", icono: "bi-file-earmark-pdf", url: "generar_rechazo.html" },
-        { id: "plu", titulo: "Aplicar PLU de paquete", icono: "bi-basket", url: "aplicar_plu.html" }
+        { id: "plu", titulo: "Aplicar PLU de paquete", icono: "bi-basket", url: "aplicar_plu.html" },
+        { id: "estado-lineas", titulo: "Estado de líneas", icono: "bi-toggle-off", url: "estado_lineas.html" },
+        { id: "cambio-imsi", titulo: "Cambio de IMSI", icono: "bi-sim", url: "cambio_imsi.html" }
       ]
     },
     {

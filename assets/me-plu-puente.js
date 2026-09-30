@@ -623,11 +623,23 @@
         aviso: "Con novedad", error: "Error", cancelado: "Cancelado"
     };
 
+    /* La lista se repinta en cada aviso (innerHTML), así que el estado
+       abierto/cerrado de cada bloque de bolsillos se guarda aparte: si no,
+       cada aviso del PLU en curso cerraría lo que el analista abrió.
+       «toggle» no burbujea: se escucha en fase de captura. */
+    const abiertos = new Set();
+    el("seqLista").addEventListener("toggle", ev => {
+        const d = ev.target;
+        if (!d.matches || !d.matches("details.seq-paquetes")) return;
+        if (d.open) abiertos.add(d.dataset.idx); else abiertos.delete(d.dataset.idx);
+    }, true);
+
     function pintarSecuencia() {
         const panel = el("seqPanel");
         panel.hidden = !secuencia.items.length;
         if (panel.hidden) return;
         el("seqPanelLinea").textContent = secuencia.linea || "—";
+        el("seqPanelBarra").innerHTML = barraSecuenciaHTML(secuencia.items);
         el("seqLista").innerHTML = secuencia.items.map((r, i) => {
             const est = r.estado || "espera";
             const seg = r.inicio ? Math.round(((r.fin || Date.now()) - r.inicio) / 1000) : null;
@@ -635,12 +647,13 @@
                 <div class="seq-item-cab">
                     <span class="seq-estado ${est}">${MEUI.esc(ETIQUETA_ESTADO[est] || est)}</span>
                     <span class="seq-item-plu">${i + 1}. PLU ${MEUI.esc(r.plu)}</span>
+                    ${barraEtapasHTML(r)}
                     <span class="me-hint">costo ${MEUI.esc(r.costo)} · canal ${MEUI.esc(r.canal)}</span>
                     ${seg !== null ? `<span class="me-hint">${seg}s</span>` : ""}
                     <span class="seq-item-paso ms-auto">${MEUI.esc(r.paso || "")}</span>
                 </div>
                 ${r.detalle ? `<div class="me-hint mt-1">${MEUI.esc(r.detalle)}</div>` : ""}
-                ${(r.cambios || []).length ? `<div class="plu-cambios mt-2">${r.cambios.map(cuadroCambioHTML).join("")}</div>` : ""}
+                ${bolsillosPlegablesHTML(r, i, abiertos.has(String(i)))}
             </div>`;
         }).join("");
     }
@@ -668,6 +681,7 @@
         secuencia.corriendo = true; secuencia.detener = false;
         secuencia.linea = linea;
         secuencia.items = items.map(x => ({ plu: x.plu, costo: x.costo, canal: x.canal, estado: "espera" }));
+        abiertos.clear();   // los índices son de la lista anterior
         el("seqEjecutar").disabled = true;
         el("seqDetener").hidden = false; el("seqDetener").disabled = false;
         el("seqDetener").textContent = "Detener al terminar el PLU actual";
@@ -743,6 +757,17 @@
         if (!bitacora.length) { MEUI.toast("Todavía no se ha aplicado ningún PLU.", "warn"); return; }
         const d = filasBitacora(bitacora);
         MEUI.exportarCSV(d.head, d.rows, "bitacora_plu");
+    });
+
+    el("btnEvidenciaXlsx").addEventListener("click", () => {
+        if (!secuencia.items.length) { MEUI.toast("No hay secuencia que exportar.", "warn"); return; }
+        try {
+            const r = descargarEvidenciaXlsx(secuencia.linea, secuencia.items);
+            MEUI.log(`Evidencia descargada: ${r.archivo} (${r.hojas.length} hoja(s): ${r.hojas.join(", ")}).`, "ok");
+        } catch (e) {
+            MEUI.log("✖ No se pudo generar el Excel: " + (e.message || e), "err");
+            MEUI.toast("No se pudo generar el Excel. Mira el registro.", "err");
+        }
     });
 
     el("btnEvidencia").addEventListener("click", () => {

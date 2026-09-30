@@ -1,4 +1,4 @@
-<!-- aplicar_plu.html · v1.3.0
+<!-- aplicar_plu.html · v1.5.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -430,6 +430,106 @@
             background: #ECECEA;
             color: var(--me-off);
         }
+        /* ---------- Barra de avance por etapas ----------
+           Un tramo por etapa del PLU (o por PLU, en el título del panel).
+           Lo ya pasado en verde, lo que corre en azul hasta su fracción, y
+           el tramo donde se detuvo según cómo terminó. */
+        .etapas {
+            display: inline-flex;
+            gap: 3px;
+            min-width: 150px;
+            flex: 0 1 220px;
+        }
+
+        .etapas-seq {
+            flex-basis: 260px;
+        }
+
+        .etapa {
+            flex: 1 1 0;
+            height: 8px;
+            border-radius: 3px;
+            background: #EBEAE4;
+            overflow: hidden;
+        }
+
+        .etapa-fill {
+            display: block;
+            height: 100%;
+            width: 0;
+            transition: width .35s ease;
+        }
+
+        .etapa.hecho .etapa-fill {
+            background: var(--me-ok);
+        }
+
+        .etapa.curso .etapa-fill {
+            background: var(--me-info);
+        }
+
+        .etapa.fallo .etapa-fill {
+            background: var(--me-err);
+        }
+
+        .etapa.novedad .etapa-fill {
+            background: var(--me-warn);
+        }
+
+        .etapa.parado .etapa-fill {
+            background: #B8B8B2;
+        }
+
+        .etapas-rotulo {
+            font-family: var(--me-mono);
+            font-size: .68rem;
+            color: var(--me-suave);
+            white-space: nowrap;
+        }
+
+        /* Bolsillos de cada PLU, plegados por defecto */
+        details.seq-paquetes {
+            margin-top: .4rem;
+        }
+
+        details.seq-paquetes>summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: .5rem;
+            font-size: .76rem;
+        }
+
+        details.seq-paquetes>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.seq-paquetes>summary::before {
+            content: "▸";
+            display: inline-block;
+            transition: transform .15s;
+            color: var(--me-suave);
+        }
+
+        details.seq-paquetes[open]>summary::before {
+            transform: rotate(90deg);
+        }
+
+        .seq-paquetes-n {
+            font-weight: 700;
+        }
+
+        .seq-paquetes-res {
+            font-family: var(--me-mono);
+            color: var(--me-suave);
+        }
+
+        .seq-paquetes-alerta {
+            color: var(--me-err);
+            font-weight: 600;
+        }
     </style>
 </head>
 
@@ -581,10 +681,15 @@
             <!-- Secuencia en curso / terminada: un renglón por PLU -->
             <div id="seqPanel" class="mb-3" hidden>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                    <div class="fw-bold small flex-grow-1">Secuencia · línea <span id="seqPanelLinea"
-                            class="me-mono"></span></div>
-                    <button id="btnEvidencia" class="btn btn-sm btn-me-line" type="button"><i
-                            class="bi bi-filetype-csv"></i> Evidencia</button>
+                    <div class="fw-bold small flex-grow-1 d-flex flex-wrap align-items-center gap-2">
+                        <span>Secuencia · línea <span id="seqPanelLinea" class="me-mono"></span></span>
+                        <span id="seqPanelBarra" class="d-inline-flex align-items-center gap-2"></span>
+                    </div>
+                    <button id="btnEvidenciaXlsx" class="btn btn-sm btn-me-line" type="button"
+                        title="Resumen + una hoja por PLU, con request/response (mismo formato que la consola)"><i
+                            class="bi bi-file-earmark-excel"></i> Evidencia Excel</button>
+                    <button id="btnEvidencia" class="btn btn-sm btn-me-line" type="button"
+                        title="Una fila por bolsillo que cambió"><i class="bi bi-filetype-csv"></i> Evidencia CSV</button>
                 </div>
                 <div class="seq-resultado" id="seqLista"></div>
             </div>
@@ -677,7 +782,7 @@
     <script>
         MEUI.init({
             app: "plu",
-            version: "1.3.0",
+            version: "1.5.0",
             doc: "../doc/aplicar-plu/README.md",
             titulo: "Aplicar PLU de paquete",
             descripcion: "Recarga de paquete en Tulio y verificación contra el CM",
