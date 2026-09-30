@@ -151,6 +151,7 @@ async function probarSime() {
         const p = await simeConsultarPestana("3012398258");
         sesion.sime = true; pintarSesion();
         log(`✔ SIME responde. pestana=${p}`);
+        cargarCatalogoSime();
     } catch (e) {
         sesion.sime = false; pintarSesion();
         log(`✖ SIME: ${e.message}. Si es CORS/401, abre esta página con el acceso directo (.bat) y revisa el token prf.`);
@@ -171,6 +172,7 @@ async function obtenerTokenSime() {
     cfgTokenSime.value = token;
     cfgTokenSime.dispatchEvent(new Event("input"));   // refresca "Usuario creación" (solo lectura)
     sesion.sime = true; pintarSesion();
+    cargarCatalogoSime();
     try {
         const perfil = JSON.parse(atob(token));
         log(`✔ Token SIME obtenido para ${perfil.Nombre || perfil.UserName || "usuario"} (${perfil.Departamento || ""})`);
@@ -1235,16 +1237,76 @@ function usoHTML(bundles) {
    La LÍNEA sí es editable: si hubo portabilidad o el cliente cambia de
    número para el siguiente ciclo, se registra con la línea nueva.
 ===================================================================== */
-const CANALES = [
+const CANALES_FIJOS = [
     { v: "01", t: "POS" }, { v: "02", t: "PRESENTE" }, { v: "03", t: "PAGINA WEB" },
     { v: "04", t: "Contingencia" }, { v: "05", t: "MarketPlace_PuntoCol" },
     { v: "06", t: "Empresas" }, { v: "07", t: "Gestores" }
 ];
 
+/* ---- Catálogo EN VIVO de SIME: GET {simeBase}/GetCanalTipo ----------
+   Es lo que llena el desplegable de la propia SIME: cada tipo de
+   suscripción con su id real, canal y (en adicionalesTipoSuscripcion) el
+   PluPrimeraCompra, más la lista de canales. Cuando está cargado MANDA
+   sobre todo lo demás; los catálogos fijos de abajo quedan solo como
+   respaldo si SIME no responde. Solo se guardan los campos que se usan
+   (la respuesta trae apiKeys que no tienen por qué quedar en memoria). */
+let catalogoSime = null;          // { planes: Map(nombre → plan), canales: [{v,t}] }
+let cargandoCatalogoSime = null;  // promesa en curso
+
+function adicional(json, clave) {
+    try {
+        const kv = (JSON.parse(json || "[]") || []).find(x => x && x.key === clave);
+        return kv ? String(kv.value ?? "").trim() : "";
+    } catch (_) { return ""; }
+}
+
+async function simeCatalogo() {
+    const r = await fetch(`${CONFIG.simeBase}/GetCanalTipo`, { headers: headersSime(), credentials: "include" });
+    if (!r.ok) throw new Error(`SIME ${r.status} en GetCanalTipo`);
+    const d = await r.json();
+    const canalesSime = (d.listaCanalVenta || []).filter(c => c.estado === 1);
+    const codigoCanal = new Map(canalesSime.map(c => [c.canalVentaId, c.codigo]));
+    const planes = new Map();
+    (d.listaTipoSuscripcion || [])
+        .filter(t => t.estado === 1 && t.nombre)
+        .sort((a, b) => a.tipoSuscripcionId - b.tipoSuscripcionId)
+        .forEach(t => planes.set(String(t.nombre).trim(), {
+            id: t.tipoSuscripcionId,
+            canal: codigoCanal.get(t.canalVentaId) || String(t.canalVentaId ?? "").padStart(2, "0"),
+            plu: adicional(t.adicionalesTipoSuscripcion, "PluPrimeraCompra")
+        }));
+    if (!planes.size) throw new Error("GetCanalTipo no trajo planes activos");
+    return { planes, canales: canalesSime.map(c => ({ v: c.codigo, t: c.nombre })) };
+}
+
+// Carga una sola vez (o reintenta si falló). `alTerminar` repinta la modal.
+function cargarCatalogoSime(alTerminar) {
+    if (catalogoSime) return Promise.resolve(catalogoSime);
+    if (!cargandoCatalogoSime) {
+        cargandoCatalogoSime = simeCatalogo()
+            .then(c => {
+                catalogoSime = c;
+                log(`✔ Catálogo de SIME: ${c.planes.size} planes activos y ${c.canales.length} canales (GetCanalTipo).`);
+                return c;
+            })
+            .catch(e => { log(`⚠ Catálogo de SIME no disponible (${e.message}): se usa el catálogo fijo.`); return null; })
+            .finally(() => { cargandoCatalogoSime = null; });
+    }
+    return alTerminar ? cargandoCatalogoSime.then(alTerminar) : cargandoCatalogoSime;
+}
+
+const canalesVigentes = () => catalogoSime ? catalogoSime.canales : CANALES_FIJOS;
+const planesVigentes = () => catalogoSime ? [...catalogoSime.planes.keys()] : TIPOS_SUSCRIPCION;
+
+// RESPALDO (solo si GetCanalTipo no responde).
 // Catálogo de planes, en el MISMO orden del desplegable de SIME.
-// El ID de tipo de suscripción se asume = posición + 1 (en la lista real,
-// "Pague 3 Lleve 4 paquete $19.900 - POS" está en la posición 15 y su
-// tipoSuscripcionId es 16). El campo queda editable para poder corregirlo.
+// OJO: el ID de tipo de suscripción NO es siempre posición + 1. Vale hasta
+// "Pague 3 Lleve 4 paquete $35.000 - POS" (19), pero más abajo SIME tiene un
+// hueco y los planes «Pague 8 Lleve 12» van corridos en uno: «$159.200 - POS»
+// está en la posición 46 y su id real es 47. Mandar 46 (otro plan) hace que
+// SIME responda 400 «Object reference not set to an instance of an object».
+// Por eso se usa primero TIPO_SUSCRIPCION_ID (ids confirmados) y la
+// posición solo como último recurso, marcada como no confirmada.
 const TIPOS_SUSCRIPCION = [
     "test",
     "Pague 3 Lleve 4 paquete $19.900 - PCompraPrepagadaWeb",
@@ -1331,6 +1393,19 @@ const TIPOS_SUSCRIPCION = [
                      analista (caso "Generico Primera compra Presente").
      · Varios planes comparten PLU a propósito (mismo paquete, distinto canal).
 ------------------------------------------------------------------- */
+// tipoSuscripcionId reales, tomados de registros de SIME (captura
+// «agregar recurrencia.har», 2026-09-30). Mandan sobre la posición.
+const TIPO_SUSCRIPCION_ID = {
+    "Pague 3 Lleve 4 paquete $19.900 - POS": 16,
+    "Pague 3 Lleve 4 paquete $24.900 - POS": 18,
+    "Pague 3 Lleve 4 paquete $35.000 - POS": 19,
+    "Pague 8 Lleve 12 paquete $159.200 - Presente": 42,
+    "Pague 8 Lleve 12 paquete $199.200 - Presente": 44,
+    "Pague 8 Lleve 12 paquete $159.200 - POS": 47,
+    "Pague 8 Lleve 12 paquete $199.200 - POS": 49,
+    "Pague 8 Lleve 12 paquete $280.000 - POS": 50
+};
+
 const PLU_MANUAL = "MANUAL";
 const PLU_PRIMERA_COMPRA = {
     "test": "",
@@ -1429,6 +1504,9 @@ function catalogoPlu() {
         if (it?.nombre && it.plu != null && it.plu !== "")
             m.set(it.nombre, { plu: it.plu, origen: "aprendido de SIME", manual: false });
     });
+    if (catalogoSime) catalogoSime.planes.forEach((pl, n) => {
+        if (pl.plu) m.set(n, { plu: pl.plu, origen: "catálogo de SIME", manual: false });
+    });
     return m;
 }
 // Canal sugerido a partir del sufijo del nombre del plan
@@ -1478,7 +1556,7 @@ function pintarFijos() {
     ].map(([k, v]) => `<span class="fijo"><b>${k}:</b> ${escHtml(v)}</span>`).join("");
     const calc = [
         ["ID tipo suscripción", crTipoId.value || "— elige el plan —",
-            "Se deriva del plan: aprendido de SIME o posición en el catálogo."],
+            "Se deriva del plan: aprendido de SIME > ids confirmados (TIPO_SUSCRIPCION_ID) > posición en el catálogo."],
         ["Usuario creación", crUsuario.value || "— sin usuario en el token prf —",
             "Sale del token prf de SIME."]
     ].map(([k, v, t]) => `<span class="fijo calc" title="${escHtml(t)}"><b>${k}:</b> ${escHtml(v)}</span>`).join("");
@@ -1507,10 +1585,10 @@ const compactoPlan = s => norm(s).replace(/[^a-z0-9]/g, "");
 // Etiqueta de cada plan: marca ✓id / ✓PLU cuando el dato es REAL y no supuesto
 function opcionesPlan() {
     const aprendido = catalogoAprendido(), plus = catalogoPlu();
-    return TIPOS_SUSCRIPCION.map((n, idx) => {
-        const a = aprendido.get(n), p = plus.get(n);
+    return planesVigentes().map(n => {
+        const a = catalogoSime || aprendido.get(n), p = plus.get(n);
         const marcaPlu = p ? (p.manual ? " ✎ PLU manual" : ` ✓PLU ${p.plu}`) : "";
-        return { idx, nombre: n, etiqueta: `${n}${a ? " ✓id" : ""}${marcaPlu}` };
+        return { valor: n, nombre: n, etiqueta: `${n}${a ? " ✓id" : ""}${marcaPlu}` };
     });
 }
 
@@ -1523,18 +1601,18 @@ function pintarOpcionesPlan() {
     const todas = opcionesPlan();
     let lista = tokens.length ? todas.filter(casa) : todas;
     // El plan ya elegido siempre queda disponible, aunque no case con el filtro
-    if (sel !== "" && !lista.some(o => String(o.idx) === sel)) {
-        const actual = todas.find(o => String(o.idx) === sel);
+    if (sel !== "" && !lista.some(o => o.valor === sel)) {
+        const actual = todas.find(o => o.valor === sel);
         if (actual) lista = [actual, ...lista];
     }
     crTipoNombre.innerHTML = `<option value="">— elegir plan —</option>`
-        + lista.map(o => `<option value="${o.idx}">${escHtml(o.etiqueta)}</option>`).join("");
+        + lista.map(o => `<option value="${escHtml(o.valor)}">${escHtml(o.etiqueta)}</option>`).join("");
     crTipoNombre.value = sel;
     // Con filtro activo el select se abre como lista para ver los resultados
     crTipoNombre.size = tokens.length ? Math.min(8, Math.max(2, lista.length + 1)) : 1;
     crTipoCount.textContent = tokens.length
         ? `${lista.length} de ${todas.length} planes coinciden`
-        : `${todas.length} planes en el catálogo`;
+        : `${todas.length} planes ${catalogoSime ? "activos en SIME" : cargandoCatalogoSime ? "en el catálogo fijo (cargando el de SIME…)" : "en el catálogo fijo"}`;
 }
 
 crTipoBuscar.addEventListener("input", pintarOpcionesPlan);
@@ -1553,6 +1631,18 @@ btnTipoBuscarLimpiar.addEventListener("click", () => {
     pintarOpcionesPlan();
     crTipoBuscar.focus();
 });
+
+function refrescarCatalogoModal(r) {
+    const canal = crCanal.value;
+    crCanal.innerHTML = `<option value="">— elegir —</option>`
+        + canalesVigentes().map(c => `<option value="${escHtml(c.v)}">${escHtml(c.v)} · ${escHtml(c.t)}</option>`).join("");
+    crCanal.value = canal;
+    if (!crTipoNombre.value && r.item?.nombre && planesVigentes().includes(r.item.nombre)) {
+        crTipoNombre.value = r.item.nombre;
+    }
+    pintarOpcionesPlan();
+    if (crTipoNombre.value) alElegirTipo();    // id/canal/PLU pasan a los de SIME
+}
 
 function pintarCrearSime(r, i) {
     filaActual = i;
@@ -1575,7 +1665,7 @@ function pintarCrearSime(r, i) {
 
     // Selects
     crCanal.innerHTML = `<option value="">— elegir —</option>`
-        + CANALES.map(c => `<option value="${c.v}">${c.v} · ${c.t}</option>`).join("");
+        + canalesVigentes().map(c => `<option value="${escHtml(c.v)}">${escHtml(c.v)} · ${escHtml(c.t)}</option>`).join("");
     crTipoBuscar.value = "";
     pintarOpcionesPlan();
 
@@ -1604,9 +1694,8 @@ function pintarCrearSime(r, i) {
     limpiarDerivados();
 
     if (r.item?.nombre) {
-        const idx = TIPOS_SUSCRIPCION.indexOf(r.item.nombre);
-        if (idx >= 0) {
-            crTipoNombre.value = String(idx);
+        if (planesVigentes().includes(r.item.nombre)) {
+            crTipoNombre.value = r.item.nombre;
             alElegirTipo();                 // los derivados salen del PLAN, no del registro viejo
             marcarRecalculo("");
             crTipoHint.innerHTML = `Precargado con el plan del registro actual en SIME. <strong>Si vas a registrar el ciclo nuevo, elige aquí el plan de esa compra</strong>: canal, ID de tipo y PLU se recalculan solos.`;
@@ -1621,6 +1710,11 @@ function pintarCrearSime(r, i) {
 
     avisoMsisdn();
     pintarFijos();
+
+    // Sin el catálogo en vivo todavía: se pide y, al llegar, se refrescan
+    // canales y planes sin tocar lo que el analista ya escribió.
+    if (!catalogoSime && cfgTokenSime.value.trim())
+        cargarCatalogoSime(c => { if (c && filaActual === i) refrescarCatalogoModal(r); });
     actualizarPayload();
 }
 
@@ -1638,23 +1732,28 @@ function avisoMsisdn() {
 // Al elegir plan: SOBRESCRIBE canal, ID de tipo y PLU con los de ESE plan.
 // Nunca conserva lo del plan anterior (causa del 400 de validación en SIME).
 function alElegirTipo() {
-    const idx = crTipoNombre.value;
-    if (idx === "") { limpiarDerivados(); marcarRecalculo(""); return; }
-    const nombre = TIPOS_SUSCRIPCION[+idx];
-    const a = catalogoAprendido().get(nombre);   // dato real de SIME, si lo hay
-    const p = catalogoPlu().get(nombre);         // catálogo fijo + aprendido
+    const nombre = crTipoNombre.value;
+    if (nombre === "") { limpiarDerivados(); marcarRecalculo(""); return; }
+    const vivo = catalogoSime?.planes.get(nombre);  // catálogo en vivo de SIME: manda
+    const a = vivo ? { id: vivo.id, canalCodigo: vivo.canal }
+        : catalogoAprendido().get(nombre);        // dato real de una línea consultada
+    const p = catalogoPlu().get(nombre);          // SIME en vivo > aprendido > fijo
 
-    // 1) ID tipo suscripción: aprendido de SIME > posición + 1 (supuesto)
-    crTipoId.value = a ? a.id : (+idx + 1);
-    // 2) Canal de venta: aprendido de SIME > deducido del sufijo del plan
-    crCanal.value = (a && a.canalId != null)
-        ? String(a.canalId).padStart(2, "0")
+    // 1) ID tipo suscripción: SIME en vivo > aprendido > confirmado > posición + 1 (supuesto)
+    const confirmado = TIPO_SUSCRIPCION_ID[nombre];
+    const pos = TIPOS_SUSCRIPCION.indexOf(nombre);
+    crTipoId.value = a ? a.id : (confirmado ?? (pos >= 0 ? pos + 1 : ""));
+    const origenId = vivo ? "catálogo de SIME" : a ? "aprendido de SIME"
+        : confirmado != null ? "confirmado" : "posición en el catálogo (sin confirmar)";
+    // 2) Canal de venta: SIME en vivo > aprendido > deducido del sufijo del plan
+    crCanal.value = a?.canalCodigo ? a.canalCodigo
+        : (a && a.canalId != null) ? String(a.canalId).padStart(2, "0")
         : canalDeNombre(nombre);
     // 3) PLU 1.ª compra: catálogo/aprendido; vacío si el plan lo exige manual
     crPlu.value = (p && !p.manual) ? p.plu : "";
 
     crCanalHint.innerHTML = crCanal.value
-        ? `Canal ${escHtml(crCanal.value)} · ${(a && a.canalId != null) ? "aprendido de SIME" : "deducido del nombre del plan"}`
+        ? `Canal ${escHtml(crCanal.value)} · ${vivo ? "catálogo de SIME" : (a && a.canalId != null) ? "aprendido de SIME" : "deducido del nombre del plan"}`
         : `<span class="text-danger">Sin canal para este plan — elígelo a mano.</span>`;
     crPluHint.innerHTML = !p
         ? `<span class="text-danger">Sin PLU conocido para este plan — escríbelo a mano (y agrégalo a PLU_PRIMERA_COMPRA).</span>`
@@ -1662,7 +1761,8 @@ function alElegirTipo() {
             ? `<span class="text-danger">⚠ Este plan no tiene PLU fijo: escribe el de la venta.</span>`
             : `PLU ${escHtml(p.plu)} · ${p.origen}`;
 
-    marcarRecalculo(`✓ Recalculado para «${nombre}»: canal ${crCanal.value || "—"} · ID tipo ${crTipoId.value} · PLU ${crPlu.value || "(manual)"}.`);
+    marcarRecalculo(`✓ Recalculado para «${nombre}»: canal ${crCanal.value || "—"} · ID tipo ${crTipoId.value} (${origenId}) · PLU ${crPlu.value || "(manual)"}.`
+        + (a || confirmado != null ? "" : " ⚠ Verifica el ID tipo en SIME: por posición puede ir corrido."));
     pintarFijos();
     actualizarPayload();
 }

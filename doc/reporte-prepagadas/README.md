@@ -1,6 +1,6 @@
 # Reporte de Suscripciones Prepagadas (SIME ⇄ CM) — Documentación técnica
 
-> **Versión: v9.3** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v9.4.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para **verificar de forma cruzada** las suscripciones prepagadas de **Móvil Éxito** entre dos plataformas: **SIME** (front de tipificación / negocio) y **CM / OBP** (Optiva). Por cada línea (MSISDN) consulta las dos fuentes, compara identificadores y fechas de compra, calcula los periodos del plan, detecta ciclos apilados y muestra todo en una tabla con detalle por línea, exportable a **CSV / Excel / JSON**.
@@ -61,6 +61,7 @@ Cambiar una consulta del CM se hace en `me-api.js`; cambiar una regla de prepaga
 | Método | Endpoint | Para qué |
 |---|---|---|
 | `GET` | `{simeBase}/Tiposuscription/1/{linea}` | Devuelve la **pestaña** (0–4) de la línea → estado. |
+| `GET` | `{simeBase}/GetCanalTipo` | **Catálogo en vivo** que llena el desplegable de SIME: `listaTipoSuscripcion` (id real, nombre, `canalVentaId`, `estado`, y `PluPrimeraCompra` dentro de `adicionalesTipoSuscripcion`) y `listaCanalVenta` (código y nombre). Se piden solo los activos (`estado = 1`). |
 | `POST` | `{simeBase}/GetSuscripcionPresentePaginador/{pestana}` | Detalle de la suscripción. La paginación viaja en base64 en el header `pagination`. |
 | `GET` | `{simeBase}/suscripcion/{b64(id)}` | Relee la suscripción al día tras editar una recurrencia. |
 | `GET` | `{simeRecurrencias}/suscripcion/{b64(id)}` | Recurrencias planificadas de la suscripción. |
@@ -208,9 +209,11 @@ Cada compra cubre `total` meses consecutivos desde el mes de compra; varias pued
 
 | Campo derivado | De dónde sale (en orden de prioridad) |
 |---|---|
-| **ID tipo suscripción** | `catalogoAprendido()` (dato real de SIME) → posición en `TIPOS_SUSCRIPCION` + 1 (supuesto) |
-| **Canal de venta** | `catalogoAprendido()` (`canalId` real) → `canalDeNombre()` (sufijo del nombre del plan) |
-| **PLU 1.ª compra** | `catalogoPlu()`: PLU aprendido de SIME → `PLU_PRIMERA_COMPRA` → vacío si el plan exige PLU manual |
+| **ID tipo suscripción** | **`GetCanalTipo` (catálogo en vivo de SIME)** → `catalogoAprendido()` (dato real de SIME) → `TIPO_SUSCRIPCION_ID` (ids confirmados) → posición en `TIPOS_SUSCRIPCION` + 1 (supuesto, se avisa). **La posición no es confiable**: desde los planes «Pague 8 Lleve 12» SIME va corrido en uno (`$159.200 - POS` es la posición 46 y su id real 47). |
+| **Canal de venta** | **`GetCanalTipo`** (`canalVentaId` → código de `listaCanalVenta`) → `catalogoAprendido()` (`canalId` real) → `canalDeNombre()` (sufijo del nombre del plan) |
+| **PLU 1.ª compra** | `catalogoPlu()`: **`PluPrimeraCompra` de `GetCanalTipo`** → PLU aprendido de SIME → `PLU_PRIMERA_COMPRA` → vacío si el plan exige PLU manual |
+
+El catálogo en vivo se pide una vez por sesión: al obtener o probar el token `prf`, o al abrir el alta si todavía no estaba. Mientras llega (o si SIME no responde) se usan los catálogos fijos, que quedan **solo como respaldo**; al llegar, la modal se refresca sola y el contador dice «N planes activos en SIME». Los planes nuevos que se creen en SIME aparecen sin tocar el código.
 
 Sin plan seleccionado, los tres quedan **en blanco**: nunca se heredan del plan anterior. Antes de la v7.2 el canal solo se rellenaba si estaba vacío, y al cambiar de plan sobre una suscripción finalizada SIME respondía `400 One or more validation errors occurred`.
 
@@ -263,7 +266,9 @@ Toda suscripción con `suscripcionRecurrenteId` lista sus recurrencias (nº, id,
 
 | Versión | Cambios |
 |---|---|
-| **9.3** | **Uso y Balance más específico**: cada bundle muestra ahora **consumido / total** (con el porcentaje) arriba y el **disponible** destacado debajo, en vez de "disponible / total" con el consumo en letra pequeña. Mismo cambio, a la vez, en "Consumos y Paquetes (CM)". |
+| **9.4.0** | **Planes y canales en vivo desde SIME** (`GET GetCanalTipo`, el mismo servicio que llena el desplegable de SIME): id real del tipo de suscripción, canal y PLU de 1.ª compra salen de SIME, y los planes nuevos aparecen solos. Los catálogos fijos (`TIPOS_SUSCRIPCION`, `TIPO_SUSCRIPCION_ID`, `PLU_PRIMERA_COMPRA`, `CANALES_FIJOS`) quedan como respaldo si SIME no responde. El desplegable de planes usa el nombre como valor, no la posición. |
+| 9.3.1 | **Fix alta en SIME: 400 «Object reference not set to an instance of an object»**. El ID tipo de suscripción se calculaba como «posición en el catálogo + 1», y desde los planes «Pague 8 Lleve 12» SIME va corrido en uno: para «Pague 8 Lleve 12 paquete $159.200 - POS» se mandaba 46 en lugar de 47. Nueva tabla `TIPO_SUSCRIPCION_ID` con los ids reales vistos en SIME (captura `agregar recurrencia.har`), que manda sobre la posición; si un plan solo tiene el id por posición, el recálculo lo avisa. `documento: "0"` se mantiene: SIME lo acepta. |
+| 9.3 | **Uso y Balance más específico**: cada bundle muestra ahora **consumido / total** (con el porcentaje) arriba y el **disponible** destacado debajo, en vez de "disponible / total" con el consumo en letra pequeña. Mismo cambio, a la vez, en "Consumos y Paquetes (CM)". |
 | 9.2 | Cambio en la tabla de líneas, para que las acciones aparezcan de primeras. |
 | 9.1 | Migración a la base compartida: el HTML queda solo con marcado, la lógica pasa a `assets/logica-prepagadas.js` y el acceso al CM a `assets/me-api.js`. Nuevo shell (menú lateral, chips de sesión, pie con tiempo abierto), pasos plegables, tabla al alto útil que se oculta sin datos, entrada de líneas con más separadores, exportación con separador `;` por defecto y JSON, y spinner en las acciones lentas. |
 | 9.0 | Rediseño de la interfaz sobre el sistema común `me-ui`. |

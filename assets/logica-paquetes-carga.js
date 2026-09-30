@@ -604,7 +604,7 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
     /* =====================================================================
        8 · ORQUESTACIÓN DE LA INTERFAZ
     ===================================================================== */
-    async function resolverContexto() {
+    async function resolverContexto(fila) {
         const subId = fila?.cm?.subscriberId;
         if (!subId) throw new Error("La línea no tiene SubscriptionID en el CM.");
 
@@ -619,7 +619,7 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         ]);
         const cat = await catalogoDeOferta(oferta.id);
 
-        ctx = Object.assign({}, perfil, quien, {
+        const nuevo = Object.assign({}, perfil, quien, {
             offeringId: oferta.id,
             offeringNombre: oferta.nombre,
             obligatorios: cat.obligatorios,
@@ -627,26 +627,62 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         });
         log(`Catálogo de la oferta ${oferta.id} (${oferta.nombre}): ${cat.elegibles.length} paquetes, `
             + `${cat.obligatorios.length} componente(s) obligatorio(s).`, "info");
-        estado(`Oferta <b class="me-mono">${esc(oferta.id)}</b> ${esc(oferta.nombre)} · `
+        return nuevo;
+    }
+
+    function estadoCatalogo() {
+        estado(`Oferta <b class="me-mono">${esc(ctx.offeringId)}</b> ${esc(ctx.offeringNombre)} · `
             + `${ctx.elegibles.length} paquetes disponibles · ${ctx.bundlesActivos.length} activos en la línea.`, "info");
+    }
+
+    /* El catálogo se precarga al abrir el detalle de la línea: el botón
+       «Cargar paquete» queda con spinner hasta que está listo. Antes se
+       pedía al hacer clic, y el spinner quedaba en el botón que el panel
+       oculta: la carga no se veía hasta darle «Cancelar».
+       `montaje` descarta respuestas de una línea que ya no está abierta. */
+    let montaje = 0;
+    let preparando = null;    // promesa de la precarga en curso
+    let errorPrep = null;
+
+    function preparar() {
+        const yo = ++montaje;
+        const btn = $("#btnCargaAbrir");
+        errorPrep = null;
+        MEUI.ocupado(btn, "Cargando catálogo…");
+        preparando = resolverContexto(fila)
+            .then(c => { if (yo === montaje) ctx = c; })
+            .catch(e => {
+                if (yo !== montaje) return;
+                errorPrep = e;
+                log("✖ Cargar paquete: " + e.message, "err");
+            })
+            .finally(() => {
+                if (yo !== montaje) return;
+                preparando = null;
+                MEUI.libre(btn);
+                if (errorPrep) btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Reintentar catálogo';
+            });
+        return preparando;
     }
 
     async function abrirPanel() {
         if (ocupado) return;
+        if (!ctx) {
+            if (!preparando) preparar();
+            await preparando;
+            if (!ctx) {
+                panel().classList.remove("d-none");
+                estado(`<i class="bi bi-x-octagon-fill"></i> No se pudo preparar la carga: ${esc(errorPrep?.message || "sin detalle")}`, "err");
+                return;
+            }
+        }
         panel().classList.remove("d-none");
         $("#btnCargaAbrir").classList.add("d-none");
         irAPaso(1);
-        if (ctx) { pintarLista(); pintarSeleccion(); return; }
-        ocupado = true;
-        try {
-            await resolverContexto();
-            pintarLista();
-            pintarSeleccion();
-            $("#cargaBuscar").focus();
-        } catch (e) {
-            estado(`<i class="bi bi-x-octagon-fill"></i> No se pudo preparar la carga: ${esc(e.message)}`, "err");
-            log("✖ Cargar paquete: " + e.message, "err");
-        } finally { ocupado = false; }
+        estadoCatalogo();
+        pintarLista();
+        pintarSeleccion();
+        $("#cargaBuscar").focus();
     }
 
     function cerrarPanel() {
@@ -707,6 +743,10 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         if ($("#cargaSel")) $("#cargaSel").innerHTML = "";
         if ($("#cargaSalida")) $("#cargaSalida").innerHTML = "";
         if ($("#cargaTimeline")) $("#cargaTimeline").innerHTML = "";
+        const btn = $("#btnCargaAbrir");
+        MEUI.libre(btn);
+        btn.innerHTML = '<i class="bi bi-plus-circle"></i> Cargar paquete';
+        preparar();
     }
 
     let cableado = false;
@@ -716,8 +756,7 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         if (!$("#mdCargaWrap")) return;   // la página no tiene la sección
         cableado = true;
 
-        $("#btnCargaAbrir").addEventListener("click", () =>
-            MEUI.conSpinner($("#btnCargaAbrir"), "Cargando catálogo…", abrirPanel));
+        $("#btnCargaAbrir").addEventListener("click", abrirPanel);
 
         let t = null;
         $("#cargaBuscar").addEventListener("input", () => {
