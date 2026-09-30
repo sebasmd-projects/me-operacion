@@ -66,16 +66,16 @@
     "semantic_hash": "fafb9412922200440288cee4f67720e9"
   },
   "assets/logica-inicio.js": {
-    "mtime": 1790633234.0,
-    "seen": 1790784790.3408852,
-    "ast_hash": "08e3b4df6a534ddf49e2651d36f684b5",
-    "semantic_hash": "08e3b4df6a534ddf49e2651d36f684b5"
+    "mtime": 1790804619.9064834,
+    "seen": 1790807307.1103523,
+    "ast_hash": "d0e0651815dc73a2a57ece77718dd0e3",
+    "semantic_hash": "d0e0651815dc73a2a57ece77718dd0e3"
   },
   "assets/logica-paquetes-carga.js": {
-    "mtime": 1790177590.0,
-    "seen": 1790784790.340886,
-    "ast_hash": "675226521c88cd5a8d2bcb2e21f60040",
-    "semantic_hash": "675226521c88cd5a8d2bcb2e21f60040"
+    "mtime": 1790795944.411479,
+    "seen": 1790807307.1103556,
+    "ast_hash": "7f157e64bbcb006ffef36635acf7cb97",
+    "semantic_hash": "7f157e64bbcb006ffef36635acf7cb97"
   },
   "assets/logica-plu.js": {
     "mtime": 1790633164.0,
@@ -90,10 +90,10 @@
     "semantic_hash": "be9c8a11539d30891653954487784fe6"
   },
   "assets/logica-prepagadas.js": {
-    "mtime": 1790182936.0,
-    "seen": 1790784790.3408885,
-    "ast_hash": "19073f95bb6793ed4cc416065c847fe8",
-    "semantic_hash": "19073f95bb6793ed4cc416065c847fe8"
+    "mtime": 1790797094.9304297,
+    "seen": 1790807307.1103628,
+    "ast_hash": "ed0c66329054cc29da6dce4509d6fbb7",
+    "semantic_hash": "ed0c66329054cc29da6dce4509d6fbb7"
   },
   "assets/logica-qdn-operaciones.js": {
     "mtime": 1790099852.0,
@@ -228,46 +228,46 @@
     "semantic_hash": "a7f310b2791cb0962fb436c655344f7e"
   },
   "release/version.json": {
-    "mtime": 1790775886.983014,
-    "seen": 1790784790.3409095,
-    "ast_hash": "c8bd3428623c63adc845efe107435ac2",
-    "semantic_hash": "c8bd3428623c63adc845efe107435ac2"
+    "mtime": 1790807263.4031353,
+    "seen": 1790807307.1104114,
+    "ast_hash": "16782709b52037f5ef8cd6f753669147",
+    "semantic_hash": "16782709b52037f5ef8cd6f753669147"
   },
   "scripts/actualizar.ps1": {
-    "mtime": 1790182936.0,
-    "seen": 1790784790.3409104,
-    "ast_hash": "6eab03f596b59971d528c53d6f251102",
-    "semantic_hash": "6eab03f596b59971d528c53d6f251102"
+    "mtime": 1790806731.7147086,
+    "seen": 1790807307.1104136,
+    "ast_hash": "58e0f19d3ac92d2a14c9d06d53625fc2",
+    "semantic_hash": "58e0f19d3ac92d2a14c9d06d53625fc2"
   },
   "scripts/empaquetar-release.ps1": {
-    "mtime": 1790182937.4290948,
-    "seen": 1790784790.3409111,
-    "ast_hash": "7313ed422b90c25a3c3c9613024a3b13",
-    "semantic_hash": "7313ed422b90c25a3c3c9613024a3b13"
+    "mtime": 1790806601.1897545,
+    "seen": 1790807307.1104155,
+    "ast_hash": "852f6972bb3e56f6debddaea0121eff1",
+    "semantic_hash": "852f6972bb3e56f6debddaea0121eff1"
   },
   "scripts/lanzador.ps1": {
-    "mtime": 1790182936.0,
-    "seen": 1790784790.340912,
-    "ast_hash": "8c615b77a819a4d5c750e71b2c273558",
-    "semantic_hash": "8c615b77a819a4d5c750e71b2c273558"
+    "mtime": 1790806551.821488,
+    "seen": 1790807307.1104174,
+    "ast_hash": "20a5985ea23d357f901044e36122126d",
+    "semantic_hash": "20a5985ea23d357f901044e36122126d"
   },
   "CODEX.md": {
-    "mtime": 1790177590.6446507,
-    "seen": 1790784790.3409128,
-    "ast_hash": "6f63f74fd8e4ba45a46dbfe4404e07f3",
-    "semantic_hash": "6f63f74fd8e4ba45a46dbfe4404e07f3"
+    "mtime": 1790806814.2437031,
+    "seen": 1790807307.1104198,
+    "ast_hash": "2ceb2ba0061194a01944e489f70be1d2",
+    "semantic_hash": "2ceb2ba0061194a01944e489f70be1d2"
   },
   "doc/GETTINGSTARTED.md": {
-    "mtime": 1789740330.0,
-    "seen": 1790784790.3409157,
-    "ast_hash": "2be86bc7032835e89bfd9fe0b6138501",
-    "semantic_hash": "2be86bc7032835e89bfd9fe0b6138501"
+    "mtime": 1790806790.659633,
+    "seen": 1790807307.1104214,
+    "ast_hash": "eee50b7c00a0bfdddce1a43b437d8d97",
+    "semantic_hash": "eee50b7c00a0bfdddce1a43b437d8d97"
   },
   "doc/README.md": {
-    "mtime": 1790177590.0,
-    "seen": 1790784790.3409164,
-    "ast_hash": "a88ee15401baac291a9601117c9c6584",
-    "semantic_hash": "a88ee15401baac291a9601117c9c6584"
+    "mtime": 1790806814.1452565,
+    "seen": 1790807307.1104233,
+    "ast_hash": "d5b3a1e3f5237db551a963a80b2b40ce",
+    "semantic_hash": "d5b3a1e3f5237db551a963a80b2b40ce"
   },
   "doc/aplicar-plu/README.md": {
     "mtime": 1790633314.0,
@@ -276,10 +276,10 @@
     "semantic_hash": "77e683b7fd667bc0dcf542b06b35db34"
   },
   "doc/audio-mp3/README.md": {
-    "mtime": 1789760508.0,
-    "seen": 1790784790.3409183,
-    "ast_hash": "835574aa21fa9645cb9d61ffb861aeed",
-    "semantic_hash": "835574aa21fa9645cb9d61ffb861aeed"
+    "mtime": 1790804693.3526244,
+    "seen": 1790807307.1104252,
+    "ast_hash": "8e329d96a6fe4e430bd104931008aaa9",
+    "semantic_hash": "8e329d96a6fe4e430bd104931008aaa9"
   },
   "doc/cambio-imsi/README.md": {
     "mtime": 1790633300.0,
@@ -288,10 +288,10 @@
     "semantic_hash": "a1d1c73324099cb50452638092b3c4ee"
   },
   "doc/cerrar-casos/README.md": {
-    "mtime": 1789740218.0,
-    "seen": 1790784790.34092,
-    "ast_hash": "a20ea3c75111dbfb05a52fdfdb2dcb09",
-    "semantic_hash": "a20ea3c75111dbfb05a52fdfdb2dcb09"
+    "mtime": 1790804619.7660906,
+    "seen": 1790807307.110427,
+    "ast_hash": "7d3aa48dc27ab73b5ac9fc0d47f893cf",
+    "semantic_hash": "7d3aa48dc27ab73b5ac9fc0d47f893cf"
   },
   "doc/consulta-qdn-tigo/README.md": {
     "mtime": 1789740226.0,
@@ -324,10 +324,10 @@
     "semantic_hash": "99ba650e3a0933bb4b1be0a35afd66a5"
   },
   "doc/lanzador/README.md": {
-    "mtime": 1789740332.0,
-    "seen": 1790784790.3409257,
-    "ast_hash": "3122cb582d0a1109bc4198a9a175ccbb",
-    "semantic_hash": "3122cb582d0a1109bc4198a9a175ccbb"
+    "mtime": 1790806790.62929,
+    "seen": 1790807307.1104286,
+    "ast_hash": "f9c09828640cff5c9cef8173e6fe415b",
+    "semantic_hash": "f9c09828640cff5c9cef8173e6fe415b"
   },
   "doc/portabilidad-tigo/README.md": {
     "mtime": 1789740210.0,
@@ -336,10 +336,10 @@
     "semantic_hash": "5b51176bcf830337775f8dc2324ec1bf"
   },
   "doc/reporte-ajustes/README.md": {
-    "mtime": 1790177590.0,
-    "seen": 1790784790.3409276,
-    "ast_hash": "b4c0559affc555c85b5c0328a6ee2645",
-    "semantic_hash": "b4c0559affc555c85b5c0328a6ee2645"
+    "mtime": 1790804619.7841275,
+    "seen": 1790807307.1104345,
+    "ast_hash": "9fd8a851852d8a6356077854ddf10c41",
+    "semantic_hash": "9fd8a851852d8a6356077854ddf10c41"
   },
   "doc/reporte-ajustes/recarga-de-paquetes-cm.md": {
     "mtime": 1790177590.0,
@@ -348,22 +348,22 @@
     "semantic_hash": "be0f9b77d00baeac32f585c39e1f1d91"
   },
   "doc/reporte-consumos/README.md": {
-    "mtime": 1790177590.0,
-    "seen": 1790784790.3409293,
-    "ast_hash": "d47be950a2124346bed5f6ee2bd62e79",
-    "semantic_hash": "d47be950a2124346bed5f6ee2bd62e79"
+    "mtime": 1790804693.333573,
+    "seen": 1790807307.1104364,
+    "ast_hash": "b536e2f970cbd39f3be114fcf93a57d6",
+    "semantic_hash": "b536e2f970cbd39f3be114fcf93a57d6"
   },
   "doc/reporte-prepagadas/README.md": {
-    "mtime": 1789740220.0,
-    "seen": 1790784790.3409302,
-    "ast_hash": "3971139089c052d4cb8c8b17160be044",
-    "semantic_hash": "3971139089c052d4cb8c8b17160be044"
+    "mtime": 1790804619.892626,
+    "seen": 1790807307.1104379,
+    "ast_hash": "19d73bae873479c967ccdc55eae78d36",
+    "semantic_hash": "19d73bae873479c967ccdc55eae78d36"
   },
   "doc/reporte-tipificacion/README.md": {
-    "mtime": 1789740232.0,
-    "seen": 1790784790.3409312,
-    "ast_hash": "a4eccdf5470b08209de8c36294880ed5",
-    "semantic_hash": "a4eccdf5470b08209de8c36294880ed5"
+    "mtime": 1790804619.8342884,
+    "seen": 1790807307.1104763,
+    "ast_hash": "a646c14c3ec11e6d67ae4b63e15c9cf2",
+    "semantic_hash": "a646c14c3ec11e6d67ae4b63e15c9cf2"
   },
   "doc/validador-qdn/README.md": {
     "mtime": 1790092376.0,
@@ -402,10 +402,10 @@
     "semantic_hash": "9c9a3dc55ae2c3b9ac2900ee3bfd831b"
   },
   "herramientas/hlr_hss.html": {
-    "mtime": 1790100550.0,
-    "seen": 1790784790.3409371,
-    "ast_hash": "c51b61922eaa746deb2dc7cf8263a08d",
-    "semantic_hash": "c51b61922eaa746deb2dc7cf8263a08d"
+    "mtime": 1790804619.6740296,
+    "seen": 1790807307.1104856,
+    "ast_hash": "404809e2af496ee8fe5864b1fc8dd51d",
+    "semantic_hash": "404809e2af496ee8fe5864b1fc8dd51d"
   },
   "herramientas/reporte_casos_masivos.html": {
     "mtime": 1789740272.0,
@@ -414,10 +414,10 @@
     "semantic_hash": "2d75d80b9c1de45f32fee90bc3bdea60"
   },
   "herramientas/validador_qdn.html": {
-    "mtime": 1790100548.0,
-    "seen": 1790784790.3409388,
-    "ast_hash": "7a6a625348e6c67d2a6d9b60be6f6b3f",
-    "semantic_hash": "7a6a625348e6c67d2a6d9b60be6f6b3f"
+    "mtime": 1790804619.6894667,
+    "seen": 1790807307.1104944,
+    "ast_hash": "881bfbbe17bf34986fcbb5236ebdc1a6",
+    "semantic_hash": "881bfbbe17bf34986fcbb5236ebdc1a6"
   },
   "herramientas/validador_qdn_tigo.html": {
     "mtime": 1790111576.0,
@@ -430,5 +430,47 @@
     "seen": 1790784790.3409407,
     "ast_hash": "3b1041f72660c04975498251c799ecc7",
     "semantic_hash": "3b1041f72660c04975498251c799ecc7"
+  },
+  "doc/lanzador/plan-3.0.0.md": {
+    "mtime": 1790806814.303815,
+    "seen": 1790807307.110432,
+    "ast_hash": "b464e2ac364b3a0de6f95d3f89188b2f",
+    "semantic_hash": "b464e2ac364b3a0de6f95d3f89188b2f"
+  },
+  "herramientas/export_ajustes.html": {
+    "mtime": 1789742952.0,
+    "seen": 1790807307.1104808,
+    "ast_hash": "645106538a53fe87e0df61fabeb4b5e6",
+    "semantic_hash": "645106538a53fe87e0df61fabeb4b5e6"
+  },
+  "herramientas/export_tipificacion.html": {
+    "mtime": 1789740288.0,
+    "seen": 1790807307.1104832,
+    "ast_hash": "c0eb32ea7bcf39034f1ed6da37233ae3",
+    "semantic_hash": "c0eb32ea7bcf39034f1ed6da37233ae3"
+  },
+  "herramientas/reporte_consumos.html": {
+    "mtime": 1790796007.4107459,
+    "seen": 1790807307.1104872,
+    "ast_hash": "07c484a436b49edb71a81cb06f4ccbaf",
+    "semantic_hash": "07c484a436b49edb71a81cb06f4ccbaf"
+  },
+  "herramientas/reporte_prepagadas.html": {
+    "mtime": 1790797157.0220885,
+    "seen": 1790807307.110489,
+    "ast_hash": "d1c3aad161dc04da2bb1bd8fd3495706",
+    "semantic_hash": "d1c3aad161dc04da2bb1bd8fd3495706"
+  },
+  "herramientas/validador_hlr_cruzado.html": {
+    "mtime": 1790111568.0,
+    "seen": 1790807307.1104906,
+    "ast_hash": "730d5493e7da155ad2edfdca079bfd9d",
+    "semantic_hash": "730d5493e7da155ad2edfdca079bfd9d"
+  },
+  "herramientas/validador_portabilidad_tigo.html": {
+    "mtime": 1790111572.0,
+    "seen": 1790807307.1104925,
+    "ast_hash": "14e9e408fd81dd87258df07f8f61486b",
+    "semantic_hash": "14e9e408fd81dd87258df07f8f61486b"
   }
 }

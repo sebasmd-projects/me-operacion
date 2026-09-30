@@ -31,7 +31,7 @@ Herramienta para consultar y exportar los **ajustes** que se hacen en el CM (Opt
 | `export_ajustes.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
 | `assets/logica-ajustes.js` | Reglas de negocio: consulta de ajustes, catálogos, columnas, resolución del número y exportación. |
 | `assets/me-ajustes-puente.js` | Enganche con el shell: sesión, pestañas y fechas por defecto. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las cuatro herramientas. |
+| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 

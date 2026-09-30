@@ -25,6 +25,8 @@
       dame click.bat /resetcm       -> borra solo las credenciales del CM
       dame click.bat /debug         -> muestra el detalle tecnico de los errores
       dame click.bat /sinupdate     -> no avisa de actualizaciones esta vez
+      dame click.bat /origen:"<carpeta>" -> consulta version.json en otra
+                                    carpeta (pruebas; por defecto la de red)
 
     Aviso de version nueva: SOLO consulta version.json y avisa si hay una
     version mas nueva -nunca la descarga ni la aplica sola-. Instalarla es
@@ -65,6 +67,15 @@ $debug      = $argumentos -match '/debug'
 $soloRep    = $argumentos -match '/solo-reporte'
 $soloCasos  = $argumentos -match '/solo-casos'
 $sinUpdate  = $argumentos -match '/sinupdate'
+
+# ---------- Origen de las releases (desde la 3.0.0) ----------
+# Carpeta de red de la compania: UNICA fuente de version.json y del .zip.
+# Antes era https://sebasmd.com/me/operacion (dominio personal). Para
+# probar contra otra carpeta: /origen:"\\servidor\carpeta".
+$RELEASE_DIR = '\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release'
+foreach ($a in $args) {
+  if ([string]$a -match '^/origen:(.+)$') { $RELEASE_DIR = $Matches[1].Trim().Trim('"') }
+}
 
 # Que se abre en esta ejecucion.
 # Por defecto UNA sola pestana: el reporte de lineas prepagadas. El cierre
@@ -166,13 +177,12 @@ $credCm = $null; $credSime = $null; $prf = $null; $urls = @()
 
 # =======================================================================
 #  0. AVISO DE VERSION NUEVA (nunca se aplica sola)
-#  Dominio propio (sebasmd.com), aprobado por la compañia y sin bloqueos
-#  de proxy/VPN. Si algo falla aqui (sin internet en este momento, el
-#  host no responde) NUNCA se bloquea el uso de la herramienta: se avisa
-#  y se sigue con la copia local tal cual.
+#  Lee version.json de la carpeta de red ($RELEASE_DIR, arriba). Si algo
+#  falla aqui (sin VPN, NAS caido, archivo a medio escribir) NUNCA se
+#  bloquea el uso de la herramienta: se avisa y se sigue con la copia
+#  local tal cual, en 6 s como maximo.
 #
-#  Este paso SOLO CONSULTA version.json: es una peticion GET de lectura,
-#  nada mas. Si hay una version mas nueva, se avisa en pantalla y se dice
+#  Este paso SOLO LEE version.json, nada mas. Si hay una version mas nueva, se avisa en pantalla y se dice
 #  que corras "actualizar.bat" cuando quieras instalarla -nunca se
 #  descarga ni se aplica desde aqui-. Aplicar una actualizacion es un
 #  paso APARTE y siempre a mano (ver scripts\actualizar.ps1): un script
@@ -183,8 +193,7 @@ $credCm = $null; $credSime = $null; $prf = $null; $urls = @()
 #  Flags:
 #    /sinupdate   -> no consulta si hay version nueva esta vez
 # =======================================================================
-$UPDATE_BASE   = 'https://sebasmd.com/me/operacion'
-$VERSION_URL   = "$UPDATE_BASE/version.json"
+$VERSION_JSON  = Join-Path $RELEASE_DIR 'version.json'
 # VERSION vive junto a los scripts (scripts\VERSION), no en la raiz del
 # proyecto: es un dato de version del propio mecanismo de actualizacion.
 $VERSION_LOCAL = Join-Path $scriptsDir 'VERSION'
@@ -200,34 +209,34 @@ function VerDe($valor) {
   try { return [version]("{0}.{1}.{2}" -f $partes[0], $partes[1], $partes[2]) } catch { return [version]'0.0.0' }
 }
 
-# Fuerza la decodificacion de los bytes como UTF-8 y normaliza los caracteres
-# a NFC. Asi las tildes y la ene no dependen del charset que Windows
-# PowerShell 5.1 (o un proxy) deduzca del encabezado HTTP.
-function Obtener-JsonUtf8($uri, $timeoutSec) {
-  $request = [Net.HttpWebRequest]::Create($uri)
-  $request.Method = 'GET'
-  $request.Timeout = $timeoutSec * 1000
-  $request.ReadWriteTimeout = $timeoutSec * 1000
-  $request.UserAgent = 'me-operacion-lanzador'
-
-  $response = $null
-  $stream = $null
-  $memoria = New-Object IO.MemoryStream
-  try {
-    $response = $request.GetResponse()
-    $stream = $response.GetResponseStream()
-    $stream.CopyTo($memoria)
-
-    $utf8 = New-Object Text.UTF8Encoding($false, $true)
-    $texto = $utf8.GetString($memoria.ToArray())
-    $texto = $texto.TrimStart([char]0xFEFF)
-    $texto = $texto.Normalize([Text.NormalizationForm]::FormC)
-    return $texto | ConvertFrom-Json -ErrorAction Stop
-  } finally {
-    if ($stream) { $stream.Dispose() }
-    if ($response) { $response.Dispose() }
-    $memoria.Dispose()
+# Lee un JSON de la carpeta de releases desde sus bytes: UTF-8 estricto
+# (throwOnInvalidBytes), sin BOM y normalizado a NFC, para que las tildes y
+# la ene de las notas no dependan de la pagina de codigos del equipo.
+# La lectura corre en un runspace aparte con tope de tiempo: fuera de la
+# VPN, o con el NAS caido, SMB puede bloquear 20-60 s cualquier acceso a la
+# ruta, y no hay que quedarse esperando eso.
+function Leer-JsonUtf8($ruta, $timeoutSec) {
+  $ps = [PowerShell]::Create()
+  [void]$ps.AddScript('param($r) , [IO.File]::ReadAllBytes($r)').AddArgument($ruta)
+  $h = $ps.BeginInvoke()
+  if (-not $h.AsyncWaitHandle.WaitOne($timeoutSec * 1000)) {
+    # No se espera a que termine (Stop/Dispose tambien se quedarian
+    # bloqueados): el runspace se abandona y muere con el proceso.
+    [void]$ps.BeginStop($null, $null)
+    throw ("la carpeta de releases no respondio en {0} s (sin VPN o sin red?)" -f $timeoutSec)
   }
+  try {
+    $res = $ps.EndInvoke($h)
+    if ($ps.Streams.Error.Count -gt 0) { throw $ps.Streams.Error[0].Exception }
+    if (-not $res -or $res.Count -lt 1) { throw ("no se pudo leer {0}" -f $ruta) }
+    $bytes = [byte[]]($res[0].psobject.BaseObject)
+  } finally { $ps.Dispose() }
+
+  $utf8 = New-Object Text.UTF8Encoding($false, $true)
+  $texto = $utf8.GetString($bytes)
+  $texto = $texto.TrimStart([char]0xFEFF)
+  $texto = $texto.Normalize([Text.NormalizationForm]::FormC)
+  return $texto | ConvertFrom-Json -ErrorAction Stop
 }
 
 Write-Host '  Buscando actualizaciones...' -ForegroundColor Gray
@@ -241,8 +250,7 @@ if ($sinUpdate) {
       if ($txtVerLocal) { $verLocal = VerDe $txtVerLocal }
     }
 
-    $cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $info = Obtener-JsonUtf8 "$VERSION_URL`?t=$cacheBust" 6
+    $info = Leer-JsonUtf8 $VERSION_JSON 6
     $verRemota = VerDe $info.version
 
     if ($verRemota -le $verLocal) {

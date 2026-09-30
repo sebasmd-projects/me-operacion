@@ -1,0 +1,6 @@
+# Capturas de red: traen tokens (prf, refresh_token), contraseñas y datos
+# reales de clientes. Nunca se suben (el repositorio es público).
+*.har
+har nuevas/
+
+# graphify-out/ SÍ se versiona (grafo de conocimiento del proyecto).

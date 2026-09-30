@@ -1,6 +1,6 @@
 # Cierre masivo de casos (CM) — Documentación técnica
 
-> **Versión: v3.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v3.2** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para **trabajar por lotes** los casos del CM a partir de un Excel de la operación. Por cada número de caso busca su ticket en el CM, trae el título y el estado actuales y, según lo que traiga la columna **Favorable**, lo cierra con el resultado o se limita a agregarle la nota. Trae **modo simulación encendido por defecto**: hace todo menos el `PATCH`.
@@ -46,7 +46,7 @@ Dos consecuencias que conviene tener presentes:
 | `reporte_casos_masivos.html` | Solo marcado: KPIs, pasos, pestañas, tablas y modal de detalle. |
 | `assets/logica-casos.js` | Reglas de negocio: lectura del Excel, mapeo de columnas, `accionDe()`, armado del título, búsqueda del ticket y `PATCH`. |
 | `assets/me-casos-puente.js` | Enganche con el shell: sesión, pestañas, habilitación de botones y spinners. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las cuatro herramientas. |
+| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 
@@ -219,7 +219,8 @@ Todo vive en memoria del navegador: las filas de trabajo (incluidos el ticket cr
 
 | Versión | Cambios |
 |---|---|
-| **3.0** | La columna «Favorable» decide la acción: `Sí` cierra como favorable, `No` como desfavorable y la casilla vacía con nota **solo agrega la nota**, sin tocar el título ni el estado; sin nota ni resultado la fila queda omitida. Nueva función `accionDe()`, columna y filtros de **Acción**, KPI **Solo con nota**, estados *anotando* / *nota agregada* / *nota simulada*, título de solo lectura en modo nota, nota obligatoria marcada en rojo, confirmación con desglose y columnas nuevas en informe y exportación. |
+| **3.1 – 3.2** | La página ya estaba en 3.2 cuando se creó el repositorio y esos cambios no quedaron anotados aquí. Se alinea el encabezado de este documento con la versión de la página. |
+| 3.0 | La columna «Favorable» decide la acción: `Sí` cierra como favorable, `No` como desfavorable y la casilla vacía con nota **solo agrega la nota**, sin tocar el título ni el estado; sin nota ni resultado la fila queda omitida. Nueva función `accionDe()`, columna y filtros de **Acción**, KPI **Solo con nota**, estados *anotando* / *nota agregada* / *nota simulada*, título de solo lectura en modo nota, nota obligatoria marcada en rojo, confirmación con desglose y columnas nuevas en informe y exportación. |
 | 2.1 | `/case/search` acepta el arreglo plano y el envoltorio antiguo (`normalizarBusqueda`); la respuesta cruda queda en el detalle. |
 | 2.0 | Migración a la base compartida: HTML solo con marcado, lógica en `assets/logica-casos.js` y acceso al CM en `me-api.js`. Se elimina el botón «Buscar y cerrar» y el encadenamiento del reintento; los botones se habilitan solo cuando corresponde; las reglas de salvaguarda dejan de ser configurables; zona de arrastrar y soltar; KPIs que filtran; tabla de trabajo e informe en pestañas; exportación con separador `;` por defecto. |
 | 1.1 | Informe con filtros propios, alcance de exportación y detección de casos ya cerrados. |

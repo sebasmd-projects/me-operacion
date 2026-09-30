@@ -12,7 +12,7 @@ Dos caminos según lo que necesites: **usar** la suite (analista) o
 
 - Windows con **Microsoft Edge** instalado (rutas estándar de programa).
 - **PowerShell** en el `PATH` (viene con Windows; no hace falta instalar nada).
-- Red interna / VPN con acceso a SIME y al CM (`obp-apigw...internal`, `keycloak...internal`).
+- Red interna / VPN con acceso a SIME y al CM (`obp-apigw...internal`, `keycloak...internal`) y a la carpeta de releases `\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release` (de ahí salen el aviso de versión nueva y las actualizaciones).
 - Usuario y clave del CM (Keycloak); opcionalmente, credenciales de dominio para SIME si no vas a usar tu sesión de Windows.
 - **No se necesita ser administrador** para nada de lo siguiente.
 
@@ -91,7 +91,7 @@ assets/logica-<algo>.js         reglas de negocio: consultas, validaciones, form
 assets/me-<algo>-puente.js      enganche entre esa lógica y el shell común
 ```
 
-Más lo que comparten las diez:
+Más lo que comparten todas:
 
 ```txt
 assets/me-ui.css / me-ui.js     diseño, shell, sesión compartida, registro, tablas
@@ -106,7 +106,7 @@ Se registra en **dos sitios** (si falta uno, queda a medias):
 
 | Dónde | Qué agregar |
 | --- | --- |
-| `assets/me-ui.js` → `APPS` | Entrada del **menú lateral**, igual en las diez páginas. |
+| `assets/me-ui.js` → `APPS` | Entrada del **menú lateral**, igual en todas las páginas. |
 | `assets/logica-inicio.js` → `PROYECTOS` | Tarjeta en la **portada** (`index.html`), con sus entregables y su doc. |
 
 El `id` debe coincidir en los dos sitios y con el `app` que la página pasa a `MEUI.init()`. `dame click.bat` no hace falta tocarlo. Detalle: [lanzador/README.md § "Dar de alta una herramienta nueva"](lanzador/README.md#dar-de-alta-una-herramienta-nueva).
@@ -137,14 +137,20 @@ Sin `-Version` ni `-Incremento`, muestra la versión guardada en
 
 Genera `release\me-operacion-<version>.zip` y `release\version.json`
 (con el SHA-256 del `.zip` incluido, que `actualizar.ps1` verifica antes
-de instalar en cada equipo). Hay que subir esos dos archivos a
-`https://sebasmd.com/me/operacion/`. Detalle completo del mecanismo de
+de instalar en cada equipo) y **los publica él mismo** en la carpeta de
+releases `\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release`: primero el `.zip`, `version.json` al final. Si
+no hay acceso a la carpeta (sin VPN), deja todo en `release\` y dice qué
+copiar. Opciones: `-SinPublicar`, `-Destino "<carpeta>"`, `-Forzar` y, solo
+para la 3.0.0, `-Puente` (recuerda subirla también a
+`https://sebasmd.com/me/operacion/` para las copias 2.x). Detalle completo del mecanismo de
 publicación, firma y verificación de integridad:
 [lanzador/README.md](lanzador/README.md).
 
 ### Convenciones del proyecto
 
-- **Sin dependencias que instalar**: no usa git, GitHub, Node, Python ni build step — HTML/JS servido tal cual, y PowerShell nativo para el lanzador y el empaquetado.
+- **Sin dependencias que instalar**: ni Node, ni Python, ni build step — HTML/JS servido tal cual, y PowerShell nativo para el lanzador y el empaquetado. El código se versiona en Git (repositorio **público**: nada de capturas HAR, credenciales ni datos de clientes en un commit), pero los analistas reciben la suite por ZIP, no por Git.
+- **Versión de cada herramienta en tres lugares**: comentario de la primera línea del `.html`, `MEUI.init({ version })` y encabezado + historial de su `README.md`. Deben coincidir.
+- **Escrituras restringidas por usuario**: las herramientas que escriben en producción habilitan el botón solo a una lista de usuarios (`USUARIO_AGREGAR_PLU`, `USUARIOS_AUTORIZADOS`, `USUARIOS_PROVISION`). Es una guarda de interfaz, no un control de acceso.
 - **Marcado sin lógica**: cada `.html` en `herramientas/` es solo estructura; toda regla de negocio vive en `assets/logica-<algo>.js`.
 - **La herramienta no inventa datos**: un campo que el CM no devuelve queda vacío (o en `N/A` al imprimir), nunca se rellena con un supuesto.
 - **Versionado `Major.Minor.Patch`**: Major = cambio mayor, Minor = funcionalidad compatible y Patch = corrección/documentación — ver [README.md § Versionado](README.md#versionado).

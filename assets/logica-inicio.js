@@ -331,7 +331,7 @@ const PROYECTOS = [
         id: "base",
         numero: 0,
         nombre: "Base compartida",
-        descripcion: "Lo que usan las cuatro herramientas: diseño, shell y acceso al CM. Un cambio aquí las afecta a todas.",
+        descripcion: "Lo que usan todas las herramientas: diseño, shell y acceso al CM. Un cambio aquí las afecta a todas.",
         estado: "Común",
         abrir: null,
         entregables: [

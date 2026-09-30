@@ -21,10 +21,13 @@ GitHub ni permisos de administrador.
 | **Cierre masivo de casos** | Búsqueda del ticket de cada caso y cierre por lotes en el CM, con simulación previa. | [cerrar-casos](cerrar-casos/README.md) |
 | **Exportar casos · Tipificación** | Descarga masiva de casos del CRM por rango de fechas y estados. | [reporte-tipificacion](reporte-tipificacion/README.md) |
 | **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) · [análisis: recarga de paquetes](reporte-ajustes/recarga-de-paquetes-cm.md) |
-| **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueo/desbloqueo/conciliación) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) |
+| **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueos, conciliación y, para usuarios autorizados, aprovisionar/desaprovisionar) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) · motores: [validador-qdn](validador-qdn/README.md) · [consulta-qdn-tigo](consulta-qdn-tigo/README.md) · [hlr-cruzado](hlr-cruzado/README.md) |
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |
 | **Bolsillos, Paquetes, Consumos · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. Además **carga paquetes** en el CM desde el detalle de la línea. | [reporte-consumos](reporte-consumos/README.md) |
+| **Aplicar PLU de paquete** | Aplica un PLU en Tulio sobre una línea, en secuencia (consultar → agregar → eliminar), y verifica en el CM cuánto se sumó a cada paquete; evidencia en Excel y CSV. Solo usuarios autorizados. | [aplicar-plu](aplicar-plu/README.md) |
+| **Estado de líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. Solo usuarios autorizados. | [estado-lineas](estado-lineas/README.md) |
+| **Cambio de IMSI** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. Solo usuarios autorizados. | [cambio-imsi](cambio-imsi/README.md) |
 | **Convertir audio a MP3** | Convierte localmente uno o varios audios OGG, M4A u otros formatos compatibles y genera archivos `mp3-*.mp3`. | [audio-mp3](audio-mp3/README.md) |
 
 Todas comparten una **base común** (marco visual, sesión, acceso al CM) y
@@ -36,7 +39,7 @@ en particular:
 | --- | --- | --- |
 | `dame click.bat` / `scripts\lanzador.ps1` | Abre las herramientas con la sesión de SIME y las credenciales del CM ya listas. | [lanzador](lanzador/README.md) |
 | `actualizar.bat` / `scripts\actualizar.ps1` | Instala una versión nueva cuando el lanzador avisa que hay una (paso aparte, siempre a mano). | [lanzador § Aviso de versión nueva](lanzador/README.md#aviso-de-versión-nueva-e-instalarla-aparte-actualizarbat) |
-| `assets/me-ui.*`, `assets/me-api.js` | Diseño, shell, sesión, tablas, exportación y llamadas al CM que usan las diez herramientas. | [lanzador](lanzador/README.md) |
+| `assets/me-ui.*`, `assets/me-api.js` | Diseño, shell, sesión, tablas, exportación y llamadas al CM que usan todas las herramientas. | [lanzador](lanzador/README.md) |
 
 ---
 
@@ -50,6 +53,7 @@ me-operacion/
 ├─ index.html                  portada: catálogo de herramientas y descargas
 ├─ dame click.bat               lanzador delgado (solo invoca scripts\lanzador.ps1)
 ├─ actualizar.bat                lanzador delgado (solo invoca scripts\actualizar.ps1)
+├─ CODEX.md                     contexto para desarrollo (no viaja en el .zip)
 │
 ├─ scripts/                     TODA la lógica en PowerShell
 │   ├─ lanzador.ps1                lógica real del lanzador (firmable con Authenticode)
@@ -84,12 +88,15 @@ nombre mezcladas, datos copiados a mano que se desactualizan. Cada
 herramienta documenta en su propio `README.md` el problema puntual que
 resuelve y por qué se resolvió así.
 
-No usa git, GitHub, SharePoint ni un dominio corporativo para
-distribuirse — cada equipo tiene su propia copia de la carpeta, y
-`dame click.bat` avisa solo cuando hay una versión nueva publicada (ver
+No usa Git, GitHub, SharePoint ni un dominio corporativo para
+**distribuirse** (el código sí se versiona en un repositorio Git, que es
+público: nada de credenciales, capturas HAR ni datos de clientes en un
+commit) — cada equipo tiene su propia copia de la carpeta, y
+`dame click.bat` avisa solo cuando hay una versión nueva publicada en la
+carpeta de releases de la red de la compañía (desde la 3.0.0; ver
 [lanzador](lanzador/README.md)). Esa decisión, y sus
 contrapartidas (antivirus, transporte HTTP plano, credenciales
-compartidas por sesión), están explicadas en la sección **Riesgos** de
+compartidas por sesión, carpeta de releases sin control de escritura), están explicadas en la sección **Riesgos** de
 ese mismo documento.
 
 ---
@@ -114,6 +121,9 @@ mecanismo de publicación y actualización.
 
 - **[GETTINGSTARTED.md](GETTINGSTARTED.md)** — usar la suite día a día, o
   ponerse a tocar el código por primera vez.
+- **[CODEX.md](../CODEX.md)** — contexto de continuidad para quien retome el
+  código: mapa de conexiones, órdenes del CM, copias deliberadas, estado de
+  la release y pendientes.
 - **[lanzador](lanzador/README.md)** — arquitectura de la base
   común, el lanzador, la auto-actualización y los riesgos conocidos.
 - **`<herramienta>/README.md`** — una por cada herramienta de la

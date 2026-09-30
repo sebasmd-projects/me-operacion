@@ -17,17 +17,17 @@
         porque el analista lo lanzo el mismo, a proposito (desde
         "actualizar.bat" en la raiz del proyecto).
 
-    Ademas verifica el SHA-256 del .zip contra el que trae version.json
-    ANTES de aplicarlo: si no coincide, no se toca nada. (Los releases
-    generados con scripts\empaquetar-release.ps1 desde esta version en
-    adelante ya incluyen ese hash; uno mas viejo simplemente avisa que no
-    se pudo verificar, en vez de bloquear la actualizacion.)
+    Origen (desde la 3.0.0): la carpeta de red de la compania
+    ($RELEASE_DIR, abajo), no un dominio web. Lee version.json de ahi,
+    copia el .zip a %TEMP% y verifica su SHA-256 contra version.json ANTES
+    de aplicarlo: sin hash, o si no coincide, no se toca nada.
 
     Uso:
         actualizar.bat
         actualizar.bat /debug         -> muestra el detalle tecnico si algo falla
         actualizar.bat /sinconfirmar  -> no pregunta "instalar? [S/n]" (para
                                           correrlo desde otro script propio)
+        actualizar.bat /origen:"<carpeta>" -> usa otra carpeta de releases (pruebas)
 #>
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -35,6 +35,15 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 $argumentos   = $args -join ' '
 $debug        = $argumentos -match '/debug'
 $sinConfirmar = $argumentos -match '/sinconfirmar'
+
+# ---------- Origen de las releases (desde la 3.0.0) ----------
+# Carpeta de red de la compania: UNICA fuente de version.json y del .zip
+# (antes https://sebasmd.com/me/operacion). Para probar contra otra
+# carpeta: actualizar.bat /origen:"\\servidor\carpeta".
+$RELEASE_DIR = '\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release'
+foreach ($a in $args) {
+  if ([string]$a -match '^/origen:(.+)$') { $RELEASE_DIR = $Matches[1].Trim().Trim('"') }
+}
 
 # $PSScriptRoot es la carpeta de ESTE script (scripts\); la raiz del
 # proyecto (donde se aplica la actualizacion con robocopy) es su carpeta
@@ -63,40 +72,37 @@ function VerDe($valor) {
   try { return [version]("{0}.{1}.{2}" -f $partes[0], $partes[1], $partes[2]) } catch { return [version]'0.0.0' }
 }
 
-# Lee el JSON desde sus bytes y fuerza UTF-8. Windows PowerShell 5.1 puede
-# decodificar Invoke-RestMethod con la pagina de codigos del equipo cuando el
-# servidor no informa (o un proxy altera) el charset; ahi los caracteres con
-# tilde y la ene terminan con mojibake aunque el archivo publicado sea UTF-8.
-function Obtener-JsonUtf8($uri, $timeoutSec) {
-  $request = [Net.HttpWebRequest]::Create($uri)
-  $request.Method = 'GET'
-  $request.Timeout = $timeoutSec * 1000
-  $request.ReadWriteTimeout = $timeoutSec * 1000
-  $request.UserAgent = 'me-operacion-actualizador'
-
-  $response = $null
-  $stream = $null
-  $memoria = New-Object IO.MemoryStream
-  try {
-    $response = $request.GetResponse()
-    $stream = $response.GetResponseStream()
-    $stream.CopyTo($memoria)
-
-    # throwOnInvalidBytes=$true: no se reemplazan bytes invalidos en silencio.
-    $utf8 = New-Object Text.UTF8Encoding($false, $true)
-    $texto = $utf8.GetString($memoria.ToArray())
-    $texto = $texto.TrimStart([char]0xFEFF)
-    $texto = $texto.Normalize([Text.NormalizationForm]::FormC)
-    return $texto | ConvertFrom-Json -ErrorAction Stop
-  } finally {
-    if ($stream) { $stream.Dispose() }
-    if ($response) { $response.Dispose() }
-    $memoria.Dispose()
+# Lee un JSON de la carpeta de releases desde sus bytes: UTF-8 estricto
+# (throwOnInvalidBytes), sin BOM y normalizado a NFC, para que las tildes y
+# la ene de las notas no dependan de la pagina de codigos del equipo.
+# La lectura corre en un runspace aparte con tope de tiempo: fuera de la
+# VPN, o con el NAS caido, SMB puede bloquear 20-60 s cualquier acceso a la
+# ruta, y no hay que quedarse esperando eso.
+function Leer-JsonUtf8($ruta, $timeoutSec) {
+  $ps = [PowerShell]::Create()
+  [void]$ps.AddScript('param($r) , [IO.File]::ReadAllBytes($r)').AddArgument($ruta)
+  $h = $ps.BeginInvoke()
+  if (-not $h.AsyncWaitHandle.WaitOne($timeoutSec * 1000)) {
+    # No se espera a que termine (Stop/Dispose tambien se quedarian
+    # bloqueados): el runspace se abandona y muere con el proceso.
+    [void]$ps.BeginStop($null, $null)
+    throw ("la carpeta de releases no respondio en {0} s (sin VPN o sin red?)" -f $timeoutSec)
   }
+  try {
+    $res = $ps.EndInvoke($h)
+    if ($ps.Streams.Error.Count -gt 0) { throw $ps.Streams.Error[0].Exception }
+    if (-not $res -or $res.Count -lt 1) { throw ("no se pudo leer {0}" -f $ruta) }
+    $bytes = [byte[]]($res[0].psobject.BaseObject)
+  } finally { $ps.Dispose() }
+
+  $utf8 = New-Object Text.UTF8Encoding($false, $true)
+  $texto = $utf8.GetString($bytes)
+  $texto = $texto.TrimStart([char]0xFEFF)
+  $texto = $texto.Normalize([Text.NormalizationForm]::FormC)
+  return $texto | ConvertFrom-Json -ErrorAction Stop
 }
 
-$UPDATE_BASE   = 'https://sebasmd.com/me/operacion'
-$VERSION_URL   = "$UPDATE_BASE/version.json"
+$VERSION_JSON  = Join-Path $RELEASE_DIR 'version.json'
 # VERSION vive junto a los scripts (scripts\VERSION), no en la raiz del
 # proyecto.
 $VERSION_LOCAL = Join-Path $scriptsDir 'VERSION'
@@ -109,8 +115,7 @@ try {
   }
 
   Write-Host '  Consultando version disponible...' -ForegroundColor Gray
-  $cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-  $info = Obtener-JsonUtf8 "$VERSION_URL`?t=$cacheBust" 15
+  $info = Leer-JsonUtf8 $VERSION_JSON 20
   $verRemota = VerDe $info.version
 
   if ($verRemota -le $verLocal) {
@@ -139,36 +144,43 @@ try {
     }
   }
 
-  $zipUrl = [string]$info.zip
-  if ($zipUrl -notmatch '^https?://') { $zipUrl = "$UPDATE_BASE/$zipUrl" }
+  # "zip" tiene que ser SOLO un nombre de archivo dentro de la carpeta de
+  # releases: nada de rutas, unidades ni '..' que lleven a otro lado (la
+  # carpeta es de lectura y escritura para cualquiera con VPN).
+  $nombreZip = [string]$info.zip
+  if ($nombreZip -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$') {
+    throw ("version.json trae un nombre de .zip no valido: '{0}'. No se aplico nada." -f $nombreZip)
+  }
+  if (-not $info.sha256) {
+    throw 'version.json no trae sha256: desde la 3.0.0 es obligatorio. No se aplico nada.'
+  }
+  $zipOrigen = Join-Path $RELEASE_DIR $nombreZip
 
   $zipTmp = Join-Path $env:TEMP ("me-operacion-{0}.zip" -f $verRemota)
   $exTmp  = Join-Path $env:TEMP ("me-operacion-{0}-extract" -f $verRemota)
   if (Test-Path $exTmp) { Remove-Item $exTmp -Recurse -Force -ErrorAction SilentlyContinue }
   if (Test-Path $zipTmp) { Remove-Item $zipTmp -Force -ErrorAction SilentlyContinue }
 
-  Write-Host '  Descargando...' -ForegroundColor Gray
-  Invoke-WebRequest -Uri $zipUrl -OutFile $zipTmp -TimeoutSec 120 -UseBasicParsing
+  # Se copia a %TEMP% y se trabaja desde ahi: extraer directo desde la red
+  # es fragil (cortes de VPN, antivirus escaneando el recurso compartido).
+  Write-Host '  Copiando desde la carpeta de red...' -ForegroundColor Gray
+  Copy-Item -LiteralPath $zipOrigen -Destination $zipTmp -Force
 
-  # Verificacion de integridad: si version.json trae sha256, el .zip
-  # descargado tiene que coincidir EXACTO o no se aplica nada. HTTPS ya
-  # protege el transporte, pero esto ademas cubre que el archivo publicado
-  # en sebasmd.com sea justo el que se genero con empaquetar-release.ps1
-  # (y no uno corrupto o distinto). La herramienta no adivina: si no
-  # coincide, se detiene y avisa, no intenta "arreglarlo solo".
-  if ($info.sha256) {
-    Write-Host '  Verificando integridad (SHA-256)...' -ForegroundColor Gray
-    $hashReal = (Get-FileHash -Path $zipTmp -Algorithm SHA256).Hash
-    if ($hashReal.ToLower() -ne ([string]$info.sha256).ToLower()) {
-      Remove-Item $zipTmp -Force -ErrorAction SilentlyContinue
-      throw ("El .zip descargado NO coincide con el hash publicado en version.json.`n" +
-             "         Esperado: {0}`n         Obtenido: {1}`n" +
-             "         No se aplico nada. Vuelve a intentarlo mas tarde." -f $info.sha256, $hashReal)
-    }
-    Ok 'Hash verificado: el archivo descargado es el que se publico.'
-  } else {
-    Aviso 'version.json no trae sha256 (release anterior a esta funcion): no se pudo verificar integridad.'
+  # Verificacion de integridad: el .zip copiado tiene que coincidir EXACTO
+  # con el hash de version.json o no se aplica nada. Detecta una copia
+  # incompleta o un .zip reemplazado sin volver a empaquetar; no protege de
+  # alguien que publique un .zip y un version.json nuevos a proposito.
+  Write-Host '  Verificando integridad (SHA-256)...' -ForegroundColor Gray
+  $hashReal = (Get-FileHash -Path $zipTmp -Algorithm SHA256).Hash
+  if ($hashReal.ToLower() -ne ([string]$info.sha256).ToLower()) {
+    Remove-Item $zipTmp -Force -ErrorAction SilentlyContinue
+    # Parentesis alrededor de la concatenacion: -f tiene mas precedencia
+    # que +, y sin ellos solo formateaba el ultimo pedazo ("Esperado: {0}").
+    throw (("El .zip de la carpeta de red NO coincide con el hash de version.json.`n" +
+            "         Esperado: {0}`n         Obtenido: {1}`n" +
+            "         No se aplico nada. Vuelve a intentarlo mas tarde.") -f $info.sha256, $hashReal)
   }
+  Ok 'Hash verificado: el archivo copiado es el que se publico.'
 
   Write-Host '  Descomprimiendo...' -ForegroundColor Gray
   Expand-Archive -Path $zipTmp -DestinationPath $exTmp -Force

@@ -27,7 +27,7 @@ Herramienta para **verificar de forma cruzada** las suscripciones prepagadas de 
 | `reporte_prepagadas.html` | Solo marcado: KPIs, pasos, filtros, tabla y modal de detalle. |
 | `assets/logica-prepagadas.js` | Reglas de negocio: endpoints de SIME, clasificación de movimientos, catálogo de planes/PLU, ciclos, verificación, tabla y modal. |
 | `assets/me-prepagadas-puente.js` | Enganche con el shell: chips de sesión, alto de la tabla, entrada de líneas, exportaciones y spinners. |
-| `assets/me-api.js` | Keycloak, `auth` y consultas al CM. **Común a las cuatro herramientas.** |
+| `assets/me-api.js` | Keycloak, `auth` y consultas al CM. **Común a todas las herramientas.** |
 | `assets/me-ui.js` / `me-ui.css` | Shell, registro, tablas y exportación. **Común.** |
 
 Cambiar una consulta del CM se hace en `me-api.js`; cambiar una regla de prepagadas, en `logica-prepagadas.js`. El HTML no contiene JavaScript propio.

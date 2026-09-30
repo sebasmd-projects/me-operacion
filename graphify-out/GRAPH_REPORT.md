@@ -1,107 +1,120 @@
 # Graph Report - me-operacion  (2026-09-30)
 
 ## Corpus Check
-- 78 files · ~219,511 words
+- 25 files · ~225,456 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 28 file(s) not represented in the graph (top: .zip 20, .bat 3, .har 3)
 
 ## Summary
-- 1421 nodes · 3039 edges · 53 communities (50 shown, 3 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 238 edges (avg confidence: 0.85)
-- Token cost: 193,441 input · 0 output
+- 1494 nodes · 3218 edges · 65 communities (56 shown, 9 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 281 edges (avg confidence: 0.86)
+- Token cost: 186,698 input · 0 output
 
 ## Community Hubs (Navigation)
 - HLR/HSS Claro
 - Cierre masivo de casos
 - Aplicar PLU (lógica)
-- Operaciones QDN Claro
 - Validador QDN Claro
+- Operaciones QDN Claro
 - Archivo de rechazo
-- HLR cruzado
 - Portabilidad Tigo
 - Shell me-ui
 - Validador QDN Tigo
-- HLR/HSS ambos operadores
-- Carga de paquetes CM
 - Prepagadas núcleo
+- HLR cruzado
+- HLR/HSS ambos operadores
 - HLR/HSS Tigo
 - Consumos núcleo
 - Ajustes y paquetes
-- Tipificación
 - Puente de rechazo
-- Audio a MP3
+- Tipificación
+- Carga de paquetes CM
 - Inicio y descargas
 - Aplicar PLU (puente)
-- Recargas SIME (edición)
-- Contexto y servicios externos
+- Audio a MP3
+- Páginas y shell común
+- Releases 3.0.0 carpeta de red
 - Histórico CDR
-- Movimientos de consumo
-- Cliente API CM
-- Líneas CM compartido
 - Tabla de prepagadas
-- Consulta BSS prepagadas
-- Docs consumos y prepagadas
+- Alta en SIME (plan)
+- Movimientos de consumo
+- Consulta BSS y catálogo SIME
+- Líneas CM compartido
+- Docs HLR cruzado y Tigo
+- Contexto CODEX
+- Reglas y herramientas
+- Cliente API CM
 - Carga de histórico
 - Cambio de IMSI (lógica)
+- Arquitectura y casos
+- SIME y prepagadas docs
+- Docs consumos y tipificación
 - Tabla de consumos
-- Alta en SIME
 - Transacciones BSS
 - Estado de líneas (lógica)
+- Recurrencias SIME
+- Cabeceras y edición SIME
+- Puentes con sesión CM
+- Docs Aplicar PLU
+- KPIs de consumos
 - Ciclos y comentarios
 - Lanzador PowerShell
-- KPIs de consumos
-- Docs de arquitectura
-- Carga de archivo prepagadas
+- Docs portabilidad Tigo
+- Órdenes del CM
 - Formatos de uso
-- Docs de ajustes
 - Tabla seleccionable
 - Puente estado de líneas
-- Docs portabilidad Tigo
-- Sesión CM y cambio IMSI
 - Columna de archivo
 - Modal de uso
 - Puente cambio de IMSI
+- Puente de ajustes
 - Puente de casos
+- Puente de tipificación
+- Sesión CM de líneas
+- Captura HAR de recarga
+- Catálogo selectableProducts
+- Perfil del suscriptor
 
 ## God Nodes (most connected - your core abstractions)
-1. `Lanzador docs` - 27 edges
-2. `log()` - 17 edges
-3. `abrirDetalle()` - 17 edges
-4. `abrirConfirmacion()` - 17 edges
-5. `inicializarConsumos()` - 16 edges
-6. `abrirConfirmacion()` - 16 edges
-7. `render()` - 16 edges
-8. `escHtml()` - 15 edges
-9. `render()` - 14 edges
-10. `iniciar()` - 14 edges
+1. `CODEX.md - Contexto de continuidad` - 39 edges
+2. `Base compartida y lanzador - Doc tecnica` - 31 edges
+3. `me-operacion README (catalogo)` - 24 edges
+4. `HLR/HSS · Claro y Tigo (page, v2.4)` - 18 edges
+5. `log()` - 18 edges
+6. `abrirConfirmacion()` - 17 edges
+7. `pintarCrearSime()` - 17 edges
+8. `abrirDetalle()` - 17 edges
+9. `abrirConfirmacion()` - 16 edges
+10. `inicializarConsumos()` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `validador_qdn.html` --semantically_similar_to--> `validador_qdn_tigo.html (Consulta QDN · Tigo)`  [INFERRED] [semantically similar]
-  doc/validador-qdn/README.md → herramientas/validador_qdn_tigo.html
-- `Carga de paquetes (Consumos 1.8.0)` --semantically_similar_to--> `CM ChangeOffer order (cart + productOrder) to delete bundles`  [INFERRED] [semantically similar]
-  CODEX.md → doc/aplicar-plu/README.md
-- `Tulio RecargaPaquete` --semantically_similar_to--> `Carga de paquetes (Consumos 1.8.0)`  [INFERRED] [semantically similar]
-  doc/aplicar-plu/README.md → CODEX.md
-- `aplicar_plu.html (Aplicar PLU de paquete)` --semantically_similar_to--> `reporte_consumos.html`  [INFERRED] [semantically similar]
-  herramientas/aplicar_plu.html → doc/reporte-consumos/README.md
-- `Lanzador docs` --references--> `dame click.bat`  [EXTRACTED]
-  CODEX.md → doc/lanzador/README.md
+- `me-operacion README (catalogo)` --references--> `Herramienta Cambio de IMSI`  [INFERRED]
+  doc/README.md → CODEX.md
+- `me-operacion README (catalogo)` --references--> `Herramienta Casos masivos`  [INFERRED]
+  doc/README.md → CODEX.md
+- `me-operacion README (catalogo)` --references--> `Herramienta Consumos`  [INFERRED]
+  doc/README.md → CODEX.md
+- `me-operacion README (catalogo)` --references--> `Herramienta Estado de lineas`  [INFERRED]
+  doc/README.md → CODEX.md
+- `me-operacion README (catalogo)` --references--> `Herramienta HLR/HSS`  [INFERRED]
+  doc/README.md → CODEX.md
 
 ## Import Cycles
 - None detected.
 
 ## Hyperedges (group relationships)
-- **CM cart + productOrder write flows** — doc_aplicar_plu_readme_changeoffer_order, doc_cambio_imsi_readme_changesim_order, doc_estado_lineas_readme_changesubscriptionstate, codex_paquetes_carga [INFERRED 0.85]
-- **Exact billingAccount resolution shared across tools** — assets_logica_plu, assets_logica_consumos, assets_logica_rechazo, doc_aplicar_plu_readme_exact_billing_account [EXTRACTED 1.00]
-- **Release publication and update pipeline** — codex_release_zip_sha256, codex_version_json_authority, doc_gettingstarted_actualizar, doc_gettingstarted_dame_click_launcher, codex_semver_convention [EXTRACTED 1.00]
-- **Motores fusionados en HLR/HSS** — assets_me_hlr_hss_puente, assets_logica_hlr_hss_tigo, assets_logica_hlr_hss_claro, assets_logica_hlr_hss_ambos, assets_logica_qdn, assets_logica_qdn_operaciones, assets_logica_hlr_cruzado, assets_logica_qdn_tigo [EXTRACTED 1.00]
-- **Flujo de carga de paquete en el CM** — assets_logica_paquetes_carga, assets_logica_consumos, doc_reporte_ajustes_recarga_de_paquetes_cm_subscriberprofile, doc_reporte_ajustes_recarga_de_paquetes_cm_selectableproducts, doc_reporte_ajustes_recarga_de_paquetes_cm_flujo_carrito_orden, doc_reporte_consumos_readme_bundlebalance [EXTRACTED 1.00]
-- **Base compartida de la suite (shell, API, lanzador)** — assets_me_ui, assets_me_ui_css, assets_me_api, scripts_lanzador, doc_lanzador_readme_dame_click_bat [EXTRACTED 1.00]
 - **Pages built on shared CM line lookup (cm-lineas.js + me-api.js)** — herramientas_cambio_imsi, herramientas_estado_lineas, assets_cm_lineas, assets_me_api [EXTRACTED 1.00]
-- **Client-only tools that do not load me-api.js (local file processing)** — herramientas_validador_hlr_cruzado, herramientas_validador_qdn, herramientas_validador_qdn_tigo, herramientas_convertir_audio_mp3 [INFERRED 0.85]
-- **HLR/HSS page combining Claro, Tigo and both-operator logic** — herramientas_hlr_hss, assets_logica_hlr_hss_claro, assets_logica_hlr_hss_tigo, assets_logica_hlr_hss_ambos, assets_me_hlr_hss_puente [EXTRACTED 1.00]
+- **Exact billingAccount resolution shared across tools** — assets_logica_plu, assets_logica_consumos, assets_logica_rechazo, doc_aplicar_plu_readme_exact_billing_account [EXTRACTED 1.00]
+- **Flujo de carga de paquete en el CM** — assets_logica_paquetes_carga, assets_logica_consumos, doc_reporte_ajustes_recarga_de_paquetes_cm_subscriberprofile, doc_reporte_ajustes_recarga_de_paquetes_cm_selectableproducts, doc_reporte_ajustes_recarga_de_paquetes_cm_flujo_carrito_orden [EXTRACTED 1.00]
+- **Motores fusionados en HLR/HSS** — assets_me_hlr_hss_puente, assets_logica_hlr_hss_tigo, assets_logica_hlr_hss_claro, assets_logica_hlr_hss_ambos, assets_logica_qdn, assets_logica_qdn_operaciones, assets_logica_hlr_cruzado, assets_logica_qdn_tigo [EXTRACTED 1.00]
+- **CM cart + productOrder write flows** — doc_aplicar_plu_readme_changeoffer_order, doc_cambio_imsi_readme_changesim_order, doc_estado_lineas_readme_changesubscriptionstate [INFERRED 0.85]
+- **Escrituras al CM con patron carrito-orden-seguimiento** — codex_cm_order_pattern, codex_changeoffer_order, codex_changesubscriptionstate_order, codex_changesim_order, codex_mepaq, codex_cmlineas, doc_reporte_consumos_readme_cargar_paquete [EXTRACTED 1.00]
+- **Pipeline de releases por carpeta de red** — doc_lanzador_readme_empaquetar_release, codex_version_json, codex_release_network_folder, doc_lanzador_readme_dame_click_launcher, doc_lanzador_readme_actualizar, doc_lanzador_readme_sha256_verification, doc_lanzador_plan_3_0_0_publish_order_zip_then_json [INFERRED 0.85]
+- **Copias alineadas de resolucion de titular** — codex_titular_resolution_flow, codex_tool_consumos, codex_tool_rechazo, codex_tool_ajustes, doc_reporte_consumos_readme_titulardecuenta, codex_billingaccount_exact_match [EXTRACTED 1.00]
+- **Tool bridge (puente) modules connecting logic to MEUI shell** — assets_me_hlr_hss_puente, assets_me_consumos_puente, assets_me_prepagadas_puente, assets_me_qdn_puente, assets_me_ui [INFERRED 0.85]
+- **Guarded production-write operations** — herramientas_reporte_consumos_cargar_paquete, herramientas_validador_qdn_operaciones, herramientas_hlr_hss_aprovisionamiento [INFERRED 0.75]
+- **HLR/HSS tabbed tool** — herramientas_hlr_hss_pestana_tigo, herramientas_hlr_hss_pestana_claro, herramientas_hlr_hss_pestana_ambos [EXTRACTED 1.00]
 
-## Communities (53 total, 3 thin omitted)
+## Communities (65 total, 9 thin omitted)
 
 ### Community 0 - "HLR/HSS Claro"
 Cohesion: 0.05
@@ -109,219 +122,247 @@ Nodes (101): abrirConfirmacion(), abrirDetalle(), actualizarConteoMasivo(), actu
 
 ### Community 1 - "Cierre masivo de casos"
 Cohesion: 0.05
-Nodes (77): abrirDetalle(), accionDe(), actualizarBotones(), actualizarContadores(), apiFetch(), asegurarCaracteristicas(), autoMapear(), baseTitulo() (+69 more)
+Nodes (75): abrirDetalle(), accionDe(), actualizarBotones(), actualizarContadores(), apiFetch(), asegurarCaracteristicas(), autoMapear(), baseTitulo() (+67 more)
 
 ### Community 2 - "Aplicar PLU (lógica)"
 Cohesion: 0.05
 Nodes (73): apiCm(), aplicarPlu(), barraEtapasHTML(), barraSecuenciaHTML(), bolsillosPlegablesHTML(), CABECERA_BITACORA, CABECERA_EXPORT, CABECERA_SECUENCIA (+65 more)
 
-### Community 3 - "Operaciones QDN Claro"
-Cohesion: 0.07
-Nodes (67): abrirConfirmacion(), actualizarConteoMasivo(), anotarBitacora(), bitacoraExport(), bitacoraOperaciones, BLOQUEO_A_PROCESO, botonOperacionHTML(), CABECERA_BITACORA (+59 more)
-
-### Community 4 - "Validador QDN Claro"
+### Community 3 - "Validador QDN Claro"
 Cohesion: 0.06
 Nodes (64): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_QDN, BSVOZ_TELEFONIA, buscarCaracteristica() (+56 more)
 
+### Community 4 - "Operaciones QDN Claro"
+Cohesion: 0.08
+Nodes (62): abrirConfirmacion(), actualizarConteoMasivo(), anotarBitacora(), bitacoraExport(), bitacoraOperaciones, BLOQUEO_A_PROCESO, botonOperacionHTML(), CABECERA_BITACORA (+54 more)
+
 ### Community 5 - "Archivo de rechazo"
 Cohesion: 0.06
-Nodes (53): aInputFechaHora(), altoUtil(), AMARILLO, API(), barra(), bloqueImagen(), buscarBillingAccount(), CAMPOS_CIERRE (+45 more)
+Nodes (54): aInputFechaHora(), altoUtil(), AMARILLO, API(), barra(), bloqueImagen(), buscarBillingAccount(), CAMPOS_CIERRE (+46 more)
 
-### Community 6 - "HLR cruzado"
-Cohesion: 0.06
-Nodes (55): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_CLARO, AMBIENTE_TIGO, CABECERA_EXPORT (+47 more)
-
-### Community 7 - "Portabilidad Tigo"
+### Community 6 - "Portabilidad Tigo"
 Cohesion: 0.07
 Nodes (55): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_TIGO, buscarSeccion(), CABECERA_EXPORT (+47 more)
 
-### Community 8 - "Shell me-ui"
+### Community 7 - "Shell me-ui"
 Cohesion: 0.08
 Nodes (47): abrirDoc(), abrirPaso(), ajustarTabla(), ajustarTablas(), aplicarAperturaPasos(), autoSpinner(), caida(), cajasLog() (+39 more)
 
-### Community 9 - "Validador QDN Tigo"
+### Community 8 - "Validador QDN Tigo"
 Cohesion: 0.07
-Nodes (52): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_TIGO, buscarSeccion(), CABECERA_EXPORT (+44 more)
+Nodes (53): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_TIGO, buscarSeccion(), CABECERA_EXPORT (+45 more)
 
-### Community 10 - "HLR/HSS ambos operadores"
-Cohesion: 0.08
-Nodes (47): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), celdaCarrier(), celdaUbicacion(), concluirUbicacion() (+39 more)
-
-### Community 11 - "Carga de paquetes CM"
-Cohesion: 0.10
-Nodes (40): abrirPanel(), alternar(), cablear(), catalogoDeOferta(), cerrarPanel(), cuerpoCarrito(), cuerpoOrden(), ejecutar() (+32 more)
-
-### Community 12 - "Prepagadas núcleo"
+### Community 9 - "Prepagadas núcleo"
 Cohesion: 0.06
-Nodes (39): actualizarEtiquetasFiltro(), ALIAS_COLUMNA, BADGE_LINEA, bssCliente(), cacheRecurrencias, cacheServicios, CANALES, candidatosExternalID() (+31 more)
+Nodes (46): actualizarEtiquetasFiltro(), ALIAS_COLUMNA, BADGE_LINEA, bssCliente(), buscarBillingAccount(), cacheRecurrencias, cacheServicios, CANALES_FIJOS (+38 more)
 
-### Community 13 - "HLR/HSS Tigo"
+### Community 10 - "HLR cruzado"
+Cohesion: 0.08
+Nodes (46): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), AMBIENTE_CLARO, AMBIENTE_TIGO, CABECERA_EXPORT (+38 more)
+
+### Community 11 - "HLR/HSS ambos operadores"
+Cohesion: 0.11
+Nodes (39): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), celdaCarrier(), celdaUbicacion(), concluirUbicacion() (+31 more)
+
+### Community 12 - "HLR/HSS Tigo"
 Cohesion: 0.11
 Nodes (38): abrirDetalle(), actualizarFiltros(), actualizarKPIs(), actualizarProgreso(), alternarKpi(), buscarSeccion(), calcularBloqueos(), celdaEstado() (+30 more)
 
-### Community 14 - "Consumos núcleo"
+### Community 13 - "Consumos núcleo"
 Cohesion: 0.08
 Nodes (37): actualizarProgreso(), buscarBillingAccount(), CABECERA_EXPORT, CALLTYPE_CATEGORIA, cambiarCuenta(), candidatosExternalID(), CAT_ORDEN, CLASE_CATEGORIA_CDR (+29 more)
 
-### Community 15 - "Ajustes y paquetes"
+### Community 14 - "Ajustes y paquetes"
 Cohesion: 0.10
 Nodes (32): accountFromSub(), activity(), actualizarResumen(), apiGet(), approvalDate(), approvedFlag(), BUNDLE_COLS, buscarCuenta() (+24 more)
 
-### Community 16 - "Tipificación"
-Cohesion: 0.11
-Nodes (28): actualizarProgreso(), buildQuery(), COLS_FRONT, contarCasos(), descargarPaginas(), descargarPaginasEspecificas(), descargarRangoFechas(), dividir() (+20 more)
-
-### Community 17 - "Puente de rechazo"
+### Community 15 - "Puente de rechazo"
 Cohesion: 0.17
 Nodes (31): alCambiarCampo(), aplicarPersonaJuridica(), aplicarReglaNit(), arrancarReloj(), arrancarSesion(), campoPorId(), camposDe(), cargarImagenes() (+23 more)
 
-### Community 18 - "Audio a MP3"
-Cohesion: 0.14
-Nodes (27): agregar(), canalEntero16(), codificarMp3(), convertir(), convertirPendientes(), descargar(), descargarBlob(), descargarTodo() (+19 more)
+### Community 16 - "Tipificación"
+Cohesion: 0.13
+Nodes (24): actualizarProgreso(), buildQuery(), COLS_FRONT, contarCasos(), descargarPaginas(), descargarPaginasEspecificas(), descargarRangoFechas(), dividir() (+16 more)
 
-### Community 19 - "Inicio y descargas"
+### Community 17 - "Carga de paquetes CM"
+Cohesion: 0.18
+Nodes (27): abrirPanel(), alternar(), cablear(), catalogoDeOferta(), cerrarPanel(), cuerpoCarrito(), cuerpoOrden(), ejecutar() (+19 more)
+
+### Community 18 - "Inicio y descargas"
 Cohesion: 0.14
 Nodes (26): abrirDoc(), archivosDe(), armarZip(), BASE, cargarCodigoVisible(), crc32(), descargarPaquete(), descargarUno() (+18 more)
 
-### Community 20 - "Aplicar PLU (puente)"
+### Community 19 - "Aplicar PLU (puente)"
 Cohesion: 0.12
 Nodes (22): esEliminable(), abrirDetalle(), agregarFila(), celdaEstado(), conectar(), construirTabla(), eliminarDeLinea(), errorDeFila() (+14 more)
 
-### Community 21 - "Recargas SIME (edición)"
-Cohesion: 0.16
-Nodes (23): abrirEditarRec(), actualizarPayload(), actualizarPayloadRec(), alElegirTipo(), avisoMsisdn(), canalDeNombre(), cargarRecurrencias(), catalogoAprendido() (+15 more)
+### Community 20 - "Audio a MP3"
+Cohesion: 0.17
+Nodes (24): agregar(), canalEntero16(), codificarMp3(), convertir(), convertirPendientes(), descargar(), descargarBlob(), descargarTodo() (+16 more)
 
-### Community 22 - "Contexto y servicios externos"
+### Community 21 - "Páginas y shell común"
 Cohesion: 0.12
-Nodes (22): CODEX.md continuity context, HLR Tigo consulta service, Keycloak Optiva (realm/client optiva), No inventar datos principle, QDN Claro ValideQDN service, Release ZIP + SHA-256 publication, Major.Minor.Patch versioning convention, SIME Web (+14 more)
+Nodes (24): me-ui.css, MEUI.init(), Common ME tool layout (KPI cards as filters, steps column, log, DataTable, detail modal, CSV/XLSX/JSON export), CM session, QDN OAuth2 session, SIME token session, aplicar_plu.html (Aplicar PLU de paquete), HLR/HSS · Claro y Tigo (page, v2.4) (+16 more)
+
+### Community 22 - "Releases 3.0.0 carpeta de red"
+Cohesion: 0.19
+Nodes (23): Puente 2.x -> 3.0.0 via sebasmd.com, Riesgo: carpeta de releases sin control de escritura, Carpeta de red de releases (296nas01 me-operacion-release), Convencion Major.Minor.Patch (version en tres lugares), version.json (autoridad final de release), GETTINGSTARTED - Primeros pasos, Plan 3.0.0 - Releases desde carpeta de red, Permisos de carpeta (solo lectura analistas) (+15 more)
 
 ### Community 23 - "Histórico CDR"
 Cohesion: 0.19
 Nodes (20): categoriaCdr(), celdaCategoriaCdr(), celdaUso(), colorCategoria(), construirTablaHistorico(), detalleCdrHTML(), direccionCdr(), filasHistoricoExport() (+12 more)
 
-### Community 24 - "Movimientos de consumo"
+### Community 24 - "Tabla de prepagadas"
+Cohesion: 0.15
+Nodes (19): abrirDetalle(), actualizarKPIs(), actualizarOcultas(), alternarOculta(), aplanarObjeto(), badgeEstado(), botonOcultarHTML(), celdaPeriodos() (+11 more)
+
+### Community 25 - "Alta en SIME (plan)"
+Cohesion: 0.22
+Nodes (19): actualizarPayload(), alElegirTipo(), avisoMsisdn(), canalDeNombre(), canalesVigentes(), catalogoAprendido(), catalogoPlu(), crearEnSime() (+11 more)
+
+### Community 26 - "Movimientos de consumo"
 Cohesion: 0.24
 Nodes (18): categoriaMov(), celdaCategoriaMov(), celdaVigenciaMov(), construirTablaMovimientos(), esCompraMov(), esCompraPlanMov(), esMesActual(), esPrimeraMov() (+10 more)
 
-### Community 25 - "Cliente API CM"
-Cohesion: 0.22
-Nodes (15): api(), cabeceras(), ensure(), getJson(), _guardar(), leerCampos(), _login(), reauth() (+7 more)
+### Community 27 - "Consulta BSS y catálogo SIME"
+Cohesion: 0.19
+Nodes (18): bssBundleBalance(), bssBuscarLinea(), bssServiciosDeCuenta(), cambiarCuenta(), cargarCatalogoSime(), consultar(), worker(), consultarLinea() (+10 more)
 
-### Community 26 - "Líneas CM compartido"
+### Community 28 - "Líneas CM compartido"
 Cohesion: 0.21
 Nodes (11): cambiarEstado(), cambiarImsi(), cuentaBase(), cuentaCrm(), direccionDe(), esperarOrden(), resolverLinea(), textoError() (+3 more)
 
-### Community 27 - "Tabla de prepagadas"
+### Community 29 - "Docs HLR cruzado y Tigo"
+Cohesion: 0.14
+Nodes (16): HLR Cruzado Claro-Tigo Doc, Consulta paralela Promise.all por linea, HLR Tigo autogestion (X-Api-Key), RETCODE Tigo (0 Activa, 3001 Sin perfil, 1033 Residuo), HLR/HSS Claro y Tigo Doc, Fusion de tres herramientas en pestanas, Envoltorio IIFE por motor, Guardas: solo precio 0, una linea, sin reintento de orden (+8 more)
+
+### Community 30 - "Contexto CODEX"
+Cohesion: 0.23
+Nodes (17): CODEX.md - Contexto de continuidad, billingAccount externalID con coincidencia exacta, window.CMLineas (cm-lineas.js), Copias deliberadas que pueden divergir (HLR Ambos/cruce, Claro/QDN), HLR Tigo (consulta), Patron IIFE con un solo objeto global, window.MEPAQ (logica-paquetes-carga.js), Riesgo: repositorio publico con secretos embebidos (+9 more)
+
+### Community 31 - "Reglas y herramientas"
 Cohesion: 0.15
-Nodes (17): abrirDetalle(), actualizarKPIs(), actualizarOcultas(), alternarOculta(), aplanarObjeto(), badgeEstado(), botonOcultarHTML(), celdaPeriodos() (+9 more)
+Nodes (17): Regla: no inventar datos, Flujo de resolucion de titular (MSISDN -> billingAccount -> individual), Herramienta Ajustes/Paquetes, Herramienta Audio a MP3, Herramienta Rechazos, Convertir audio a MP3 - Doc tecnica, lamejs (codificador MP3), Procesamiento local sin servidores (+9 more)
 
-### Community 28 - "Consulta BSS prepagadas"
-Cohesion: 0.19
-Nodes (17): bssBundleBalance(), bssBuscarLinea(), bssServiciosDeCuenta(), cambiarCuenta(), consultar(), worker(), consultarLinea(), leerArranqueUrl() (+9 more)
+### Community 32 - "Cliente API CM"
+Cohesion: 0.26
+Nodes (13): api(), cabeceras(), ensure(), getJson(), _guardar(), leerCampos(), _login(), reauth() (+5 more)
 
-### Community 29 - "Docs consumos y prepagadas"
-Cohesion: 0.16
-Nodes (13): Consumos y Paquetes (CM) Doc, bundleBalance (Uso y Balance), Historico de consumo CDR (listDetailedCallDetailsWithBundles), detailedSubscriptionTransaction (Movimientos), paginarHistorico, Reporte Prepagadas SIME-CM Doc, catalogoPlu / PLU 1a compra, Ciclos apilados (pague N lleve M) (+5 more)
-
-### Community 30 - "Carga de histórico"
+### Community 33 - "Carga de histórico"
 Cohesion: 0.22
 Nodes (13): abrirDetalle(), cargarHistorico(), cmHistoricoConsumo(), cmMovimientos(), isoLocalSinZ(), marcarVigentes(), normalizarLocalISO(), paginarHistorico() (+5 more)
 
-### Community 31 - "Cambio de IMSI (lógica)"
+### Community 34 - "Cambio de IMSI (lógica)"
 Cohesion: 0.20
 Nodes (6): CABECERA, CONFIG, consultarFila(), marcarRepetidos(), noAplica(), PROCESO
 
-### Community 32 - "Tabla de consumos"
+### Community 35 - "Arquitectura y casos"
+Cohesion: 0.21
+Nodes (12): CM/Optiva OBP API Gateway, Keycloak Optiva (realm/client optiva), Arquitectura de tres capas (HTML marcado / logica-*.js / me-*-puente.js), Herramienta Casos masivos, Cierre masivo de casos (CM) - Doc tecnica, accionDe(fila) - regla columna Favorable, Renovacion de token segura ante concurrencia, ESTADOS_CERRADOS (+4 more)
+
+### Community 36 - "SIME y prepagadas docs"
+Cohesion: 0.24
+Nodes (12): SIME API (token prf), SIME Web (NTLM -> prf), Herramienta Prepagadas, Clasificacion de movimientos (1.a compra/paquete/recurrencia), Reporte Suscripciones Prepagadas (SIME-CM) - Doc tecnica, GetCanalTipo (catalogo en vivo de planes SIME), Movimientos BSS / categoriaTx, Plan como campo maestro del alta (+4 more)
+
+### Community 37 - "Docs consumos y tipificación"
+Cohesion: 0.21
+Nodes (12): Herramienta Tipificacion, Consumos y Paquetes (CM) - Doc tecnica, Clasificacion CDR Datos/Voz/SMS y MO/MT, Reintentos y reduccion de tamano de pagina ante 500, paginarHistorico (paginador por llave y ventana de fechas), Deduplicacion de registros repetidos del API, Componente Uso y Balance (usoHTML duplicado), Exportar casos Tipificacion - Doc tecnica (+4 more)
+
+### Community 38 - "Tabla de consumos"
 Cohesion: 0.24
 Nodes (11): celdaEstado(), celdaIdentificacion(), celdaUsoCategoria(), construirDataTable(), estadoTabla(), filaPasaFiltros(), filasExport(), filasParaExportar() (+3 more)
 
-### Community 33 - "Alta en SIME"
-Cohesion: 0.22
-Nodes (11): b64(), crearEnSime(), guardarRec(), headersSime(), payloadCrear(), refrescarSuscripcion(), simeEditarRecurrencia(), simeGetSuscripcion() (+3 more)
-
-### Community 34 - "Transacciones BSS"
+### Community 39 - "Transacciones BSS"
 Cohesion: 0.40
 Nodes (11): bssTransacciones(), categoriaTx(), esCicloTx(), esCompraPlanTx(), esCompraTx(), esPrimeraTx(), esRecurTx(), montoTx() (+3 more)
 
-### Community 35 - "Estado de líneas (lógica)"
+### Community 40 - "Estado de líneas (lógica)"
 Cohesion: 0.22
 Nodes (6): CABECERA, cambiarFila(), CONFIG, consultarFila(), PROCESO, Estado de lineas docs
 
-### Community 36 - "Ciclos y comentarios"
-Cohesion: 0.27
-Nodes (10): calcularCiclos(), calcularPeriodos(), enriquecer(), etiquetaMes(), fmt(), generarComentarios(), mesIdxDeFecha(), soloFecha() (+2 more)
-
-### Community 37 - "Lanzador PowerShell"
+### Community 41 - "Recurrencias SIME"
 Cohesion: 0.24
-Nodes (4): dame click.bat, Leer-Credencial(), Nota(), Ok()
+Nodes (10): abrirEditarRec(), actualizarPayloadRec(), cargarRecurrencias(), dtLocal(), estadoRecTexto(), payloadRec(), pintarRecFijos(), pintarRecurrencias() (+2 more)
 
-### Community 38 - "KPIs de consumos"
+### Community 42 - "Cabeceras y edición SIME"
+Cohesion: 0.24
+Nodes (10): adicional(), b64(), guardarRec(), headersSime(), refrescarSuscripcion(), simeCatalogo(), simeEditarRecurrencia(), simeGetSuscripcion() (+2 more)
+
+### Community 43 - "Puentes con sesión CM"
+Cohesion: 0.27
+Nodes (5): conectarCm(), engancharComun(), engancharSesionCm(), montar(), Puente pattern (bridge between tool logic and MEUI shell)
+
+### Community 44 - "Docs Aplicar PLU"
+Cohesion: 0.20
+Nodes (10): CM ChangeOffer order (cart + productOrder) to delete bundles, CM stable fingerprint wait (bundleId:asignado), ERCRT1002 missing dependent product handling, NO_ELIMINABLES bundle list, PLU sequence (consultar, aplicar, evidencia, eliminar, verificar), Tulio RecargaPaquete, Cambio de IMSI docs, CM ChangeSim order (+2 more)
+
+### Community 45 - "KPIs de consumos"
 Cohesion: 0.31
 Nodes (9): actualizarFiltros(), actualizarKPIs(), alternarKpi(), cabeceraHistorico(), cabeceraMovimientos(), inicializarConsumos(), limpiarFiltros(), pintarFiltro() (+1 more)
 
-### Community 39 - "Docs de arquitectura"
-Cohesion: 0.22
-Nodes (9): me-ui.css (sistema de diseno), Cierre masivo de casos docs, Consulta QDN Tigo docs, RETCODE states (3001 inconclusive alone), Lanzador docs, Arquitectura marcado / logica / puente, DataTables 2.3.2, Orden de carga me-ui -> MEUI.init -> me-api -> logica -> puente (+1 more)
+### Community 46 - "Ciclos y comentarios"
+Cohesion: 0.31
+Nodes (9): calcularCiclos(), calcularPeriodos(), enriquecer(), etiquetaMes(), generarComentarios(), mesIdxDeFecha(), soloFecha(), totalPeriodosDePlan() (+1 more)
 
-### Community 40 - "Carga de archivo prepagadas"
-Cohesion: 0.38
-Nodes (7): buscarBillingAccount(), cargarHoja(), compactoPlan(), extraerLineas(), leerArchivo(), norm(), pintarOpcionesPlan()
+### Community 47 - "Lanzador PowerShell"
+Cohesion: 0.28
+Nodes (3): Leer-Credencial(), Nota(), Ok()
 
-### Community 41 - "Formatos de uso"
+### Community 48 - "Docs portabilidad Tigo"
+Cohesion: 0.29
+Nodes (6): Regla de conclusion Claro vs Tigo, Validador Portabilidad Tigo Doc, El 3001 no prueba que el numero sea de ME, CheckPortabilidad.html (reemplazado), estadoCM() estado ME en Optiva, validador_portabilidad_tigo.html (Validador Portabilidad · HLR Tigo)
+
+### Community 49 - "Órdenes del CM"
+Cohesion: 0.32
+Nodes (8): Orden ChangeOffer, Orden ChangeSim (cambio de IMSI), Orden ChangeSubscriptionState (bloquear/inactivar), Patron de ordenes CM: carrito -> orden -> seguimiento -> borrar carrito, IMSI en estado HELD tras inactivar, Cabecera Transaction-Id DCRM-TRX, recarga-de-paquetes-cm.md (analisis flujo agregar paquetes), Cargar paquete (unica escritura de Consumos)
+
+### Community 50 - "Formatos de uso"
 Cohesion: 0.38
 Nodes (7): fmtBytes(), fmtCantidad(), fmtFechaHora(), fmtVoz(), nfmt(), nivelUso(), usoHTML()
 
-### Community 42 - "Docs de ajustes"
-Cohesion: 0.33
-Nodes (5): Ajustes y Paquetes (CM) Doc, Catalogos de codigos editables, /api/v1/subscription/adjustment, Resolucion de titular via billingAccount/individual, export_ajustes.html
-
-### Community 43 - "Tabla seleccionable"
+### Community 51 - "Tabla seleccionable"
 Cohesion: 0.47
 Nodes (5): engancharLote(), tablaSeleccionable(), redibujar(), sincronizarTodas(), visibles()
 
-### Community 44 - "Puente estado de líneas"
+### Community 52 - "Puente estado de líneas"
 Cohesion: 0.47
 Nodes (3): actualizar(), desarmar(), pintarAccion()
 
-### Community 45 - "Docs portabilidad Tigo"
-Cohesion: 0.40
-Nodes (4): Validador Portabilidad Tigo Doc, CheckPortabilidad.html (reemplazado), estadoCM() estado ME en Optiva, validador_portabilidad_tigo.html
-
-### Community 47 - "Sesión CM y cambio IMSI"
-Cohesion: 0.30
-Nodes (4): engancharSesionCm(), Cambio de IMSI docs, CM ChangeSubscriptionState order, Inactivation leaves IMSI in HELD
-
-### Community 48 - "Columna de archivo"
+### Community 54 - "Columna de archivo"
 Cohesion: 0.70
 Nodes (5): configurarArchivo(), extraerColumna(), limpiar(), pintarColumnas(), procesar()
 
-### Community 49 - "Modal de uso"
+### Community 55 - "Modal de uso"
 Cohesion: 0.50
 Nodes (5): escHtml(), fmtFechaHora(), nivelUso(), pintarCabeceraModal(), usoHTML()
 
-### Community 50 - "Puente cambio de IMSI"
+### Community 56 - "Puente cambio de IMSI"
 Cohesion: 0.50
 Nodes (4): actualizar(), pintarAccion(), cambio_imsi.html (Cambio de IMSI), estado_lineas.html (Estado de líneas)
 
+## Ambiguous Edges - Review These
+- `Regla: no inventar datos` → `Procesamiento local sin servidores`  [AMBIGUOUS]
+  doc/audio-mp3/README.md · relation: conceptually_related_to
+
 ## Knowledge Gaps
-- **201 isolated node(s):** `DEFAULT_MAPS`, `MAPS`, `fmtCOP`, `fmtUnit`, `msisdnCache` (+196 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 283 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **207 isolated node(s):** `CAMPOS`, `CARACS_MINIMAS`, `COLS_RESULTADO`, `COLUMNAS`, `COLUMNAS_REP` (+202 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 289 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Lanzador docs` connect `Docs de arquitectura` to `Estado de líneas (lógica)`, `Operaciones QDN Claro`, `Lanzador PowerShell`, `HLR cruzado`, `Shell me-ui`, `HLR/HSS ambos operadores`, `Docs de ajustes`, `Docs portabilidad Tigo`, `Actualizador PowerShell`, `Sesión CM y cambio IMSI`, `Tipificación`, `Aplicar PLU (puente)`, `Contexto y servicios externos`, `Cliente API CM`, `Docs consumos y prepagadas`?**
-  _High betweenness centrality (0.212) - this node is a cross-community bridge._
-- **Why does `hlr_hss.html` connect `HLR/HSS ambos operadores` to `HLR/HSS Claro`, `HLR cruzado`, `Shell me-ui`, `HLR/HSS Tigo`, `Docs portabilidad Tigo`, `Cliente API CM`?**
-  _High betweenness centrality (0.159) - this node is a cross-community bridge._
-- **Why does `Reporte Prepagadas SIME-CM Doc` connect `Docs consumos y prepagadas` to `Cliente API CM`, `Docs de ajustes`, `Prepagadas núcleo`, `Docs de arquitectura`?**
-  _High betweenness centrality (0.113) - this node is a cross-community bridge._
-- **Are the 2 inferred relationships involving `inicializarConsumos()` (e.g. with `consultar()` and `limpiarFiltros()`) actually correct?**
-  _`inicializarConsumos()` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `DEFAULT_MAPS`, `MAPS`, `fmtCOP` to the rest of the system?**
-  _201 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `HLR/HSS Claro` be split into smaller, more focused modules?**
-  _Cohesion score 0.051589567865981345 - nodes in this community are weakly interconnected._
-- **Should `Cierre masivo de casos` be split into smaller, more focused modules?**
-  _Cohesion score 0.051791629027401385 - nodes in this community are weakly interconnected._
+- **What is the exact relationship between `Regla: no inventar datos` and `Procesamiento local sin servidores`?**
+  _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
+- **Why does `Prepagadas · SIME ⇄ CM (page, v9.4.0)` connect `Páginas y shell común` to `Cliente API CM`, `SIME y prepagadas docs`, `Shell me-ui`, `Prepagadas núcleo`, `Puentes con sesión CM`?**
+  _High betweenness centrality (0.215) - this node is a cross-community bridge._
+- **Why does `HLR/HSS · Claro y Tigo (page, v2.4)` connect `Páginas y shell común` to `HLR/HSS Claro`, `Cliente API CM`, `Shell me-ui`, `HLR/HSS ambos operadores`, `HLR/HSS Tigo`, `Puentes con sesión CM`, `Docs portabilidad Tigo`, `Docs HLR cruzado y Tigo`?**
+  _High betweenness centrality (0.180) - this node is a cross-community bridge._
+- **Why does `Base compartida y lanzador - Doc tecnica` connect `Releases 3.0.0 carpeta de red` to `Cliente API CM`, `Arquitectura y casos`, `SIME y prepagadas docs`, `Docs consumos y tipificación`, `Validador QDN Tigo`, `Estado de líneas (lógica)`, `Docs Aplicar PLU`, `Docs portabilidad Tigo`, `Aplicar PLU (puente)`, `Docs HLR cruzado y Tigo`, `Contexto CODEX`, `Reglas y herramientas`?**
+  _High betweenness centrality (0.153) - this node is a cross-community bridge._
+- **Are the 12 inferred relationships involving `me-operacion README (catalogo)` (e.g. with `Herramienta Ajustes/Paquetes` and `Herramienta Audio a MP3`) actually correct?**
+  _`me-operacion README (catalogo)` has 12 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 3 inferred relationships involving `HLR/HSS · Claro y Tigo (page, v2.4)` (e.g. with `Common ME tool layout (KPI cards as filters, steps column, log, DataTable, detail modal, CSV/XLSX/JSON export)` and `validador_hlr_cruzado.html (¿En qué HLR está?)`) actually correct?**
+  _`HLR/HSS · Claro y Tigo (page, v2.4)` has 3 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `CAMPOS`, `CARACS_MINIMAS`, `COLS_RESULTADO` to the rest of the system?**
+  _207 weakly-connected nodes found - possible documentation gaps or missing edges._

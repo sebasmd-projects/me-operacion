@@ -1,10 +1,11 @@
 <#
     empaquetar-release.ps1
     -----------------------------------------------------------------------
-    Arma el paquete que hay que subir a https://sebasmd.com/me/operacion/
-    para que "dame click.bat" detecte la version nueva y se actualice solo
-    en cada equipo. No usa git, GitHub ni Python: solo PowerShell nativo
-    (Compress-Archive).
+    Arma el paquete de una release y lo PUBLICA en la carpeta de red de la
+    compania (desde la 3.0.0), de donde "dame click.bat" lee la version y
+    "actualizar.bat" copia el .zip:
+        \\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release
+    No usa git, GitHub ni Python: solo PowerShell nativo (Compress-Archive).
 
     Vive en scripts\ junto a lanzador.ps1 y actualizar.ps1 -las tres cosas
     que SI viajan en el paquete-, pero este script NUNCA se incluye a si
@@ -41,11 +42,21 @@
     O con un archivo .pfx suelto:
         scripts\empaquetar-release.bat -CertPfx C:\ruta\certificado.pfx
 
-    Que genera, dentro de .\release\ (en la raiz del proyecto):
-        me-operacion-<version>.zip   <- subir a sebasmd.com/me/operacion/
-        version.json                 <- subir a sebasmd.com/me/operacion/
-                                         (reemplaza el que ya este ahi;
-                                         incluye el sha256 del .zip)
+    Que genera, dentro de .\release\ (en la raiz del proyecto) y copia a
+    la carpeta de red (-Destino):
+        me-operacion-<version>.zip
+        version.json                 (reemplaza el que ya este ahi;
+                                      incluye el sha256 del .zip)
+    Orden de la publicacion: primero el .zip (y se verifica el hash de la
+    copia), version.json AL FINAL. Asi nadie ve una version cuyo .zip
+    todavia no esta completo.
+
+    Otras opciones:
+        -SinPublicar   solo genera en release\ (no toca la carpeta de red)
+        -Forzar        reemplaza un .zip de la misma version ya publicado
+        -Puente        recuerda subir tambien a https://sebasmd.com/me/operacion/
+                       (solo para la 3.0.0: las copias 2.x solo miran ahi)
+        -Destino "<carpeta>"  publica en otra carpeta (pruebas)
 
     Estructura del .zip generado (coincide con la del proyecto):
         index.html, assets\, herramientas\, doc\, dame click.bat, actualizar.bat
@@ -88,7 +99,12 @@ param(
     [string]$CertThumbprint,
     [string]$CertPfx,
     [SecureString]$CertPfxPassword,
-    [string]$TimestampServer = "http://timestamp.digicert.com"
+    [string]$TimestampServer = "http://timestamp.digicert.com",
+    # Publicacion en la carpeta de red (desde la 3.0.0).
+    [string]$Destino = '\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release',
+    [switch]$SinPublicar,
+    [switch]$Forzar,
+    [switch]$Puente
 )
 
 $ErrorActionPreference = 'Stop'
@@ -161,6 +177,23 @@ if ($Version) {
 }
 if ($versionNueva -le $versionActual) {
     throw "La version nueva ($versionNueva) debe ser mayor que la actual ($versionActual)."
+}
+
+# ---------- 1b. Carpeta de red ----------
+# Se revisa ANTES de tocar nada (scripts\VERSION, release\): si la version
+# ya esta publicada, se detiene aqui. Sin acceso (sin VPN) no se detiene:
+# el paquete se genera igual en release\ y se avisa que hay que copiarlo.
+$publicar = -not $SinPublicar
+if ($publicar) {
+    Write-Host ""
+    Write-Host "  Comprobando la carpeta de releases..." -ForegroundColor Gray
+    if (-not (Test-Path -LiteralPath $Destino -PathType Container)) {
+        Write-Host ("  ATENCION  No se pudo acceder a {0}" -f $Destino) -ForegroundColor Yellow
+        Write-Host "            (sin VPN o ruta mal escrita). El paquete se genera igual en release\." -ForegroundColor Yellow
+        $publicar = $false
+    } elseif ((Test-Path -LiteralPath (Join-Path $Destino ("me-operacion-{0}.zip" -f $versionNueva))) -and -not $Forzar) {
+        throw ("La version {0} ya esta publicada en la carpeta de red. No se reutiliza un numero: sube la version (o usa -Forzar si de verdad hay que reemplazarla)." -f $versionNueva)
+    }
 }
 
 Write-Host ""
@@ -292,11 +325,42 @@ $textoJson = [regex]::Replace($textoJson, '[^\x00-\x7F]', {
 [IO.File]::WriteAllText($rutaJson, $textoJson, (New-Object Text.UTF8Encoding($false)))
 Write-Host ("  OK  version.json generado (sha256 {0}...)" -f $hashZip.Substring(0, 12)) -ForegroundColor Green
 
-# ---------- 7. Instrucciones ----------
+# ---------- 7. Publicar en la carpeta de red ----------
+# Primero el .zip, se verifica el hash de la COPIA y solo entonces
+# version.json: un analista que abra dame click.bat en medio de la
+# publicacion nunca ve una version cuyo .zip no esta completo.
+if ($publicar) {
+    $zipDestino  = Join-Path $Destino $nombreZip
+    $jsonDestino = Join-Path $Destino 'version.json'
+    Write-Host "  Publicando en la carpeta de red..." -ForegroundColor Gray
+    Copy-Item -LiteralPath $rutaZip -Destination $zipDestino -Force
+    $hashCopia = (Get-FileHash -LiteralPath $zipDestino -Algorithm SHA256).Hash
+    if ($hashCopia -ne $hashZip) {
+        Remove-Item -LiteralPath $zipDestino -Force -ErrorAction SilentlyContinue
+        throw "El .zip copiado a la carpeta de red no coincide con el generado (copia incompleta). No se publico version.json: vuelve a intentarlo."
+    }
+    [IO.File]::Copy($rutaJson, $jsonDestino, $true)
+    Write-Host ("  OK  Publicado en {0}" -f $Destino) -ForegroundColor Green
+}
+
+# ---------- 8. Instrucciones ----------
 Write-Host ""
-Write-Host "  Listo. Sube estos dos archivos a https://sebasmd.com/me/operacion/ :" -ForegroundColor Yellow
-Write-Host ("    - {0}" -f $rutaJson)
-Write-Host ("    - {0}" -f $rutaZip)
+if ($publicar) {
+    Write-Host ("  Listo. Quien abra dame click.bat vera la version {0} y la instala con actualizar.bat." -f $versionNueva) -ForegroundColor Yellow
+} elseif ($SinPublicar) {
+    Write-Host "  Listo. Generado solo en release\ (-SinPublicar)." -ForegroundColor Yellow
+} else {
+    Write-Host ("  Copia estos dos archivos a {0} :" -f $Destino) -ForegroundColor Yellow
+    Write-Host ("    1. {0}" -f $rutaZip)
+    Write-Host ("    2. {0}   <- SIEMPRE al final" -f $rutaJson)
+}
+if ($Puente) {
+    Write-Host ""
+    Write-Host "  PUENTE 2.x -> 3.x: sube tambien estos dos archivos a https://sebasmd.com/me/operacion/" -ForegroundColor Yellow
+    Write-Host "  (las copias 2.x solo consultan ese dominio; al instalar esta version ya leen la carpeta de red):" -ForegroundColor Yellow
+    Write-Host ("    - {0}" -f $rutaZip)
+    Write-Host ("    - {0}" -f $rutaJson)
+}
 Write-Host ""
 Write-Host "  version.json SIEMPRE se reemplaza (mismo nombre); el .zip queda" -ForegroundColor DarkGray
 Write-Host "  con nombre nuevo cada vez, no hace falta borrar los anteriores." -ForegroundColor DarkGray

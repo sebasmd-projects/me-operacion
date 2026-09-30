@@ -25,7 +25,7 @@ Herramienta para exportar casos/tickets del CRM de tipificación de **Móvil Éx
 | `export_tipificacion.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
 | `assets/logica-tipificacion.js` | Reglas de negocio: armado de la query, motor de descarga, división de rangos, enriquecimiento y validaciones. |
 | `assets/me-tipificacion-puente.js` | Enganche con el shell: sesión, pestañas y registro. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las cuatro herramientas. |
+| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 

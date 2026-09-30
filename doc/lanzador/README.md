@@ -1,8 +1,8 @@
 # Base compartida y lanzador `dame click.bat` — Documentación técnica
 
-> **Versión: v2.4** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v3.0.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 
-Las cuatro herramientas de operación son archivos HTML independientes, pero **comparten una base**: el mismo marco visual, la misma sesión y el mismo acceso al CM. Esa base son tres archivos (`me-ui.css`, `me-ui.js`, `me-api.js`) más el lanzador `dame click.bat` + `scripts\lanzador.ps1`, que deja la sesión lista antes de que aparezca la primera página.
+Las herramientas de operación son archivos HTML independientes, pero **comparten una base**: el mismo marco visual, la misma sesión y el mismo acceso al CM. Esa base son tres archivos (`me-ui.css`, `me-ui.js`, `me-api.js`) más el lanzador `dame click.bat` + `scripts\lanzador.ps1`, que deja la sesión lista antes de que aparezca la primera página.
 
 > **En la raíz del proyecto solo quedan tres archivos «externos»**: `index.html`, `dame click.bat` y `actualizar.bat`. Todo lo demás vive ordenado en subcarpetas — **todo `.ps1` en `scripts\`** (incluido el empaquetador, que nunca se distribuye), toda la documentación en `doc\`. Ver el árbol completo en §2.
 
@@ -22,7 +22,7 @@ Las cuatro herramientas de operación son archivos HTML independientes, pero **c
 
 ## 1. Objetivos
 
-- Que las cuatro herramientas se vean y se usen igual, sin copiar código entre ellas.
+- Que todas las herramientas se vean y se usen igual, sin copiar código entre ellas.
 - Tener **un solo lugar** para los endpoints, las credenciales y la renovación del token.
 - Que el analista abra el lanzador y encuentre la sesión iniciada, sin escribir nada.
 - Que cada `.html` sea **solo marcado**: la lógica vive en archivos aparte y se puede editar sin abrir el HTML.
@@ -51,7 +51,7 @@ assets\
   me-<herramienta>-puente.js enganche entre esa lógica y el shell
 ```
 
-Orden de carga, idéntico en las cuatro páginas:
+Orden de carga, idéntico en todas las páginas:
 
 ```html
 <script src="assets/me-ui.js"></script>
@@ -81,8 +81,10 @@ El orden importa: `MEUI.init()` va **antes** de la lógica porque mueve el conte
 | Servicio | Para qué se usa |
 |---|---|
 | **Keycloak** (`optiva`) | Autenticación OpenID Connect del CM: *direct grant* y *refresh token*. |
-| **API Gateway OBP** | Todas las consultas al CM de las cuatro herramientas. |
+| **API Gateway OBP** | Todas las consultas y órdenes al CM de todas las herramientas. |
 | **SIME / SIME Web** | Solo lo usa el reporte de prepagadas (token `prf` por NTLM). |
+| **Tulio** | Solo Aplicar PLU (`client_credentials` + `RecargaPaquete`); la autenticación vive en `logica-plu.js`, no en `me-api.js`. |
+| **QDN Claro / HLR Tigo** | Motores de HLR/HSS y validadores; cada uno con su propia autenticación en su `logica-*.js`. |
 
 CDNs usados: jsdelivr, datatables.net, code.jquery.com, cdnjs. Todos externos (ver §9).
 
@@ -97,6 +99,8 @@ Todos los que centraliza `me-api.js`:
 | `POST` | `{kcBase}/auth/realms/{realm}/protocol/openid-connect/token` | Login (`grant_type=password`) y renovación (`grant_type=refresh_token`). |
 | `GET` | `{apiBase}{ruta}` vía `MEAPI.getJson(ruta, params)` | Cualquier consulta autenticada al CM. |
 | `*` | `{apiBase}{ruta}` vía `MEAPI.api(ruta, {method, body, headers})` | Llamadas con cuerpo: `PATCH`, `POST`, `PUT`. |
+
+Fuera de `me-api.js`, el lanzador y el actualizador leen las releases de la **carpeta de red** `\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release` (`version.json` + `me-operacion-X.Y.Z.zip`; ver §7). No es un endpoint HTTP: es una ruta de red de Windows que exige VPN.
 
 Configuración fija:
 
@@ -193,7 +197,7 @@ dame click.bat
 
 ## 7. Flujo del lanzador
 
-0. **Avisa si hay una versión nueva** (ver más abajo). Solo consulta y avisa — **nunca la descarga ni la aplica sola**; si no hay internet en ese momento o el host no responde, sigue de largo con la copia local sin más aviso.
+0. **Avisa si hay una versión nueva** (ver más abajo). Solo consulta y avisa — **nunca la descarga ni la aplica sola**; si la carpeta de releases no responde (sin VPN, NAS caído), sigue de largo con la copia local en 6 s como máximo.
 1. **Verifica los archivos** en su carpeta. Si falta alguno, lo dice y sigue con los que haya.
 2. **Lee las credenciales** del archivo local cifrado; si no existen, las pide por consola.
 3. **SIME**: pide el token `prf` a `SIME/Web` con la sesión de Windows (NTLM). Si falla, ofrece reintentar, escribir usuario y clave de dominio, o saltarse el reporte de prepagadas y abrir el resto.
@@ -217,12 +221,12 @@ El `prf` viaja en la **query** (igual que el redirect de SIME) y las credenciale
 
 ### Aviso de versión nueva, e instalarla aparte (`actualizar.bat`)
 
-Cada equipo corporativo tiene su propia copia de esta carpeta (no hay dominio interno ni git/GitHub para distribuirla), así que actualizarla a mano en cada máquina no escala. Pero **descargar código nuevo, sobrescribir la carpeta y relanzarse solo, sin que nadie lo pida, es exactamente el patrón de comportamiento de un dropper de malware** — varios antivirus lo bloquean por eso, aunque el contenido sea inofensivo (fue justo lo que pasaba antes de v2.3: se bloqueaba al encontrar versión nueva, no al hacer la consulta). Por eso desde v2.3 el aviso y la instalación son **dos pasos separados**:
+Cada equipo corporativo tiene su propia copia de esta carpeta (se distribuye por ZIP, no por Git), así que actualizarla a mano en cada máquina no escala. Pero **descargar código nuevo, sobrescribir la carpeta y relanzarse solo, sin que nadie lo pida, es exactamente el patrón de comportamiento de un dropper de malware** — varios antivirus lo bloquean por eso, aunque el contenido sea inofensivo (fue justo lo que pasaba antes de v2.3: se bloqueaba al encontrar versión nueva, no al hacer la consulta). Por eso desde v2.3 el aviso y la instalación son **dos pasos separados**:
 
 **`dame click.bat` (vía `scripts\lanzador.ps1`), como paso 0, SOLO consulta:**
 
 1. Lee el archivo `scripts\VERSION` — un número `Major.Minor.Patch` como `2.2.1`, comparado como `[version]` de .NET: ordena bien `2.2.9 < 2.2.10 < 2.3.0`. Los números históricos incompletos se rellenan con ceros (`2.2` = `2.2.0`).
-2. Pide `https://sebasmd.com/me/operacion/version.json` — dominio propio, **aprobado por la compañía y sin bloqueos de proxy**, y no depende de la VPN (a diferencia de SIME y del CM). Timeout corto (6 s): si no responde, se sigue con la copia local sin más aviso que una nota en pantalla.
+2. Lee `version.json` de la **carpeta de releases** en la red de la compañía (`\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release`; desde la v3.0.0 es la **única** fuente —antes era `https://sebasmd.com/me/operacion/`—). Se llega con la VPN, igual que a SIME y al CM. La lectura corre aparte con un tope de **6 s**: un recurso de red inaccesible puede bloquear Windows 20-60 s, y el lanzador no espera eso; si no responde, sigue con la copia local y deja una nota en pantalla. Para probar contra otra carpeta: `dame click.bat /origen:"<carpeta>"`.
 3. Si `version.json.version` es mayor que el `VERSION` local, **avisa en pantalla** («hay una versión nueva: X → Y») y dice que corras `actualizar.bat` cuando quieras instalarla. No descarga nada más.
 
 Se puede omitir con `dame click.bat /sinupdate` (útil para depurar sin depender de la red, o si se está editando la copia local a propósito).
@@ -231,13 +235,13 @@ Se puede omitir con `dame click.bat /sinupdate` (útil para depurar sin depender
 
 1. Repite la misma consulta a `version.json`. Si ya está al día, lo dice y termina — y muestra **las dos versiones** (local y publicada), no solo la local: así, si algún día la comparación da un resultado raro, se puede confirmar desde la propia pantalla qué fue lo que se leyó.
 2. Si hay versión nueva, muestra las notas (si trae) y **pregunta antes de tocar nada** (`¿Instalar esta version ahora? [S/n]`; se puede saltar con `/sinconfirmar`).
-3. Descarga el `.zip` que indica `version.json.zip` a una carpeta temporal.
-4. **Verifica su SHA-256** contra el que trae `version.json` — si `version.json` incluye `sha256` (todo release generado desde v2.3 lo trae) y no coincide, **se detiene sin aplicar nada**. HTTPS ya protege el transporte; esto además cubre que el `.zip` publicado sea justo el que se generó con `empaquetar-release.ps1`, no uno corrupto o distinto. Al terminar, registra como versión local la versión publicada, incluso si el ZIP reutilizado traía un `scripts\VERSION` anterior.
+3. Copia el `.zip` que indica `version.json.zip` desde la carpeta de releases a `%TEMP%` (no se extrae directo desde la red). `zip` tiene que ser **solo un nombre de archivo** (`me-operacion-X.Y.Z.zip`): una ruta, una unidad o `..` se rechazan sin aplicar nada. También acepta `/origen:"<carpeta>"`.
+4. **Verifica su SHA-256** contra el que trae `version.json` — desde la v3.0.0 es **obligatorio**: sin `sha256`, o si no coincide, **se detiene sin aplicar nada**. Cubre un `.zip` copiado a medias o reemplazado sin volver a empaquetar; no protege de alguien que publique a propósito un `.zip` y un `version.json` nuevos (ver §9). Al terminar, registra como versión local la versión publicada, incluso si el ZIP reutilizado traía un `scripts\VERSION` anterior.
 5. Lo descomprime **ahí mismo** (no sobre la carpeta en uso) con `Expand-Archive`, y solo si eso termina bien copia el contenido encima de la carpeta real con `robocopy … /E` (sobrescribe, pero **no borra** archivos locales que ya no vengan en el `.zip` — más seguro que `/MIR` frente a un error de rutas).
 6. **Limpia restos de una versión anterior a v2.4** — antes del reordenamiento a `scripts\`, `lanzador.ps1`/`actualizar.ps1`/`VERSION` vivían sueltos en la raíz; como el paso anterior no borra nada que no venga en el `.zip` nuevo, esos archivos quedarían huérfanos en la raíz (sin romper nada: el `dame click.bat` nuevo ya apunta a `scripts\lanzador.ps1`). Tanto `actualizar.ps1` como `lanzador.ps1` detectan y borran esos restos solos, así que actualizar desde una versión anterior a v2.4 termina con la raíz limpia igual, aunque no sea en el mismo instante.
 7. Avisa que ya quedó instalado y que corras `dame click.bat` cuando quieras abrir las herramientas. **No se relanza nada solo.**
 
-Si cualquier parte de esto falla (sin internet, host caído, `.zip` corrupto, hash que no coincide, `robocopy` falla), se avisa en rojo/amarillo y **no se cambia nada** — nunca deja la carpeta a medias.
+Si cualquier parte de esto falla (sin VPN, carpeta inaccesible, `.zip` corrupto, hash que no coincide, `robocopy` falla), se avisa en rojo/amarillo y **no se cambia nada** — nunca deja la carpeta a medias.
 
 **Armar una versión nueva para publicar** (no usa git, GitHub ni Python — solo PowerShell). Se corre con `scripts\empaquetar-release.bat`, no llamando al `.ps1` directo: así tampoco choca con la `ExecutionPolicy` del equipo (mismo motivo por el que `dame click.bat` no es un `.ps1` suelto). Se corre desde la raíz del proyecto:
 
@@ -251,11 +255,19 @@ scripts\empaquetar-release.bat -CertThumbprint 0123456789ABCDEF0123456789ABCDEF0
 scripts\empaquetar-release.bat -CertPfx C:\ruta\certificado.pfx
 ```
 
-Sin `-Version` ni `-Incremento`, lee `scripts\VERSION` y ofrece **Fix/documentación** (`Z+1`, recomendado), **Minor** (`Y+1`, reinicia Z), **Major** (`X+1`, reinicia Y/Z) o una versión `X.Y.Z` personalizada. Para automatización se usa `-Version 3.0.0` o `-Incremento Fix|Minor|Major`. Genera `release\me-operacion-<version>.zip` y `release\version.json` (con el `sha256` del `.zip` incluido). Hay que subir **esos dos archivos** a `https://sebasmd.com/me/operacion/` (el `.zip` con nombre nuevo cada vez, no hace falta borrar los viejos; `version.json` siempre reemplaza al que ya esté). El script también deja `scripts\VERSION` en el número nuevo.
+Sin `-Version` ni `-Incremento`, lee `scripts\VERSION` y ofrece **Fix/documentación** (`Z+1`, recomendado), **Minor** (`Y+1`, reinicia Z), **Major** (`X+1`, reinicia Y/Z) o una versión `X.Y.Z` personalizada. Para automatización se usa `-Version 3.0.0` o `-Incremento Fix|Minor|Major`. Genera `release\me-operacion-<version>.zip` y `release\version.json` (con el `sha256` del `.zip` incluido) y, desde la v3.0.0, **los publica él mismo en la carpeta de releases**:
+
+1. Antes de tocar nada comprueba la carpeta. Si esa versión **ya está publicada**, se detiene (no se reutiliza un número; `-Forzar` para reemplazarla a propósito). Si la carpeta no es accesible (sin VPN), **no se detiene**: genera en `release\` y al final dice qué copiar y en qué orden.
+2. Copia el `.zip`, **vuelve a calcular el SHA-256 de la copia** y, solo si coincide, escribe `version.json` **al final**. Así nadie que abra `dame click.bat` en medio de la publicación ve una versión cuyo `.zip` no está completo.
+3. Deja `scripts\VERSION` en el número nuevo.
+
+Otras opciones: `-SinPublicar` (solo `release\`), `-Destino "<carpeta>"` (publicar en otra carpeta, para pruebas) y `-Puente` (ver abajo).
+
+**Puente 2.x → 3.0.0.** Las copias 2.x solo consultan `https://sebasmd.com/me/operacion/`. La 3.0.0 se empaqueta con `-Puente`, que además de publicarla en la carpeta recuerda subir **esos mismos dos archivos** a `sebasmd.com` una última vez. Cada analista corre `actualizar.bat` (el suyo, 2.x): baja la 3.0.0 del dominio y desde ahí su lanzador y su actualizador ya leen la carpeta de red. Después no se vuelve a publicar en el dominio.
 
 **Firma (Authenticode).** Los `.bat` (`dame click.bat`, `actualizar.bat`) **no se pueden firmar de ninguna forma** — Windows no tiene un formato de firma para archivos batch. Por eso la lógica pesada vive en `scripts\lanzador.ps1` y `scripts\actualizar.ps1`: son los que de verdad hacen llamadas de red y tocan archivos, y son los que sí se pueden firmar. Sin `-CertThumbprint` ni `-CertPfx`, este paso se omite — igual que la consulta de versión, nunca bloquea el empaquetado por no tener un certificado configurado. Un certificado de firma de código (OV, ~USD 70-200/año) ayuda tanto al escaneo estático como a la reputación de SmartScreen; uno EV (más caro) da reputación inmediata en vez de tener que "ganarla" con volumen de descargas.
 
-**Probar el mecanismo sin preparar una release real**: sube a cPanel un `version.json` con un número mayor apuntando al **mismo** `.zip` que ya esté ahí (no hace falta tocar el `.zip`; el hash publicado seguirá siendo el de ese archivo y `actualizar.ps1` lo verificará normalmente). `dame click.bat` lo detecta y avisa; al correr `actualizar.bat`, la versión local queda en el número publicado aunque el ZIP reutilizado contenga un `scripts\VERSION` anterior.
+**Probar el mecanismo sin preparar una release real**: empaquetar con `-Destino` apuntando a una carpeta local de pruebas y abrir `dame click.bat /origen:"<esa carpeta>"` / `actualizar.bat /origen:"<esa carpeta>"` desde **otra copia** del proyecto con un `scripts\VERSION` menor. O, en la carpeta real, un `version.json` con un número mayor apuntando al **mismo** `.zip` que ya esté ahí (el hash sigue siendo el de ese archivo). `dame click.bat` lo detecta y avisa; al correr `actualizar.bat`, la versión local queda en el número publicado aunque el ZIP reutilizado contenga un `scripts\VERSION` anterior.
 
 Qué entra en el paquete (lista fija, no "todo lo que haya en la carpeta"): `index.html`, `assets\`, `herramientas\`, `doc\`, `dame click.bat`, `actualizar.bat`, `scripts\lanzador.ps1`, `scripts\actualizar.ps1` y `scripts\VERSION`. **`scripts\empaquetar-release.ps1`/`.bat` NUNCA se incluyen** — es una herramienta de quien mantiene el proyecto, no algo que necesite un analista. Por dentro, `empaquetar-release.ps1` arma esta estructura copiando cada pieza a una carpeta temporal antes de comprimir (`Compress-Archive`, al recibir la ruta de un archivo suelto, lo deja en la raíz del `.zip`; no hay forma de pedirle que quede dentro de una subcarpeta `scripts\` sin antes tenerlo de verdad ahí). Las credenciales guardadas (`%APPDATA%\reporte_prepagadas\`) nunca viajan: viven fuera de esta carpeta.
 
@@ -294,6 +306,8 @@ MEUI.exportarCSV(cab, filas, base) / exportarXLSX(cab, filas, base, hoja, {numFm
 MEUI.exportarJSON(datos, base) / MEUI.descargar(blob, nombre)
 MEUI.sesion.set|caida|cerrar|estado("cm"|"sime") / MEUI.cred.get|set|borrar(...)
 MEUI.abrirPaso(n, bool) / MEUI.resumenPaso(n, texto)
+MEUI.montarPasos() / aplicarAperturaPasos() / montarTogglePasos()
+MEUI.copiarTexto(texto) / MEUI.abrirDoc(ruta) / MEUI.normalizar(txt) / separador()
 
 // --- me-api.js ---
 MEAPI.CONFIG / MEAPI.configurar({ locale: "en" })
@@ -303,7 +317,20 @@ MEAPI.api(ruta, { method, body, headers, params })
 MEAPI.cabeceras(extra)
 ```
 
-Eventos que emite el shell y atiende cada puente: `me:sesion-iniciar`, `me:sesion-renovar` (a 15 s del vencimiento) y `me:sesion-cerrar`, todos con `detail.clave`.
+Eventos que emite el shell y atiende cada puente: `me:sesion-iniciar`, `me:sesion-renovar` (a 15 s del vencimiento) y `me:sesion-cerrar`, todos con `detail.clave`, y `me:sesion-cambio` (`detail.clave`, `estado`, `usuario`), que sale **solo cuando algo cambió** y sirve para habilitar o bloquear acciones según quién opera.
+
+Otros comportamientos del shell que conviene conocer:
+
+- **Esc con modales anidados** cierra primero el de encima (p. ej. un formulario) y después el de información que quedó debajo.
+- **Columna de línea** en CSV/Excel: `detectarColumna` acepta los alias en cualquier mayúscula y, si ninguno aparece como parte del nombre, prueba los exactos `min`, `nro`, `num`, `no`, `tel`, `cel`.
+- **`autoSpinner`** se libera cuando el código de la herramienta pone `btn.disabled = false`: si una acción no reactiva el botón (p. ej. falta el `finally`), el spinner queda atascado.
+
+Módulos compartidos fuera de la base, por página:
+
+| Objeto | Archivo | Lo usan |
+|---|---|---|
+| `window.MEPAQ` | `logica-paquetes-carga.js` | Consumos (carga de paquetes). |
+| `window.CMLineas` | `cm-lineas.js` | Estado de líneas y Cambio de IMSI (resolver línea, cuenta exacta, SIM, órdenes y tabla con casillas). |
 
 ---
 
@@ -315,8 +342,8 @@ Eventos que emite el shell y atiende cada puente: `me:sesion-iniciar`, `me:sesio
 - **Dependencia de CDNs externos**: si un CDN está bloqueado o caído, las herramientas no cargan. Mezclan red interna con CDN público.
 - **Almacenamiento bloqueado**: con la prevención de seguimiento de Edge activa, la sesión no se comparte entre pestañas (funciona igual, pero hay que iniciar sesión en cada una).
 - **Dependencia de la sesión de Windows**: obtener el `prf` automáticamente requiere sesión NTLM válida y, normalmente, abrir desde el `.bat`.
-- **Un cambio en la base afecta a las cuatro**: es la contraparte de no duplicar código. Conviene probar las cuatro páginas después de tocar `me-ui` o `me-api`.
-- **Auto-actualización desde un dominio personal**: `sebasmd.com` no es infraestructura de la compañía. Si esa cuenta o ese servidor se vieran comprometidos, es una vía para distribuir código a todos los equipos que corran el lanzador. El paquete se descarga y se extrae en una carpeta temporal antes de tocar nada (un `.zip` corrupto nunca llega a aplicarse), pero no hay firma ni verificación de integridad del contenido: quien pueda publicar en esa ruta, puede publicar lo que sea.
+- **Un cambio en la base afecta a todas**: es la contraparte de no duplicar código. Conviene probar todas las páginas del menú después de tocar `me-ui` o `me-api`.
+- **Carpeta de releases abierta**: la carpeta de red (v3.0.0) es infraestructura de la compañía, pero **cualquiera con VPN puede leer y escribir** en ella: no hay control de permisos. Quien escriba ahí puede publicar un `.zip` y un `version.json` con su propio hash y los analistas lo instalarían al correr `actualizar.bat`. El SHA-256 solo protege de copias incompletas o de un `.zip` reemplazado sin tocar `version.json`. Mitigaciones posibles: pedir a TI que la carpeta sea de solo lectura salvo para quien publica, o firmar `lanzador.ps1`/`actualizar.ps1` (Authenticode) — aunque la firma no cubre el HTML/JS. Antes (hasta 2.x) el riesgo equivalente era el dominio personal `sebasmd.com`.
 
 ---
 
@@ -324,7 +351,9 @@ Eventos que emite el shell y atiende cada puente: `me:sesion-iniciar`, `me:sesio
 
 | Versión | Cambios |
 |---|---|
-| **2.4** | Reordenamiento de archivos: en la raíz del proyecto solo quedan `index.html`, `dame click.bat` y `actualizar.bat`; **todo `.ps1` se mueve a `scripts\`** (`lanzador.ps1`, `actualizar.ps1` y también `empaquetar-release.ps1`/`.bat`, que nunca se distribuye), y `VERSION` se mueve a `scripts\VERSION`. `dame click.bat`/`actualizar.bat` pasan a invocar `scripts\lanzador.ps1` / `scripts\actualizar.ps1`. `lanzador.ps1` y `actualizar.ps1` limpian solos, la primera vez que los ven, los restos de `lanzador.ps1`/`actualizar.ps1`/`VERSION` sueltos en la raíz que deja una actualización desde una versión anterior a esta (robocopy sin `/MIR` no los borra solo). `actualizar.ps1` ahora muestra la versión publicada además de la local al decir "ya estás al día". Se corrige además un bug real: `version.json` se generaba con BOM (`Set-Content -Encoding UTF8` en Windows PowerShell 5.1 siempre lo agrega), lo que hacía que `Invoke-RestMethod` devolviera un objeto vacío sin avisar de ningún error — la versión publicada se leía como "0.0". Se corrigió en el origen, en `empaquetar-release.ps1`, que escribe UTF-8 sin BOM. El lanzador y el actualizador también leen los bytes explícitamente como UTF-8 y normalizan Unicode para tolerar encabezados HTTP incompletos o alterados por un proxy. `GETTINGSTARTED.md` y el `README.md` general se mueven a `doc\`. Guía de instalación y mapa del proyecto: `doc/GETTINGSTARTED.md` y `doc/README.md`. Se retira el servidor local experimental (`server\`, `doc/servidor-local` y el modo dual de `assets/me-api.js`): la prueba real en un equipo de analista quedó bloqueada por el antivirus/EDR, el mismo problema que se buscaba evitar. Queda como riesgo abierto sin solución (ver §9). |
+| **3.0.0** | **Releases desde la carpeta de red de la compañía** (`\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release`), única fuente en lugar de `https://sebasmd.com/me/operacion/`. `empaquetar-release` publica ahí solo (`.zip` primero, hash de la copia verificado, `version.json` al final; no reutiliza una versión ya publicada salvo `-Forzar`; sin acceso deja todo en `release\`), con `-SinPublicar`, `-Destino` y `-Puente` (recuerda subir la 3.0.0 también a sebasmd.com para las copias 2.x). `dame click.bat` lee `version.json` de la carpeta con tope de 6 s (runspace aparte, para no quedar colgado 20-60 s sin VPN). `actualizar.bat` copia el `.zip` a `%TEMP%`, rechaza nombres de `.zip` que no sean un archivo suelto y exige `sha256`. Ambos aceptan `/origen:"<carpeta>"`. Fix: el mensaje de hash que no coincide mostraba `Esperado: {0}` sin el valor. |
+| 2.4.1 | Documentación: el texto deja de hablar de «cuatro herramientas»; se agregan Tulio, QDN Claro y HLR Tigo a los servicios; la API de `me-ui.js` incluye `montarTogglePasos`, `copiarTexto`, `abrirDoc`, el evento `me:sesion-cambio`, Esc con modales anidados, los alias de la columna de línea y los módulos `MEPAQ`/`CMLineas`; y el riesgo de la auto-actualización se corrige: sí hay verificación SHA-256, aunque no protege de una publicación maliciosa. |
+| 2.4 | Reordenamiento de archivos: en la raíz del proyecto solo quedan `index.html`, `dame click.bat` y `actualizar.bat`; **todo `.ps1` se mueve a `scripts\`** (`lanzador.ps1`, `actualizar.ps1` y también `empaquetar-release.ps1`/`.bat`, que nunca se distribuye), y `VERSION` se mueve a `scripts\VERSION`. `dame click.bat`/`actualizar.bat` pasan a invocar `scripts\lanzador.ps1` / `scripts\actualizar.ps1`. `lanzador.ps1` y `actualizar.ps1` limpian solos, la primera vez que los ven, los restos de `lanzador.ps1`/`actualizar.ps1`/`VERSION` sueltos en la raíz que deja una actualización desde una versión anterior a esta (robocopy sin `/MIR` no los borra solo). `actualizar.ps1` ahora muestra la versión publicada además de la local al decir "ya estás al día". Se corrige además un bug real: `version.json` se generaba con BOM (`Set-Content -Encoding UTF8` en Windows PowerShell 5.1 siempre lo agrega), lo que hacía que `Invoke-RestMethod` devolviera un objeto vacío sin avisar de ningún error — la versión publicada se leía como "0.0". Se corrigió en el origen, en `empaquetar-release.ps1`, que escribe UTF-8 sin BOM. El lanzador y el actualizador también leen los bytes explícitamente como UTF-8 y normalizan Unicode para tolerar encabezados HTTP incompletos o alterados por un proxy. `GETTINGSTARTED.md` y el `README.md` general se mueven a `doc\`. Guía de instalación y mapa del proyecto: `doc/GETTINGSTARTED.md` y `doc/README.md`. Se retira el servidor local experimental (`server\`, `doc/servidor-local` y el modo dual de `assets/me-api.js`): la prueba real en un equipo de analista quedó bloqueada por el antivirus/EDR, el mismo problema que se buscaba evitar. Queda como riesgo abierto sin solución (ver §9). |
 | 2.3 | `dame click.bat` pasa a ser un lanzador delgado: la lógica real se movió a `lanzador.ps1` (invocado como archivo, no como bloque embebido con `Invoke-Expression` — patrón que varios antivirus bloqueaban justo al encontrar versión nueva). Instalar una actualización se separó en `actualizar.bat`/`actualizar.ps1`, aparte y siempre a mano (antes se aplicaba sola y se relanzaba en silencio, otro patrón vigilado por antivirus); `actualizar.ps1` además verifica el SHA-256 del `.zip` contra `version.json` antes de aplicar. `empaquetar-release.ps1` gana firma Authenticode opcional (`-CertThumbprint` / `-CertPfx`) para `lanzador.ps1`/`actualizar.ps1` (los `.bat` no se pueden firmar) y genera el `sha256` en `version.json`. Se agrega `server/` (experimental, no conectado al lanzador): sirve las herramientas por `http://localhost` con proxy hacia el CM/Keycloak, como camino para eventualmente quitar `--disable-web-security` — ver `doc/servidor-local/README.md`. |
 | 2.2 | Auto-actualización: `dame click.bat` revisa `https://sebasmd.com/me/operacion/version.json` antes de todo lo demás y, si hay una versión nueva, la descarga, la aplica y se relanza solo (flag `/sinupdate` para omitirlo). Versión tipo `1.0`/`1.1` (comparada como `[version]`, no como número entero). Se agregan `empaquetar-release.ps1` + `empaquetar-release.bat` (este último para no chocar con la `ExecutionPolicy` del equipo) para armar el `.zip` + `version.json` que hay que subir, y el archivo `VERSION` en la raíz del proyecto. |
 | 2.1 | El lanzador abre **una sola pestaña** (el reporte de líneas prepagadas) y la ventana de Edge sale **maximizada**. El cierre masivo de casos deja de abrirse por defecto: se pide con `/solo-casos`. |

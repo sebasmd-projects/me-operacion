@@ -192,11 +192,11 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
 
 ### Cargar paquete (v1.8.0) — lo único que escribe en el CM
 
-Vive dentro del detalle, **debajo de «Paquetes · Uso y Balance»**, porque ese es el sitio donde el analista acaba de ver lo que la línea tiene: agregar es el paso natural siguiente. Está plegada por defecto (la herramienta sigue abriéndose como consulta) y se despliega con el botón **Cargar paquete**.
+Vive dentro del detalle, **debajo de «Paquetes · Uso y Balance»**, porque ese es el sitio donde el analista acaba de ver lo que la línea tiene: agregar es el paso natural siguiente. Está plegada por defecto (la herramienta sigue abriéndose como consulta) y se despliega con el botón **Cargar paquete**. Desde la v1.8.1 la línea y su catálogo se **precargan al abrir el detalle**: mientras tanto el botón dice «Cargando catálogo…» y está deshabilitado; cuando termina pasa a **+ Cargar paquete** (o a «Reintentar catálogo» si falló).
 
 Son tres pasos, con el mismo lenguaje visual que los pasos de la columna izquierda:
 
-**1 · Elegir.** Al desplegar, se resuelve la línea (perfil, titular y oferta del plan) y se trae el catálogo de esa oferta. El buscador filtra por **nombre, `bundleId` o `productId`** sobre los ~469 paquetes; cada resultado muestra sus dos identificadores, el precio si lo tiene y una marca **«ya activo»** si la línea ya lo trae. Se eligen con un clic y quedan como chips quitables. El catálogo se cachea **por oferta**, así que abrir otra línea del mismo plan no lo vuelve a pedir.
+**1 · Elegir.** El panel abre con la línea ya resuelta (perfil, titular y oferta del plan) y el catálogo de esa oferta listo. El buscador filtra por **nombre, `bundleId` o `productId`** sobre los ~469 paquetes; cada resultado muestra sus dos identificadores, el precio si lo tiene y una marca **«ya activo»** si la línea ya lo trae. Se eligen con un clic y quedan como chips quitables. El catálogo se cachea **por oferta**, así que abrir otra línea del mismo plan no lo vuelve a pedir.
 
 **2 · Revisar.** Tabla de exactamente lo que se va a enviar: los componentes obligatorios en `NO_CHANGE` y lo elegido en `ADD`, con precio y total. Un `<details>` muestra el **cuerpo JSON exacto** del carrito, igual que la simulación de "Cierre masivo de casos". Si algún paquete elegido ya está activo, se avisa; si el total es distinto de 0, **el botón de enviar queda bloqueado** (ver Riesgos).
 
