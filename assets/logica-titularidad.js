@@ -53,15 +53,28 @@ const CONFIG = {
    Ninguno de los dos se muestra crudo: un «true/2» en una tabla no le
    dice nada a quien atiende la llamada.
 
-   `resultado` se interpretó leyendo las descripciones que vienen con cada
-   valor en la propia captura. No hay catálogo publicado, así que un valor
-   nuevo se muestra como «Resultado N» y no se inventa un significado.
+   `resultado` se interpretó cruzando cada valor con TODAS las descripciones
+   que lo acompañan en la captura. No hay catálogo publicado, así que un
+   valor nuevo se muestra como «Resultado N» y no se le inventa significado.
+
+     0 (114)  «ya estaba en el estado correcto» (96) · sin descripción (18)
+     1  (15)  «estado inválido» (12) · «Respuesta fallida … SOAP 500» (3)
+     2 (120)  «finalizó, pero la línea quedó en un estado inesperado»
+
+   El 1 se llama «Falló» y no «Estado inválido» justamente por esas 3: la
+   etiqueta tiene que ser cierta para TODAS las filas del grupo, no para la
+   mayoría. El código crudo va igual en la tabla y en la exportación, así
+   que quien quiera afinar no pierde el dato.
+
+   Para el call, 1 y 2 significan lo mismo en la práctica: la línea NO quedó
+   como se pedía. Se separan porque en 1 la orden no se ejecutó y en 2 sí,
+   y eso cambia a quién se escala.
 ===================================================================== */
 const OPERACION = { true: "Bloqueo", false: "Desbloqueo" };
 const RESULTADO = {
-    0: { texto: "Sin acción necesaria", clase: "info" },
-    1: { texto: "Estado inválido", clase: "warn" },
-    2: { texto: "Terminó en estado inesperado", clase: "err" }
+    0: { texto: "Sin cambio necesario", clase: "info" },
+    1: { texto: "Falló", clase: "err" },
+    2: { texto: "Terminó en estado inesperado", clase: "warn" }
 };
 
 const textoOperacion = v => OPERACION[String(v)] || "—";

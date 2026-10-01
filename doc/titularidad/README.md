@@ -68,11 +68,19 @@ Campos de cada registro: `id`, `fechaHoraTransaccion`, `tipoOperacion`
 en la captura. **No hay catálogo publicado**, así que un valor nuevo se
 muestra como «Resultado N» en vez de inventarle un significado:
 
-| Valor | Se muestra como |
-|---|---|
-| `0` | Sin acción necesaria |
-| `1` | Estado inválido |
-| `2` | Terminó en estado inesperado |
+| Valor | Se muestra como | Qué dicen sus descripciones en la captura |
+|---|---|---|
+| `0` | Sin cambio necesario | «ya estaba en el estado correcto» (96) · sin descripción (18) |
+| `1` | Falló | «estado inválido» (12) · «Respuesta fallida … SOAP 500» (3) |
+| `2` | Terminó en estado inesperado | «finalizó, pero la línea quedó en un estado inesperado» (120) |
+
+El `1` se llama «Falló» y no «Estado inválido» por esas 3 filas de fallo SOAP:
+la etiqueta tiene que ser cierta para **todas** las filas del grupo, no para
+la mayoría. El código crudo viaja igual en la tabla y en la exportación.
+
+Para el call, `1` y `2` significan lo mismo en la práctica —la línea no quedó
+como se pedía—, pero se separan porque en `1` la orden no llegó a ejecutarse y
+en `2` sí, y eso cambia a quién se escala.
 
 ### CM y HLR/HSS
 
