@@ -428,7 +428,20 @@ function filaPasaFiltros(f) {
     return true;
 }
 
-const visibles = () => filas.filter(filaPasaFiltros);
+/* Filtrar 208.000 filas cuesta entre 7 y 54 ms (medido). Poco, pero la tabla
+   pide datos en cada paginada y en cada orden, y repetirlo ahí no aporta
+   nada: mientras no cambien ni los datos ni los filtros, el resultado es el
+   mismo. Se invalida en `render()`, que es por donde pasa todo cambio. */
+let _visibles = null;
+let _ordenadas = null;      // las mismas, ya ordenadas; clave: "columna:sentido"
+let _ordenClave = null;
+
+function invalidarVistas() { _visibles = null; _ordenadas = null; _ordenClave = null; }
+
+function visibles() {
+    if (!_visibles) _visibles = filas.filter(filaPasaFiltros);
+    return _visibles;
+}
 
 /* =====================================================================
    9 · TABLA
@@ -453,39 +466,104 @@ function celdaPaso(paso, error) {
     return "";
 }
 
+/* Las columnas se declaran aparte porque ahora hacen DOS cosas: pintar, y
+   decirle al ordenador por qué campo ordenar cuando el analista hace clic en
+   una cabecera (la tabla manda el índice de la columna, no el nombre). */
+const COLUMNAS = [
+    {
+        title: '<input type="checkbox" id="chkTodas" title="Marcar lo visible">',
+        data: null, orderable: false, width: "28px",
+        render: f => `<input type="checkbox" class="chk-fila" data-id="${esc(f.__id)}"${f.sel ? " checked" : ""}>`
+    },
+    { title: "Línea", data: "linea", render: l => `<span class="me-mono">${esc(l)}</span>` },
+    { title: "HLR/HSS", data: "hlrUbicacion", render: (v, t, f) => v ? badge(v, CLASE_UBICACION[v]) : celdaPaso(f.hlrPaso, f.hlrError) },
+    { title: "Estado línea (CM)", data: "cmEstado", render: (v, t, f) => v ? badge(v, CLASE_ESTADO_CM[v]) : celdaPaso(f.cmPaso, f.cmError) },
+    { title: "Claro", data: "hlrClaro", render: v => esc(v || "—") },
+    { title: "Tigo", data: "hlrTigo", render: v => esc(v || "—") },
+    { title: "Titular (CM)", data: "cmTitular", render: v => esc(v || "—") },
+    { title: "Documento", data: "documento", render: v => `<span class="me-mono">${esc(v)}</span>` },
+    { title: "Cuenta (BAN)", data: "cmCuenta", render: v => `<span class="me-mono">${esc(v || "—")}</span>` },
+    { title: "Operación", data: "operacion", render: v => badge(v, v === "Bloqueo" ? "err" : "ok") },
+    { title: "Resultado", data: "resultadoTexto", render: (v, t, f) => badge(v, infoResultado(f.resultado).clase) },
+    { title: "Fecha", data: "fecha", render: v => `<span class="me-mono">${esc(String(v).replace("T", " ").slice(0, 19))}</span>` },
+    { title: "Canal", data: "canal", render: v => esc(v || "—") },
+    { title: "Usuario", data: "usuario", render: v => esc(v || "—") },
+    { title: "Descripción", data: "descripcion", render: v => `<span class="desc" title="${esc(v)}">${esc(v)}</span>` },
+    { title: "ID", data: "id", render: v => `<span class="me-mono">${esc(v)}</span>` }
+];
+
+/* =====================================================================
+   9b · DE DÓNDE SACA LA TABLA SUS FILAS
+   ---------------------------------------------------------------------
+   DataTables va en modo `serverSide`, pero el «servidor» es este arreglo
+   en memoria. La diferencia con dárselo entero no es de estilo, está
+   medida en este mismo navegador:
+
+     208.249 filas dentro de DataTables   un repintado cuesta 2.979 ms
+                                          y el heap sube a ~242 MB
+     208.249 filas en un arreglo plano    48 MB · filtrar 7 ms ·
+                                          ordenar 26 ms · sacar 50 filas 0 ms
+
+   Es decir: los datos no pesan; pesaba metérselos a la tabla. Así la tabla
+   solo tiene nunca más de una página —las 50 filas que se ven— y filtrar,
+   ordenar y paginar lo hacemos nosotros sobre el arreglo.
+===================================================================== */
+function ordenadas(orden) {
+    const col = COLUMNAS[orden && orden.column];
+    const campo = col && col.data;
+    const clave = campo ? `${campo}:${orden.dir}` : "";
+    if (_ordenadas && _ordenClave === clave) return _ordenadas;
+
+    const base = visibles();
+    if (!campo) {                    // sin orden: como vino de Genesis
+        _ordenadas = base; _ordenClave = ""; return _ordenadas;
+    }
+    const signo = orden.dir === "desc" ? -1 : 1;
+    // Se ordena una COPIA: `visibles()` se reusa para las tarjetas y la
+    // exportación, y no debe quedar reordenado por detrás.
+    _ordenadas = base.slice().sort((a, b) => {
+        const x = a[campo], y = b[campo];
+        if (typeof x === "number" && typeof y === "number") return (x - y) * signo;
+        return String(x == null ? "" : x).localeCompare(String(y == null ? "" : y), "es") * signo;
+    });
+    _ordenClave = clave;
+    return _ordenadas;
+}
+
+/** Lo que DataTables llama «ajax»: aquí no sale ninguna petición. */
+function fuenteDatos(peticion, responder) {
+    // La tabla trae su propio buscador; se suma al de la barra de filtros en
+    // vez de competir con él (los dos acotan, no se pisan).
+    const suyo = (peticion.search && peticion.search.value || "").trim();
+    const previo = filtros.texto;
+    if (suyo) filtros.texto = previo ? previo + " " + suyo : suyo;
+    if (suyo) invalidarVistas();
+
+    const orden = (peticion.order && peticion.order[0]) || null;
+    const lista = ordenadas(orden);
+    const desde = peticion.start || 0;
+    const cuantas = peticion.length > 0 ? peticion.length : lista.length;
+
+    if (suyo) { filtros.texto = previo; invalidarVistas(); }
+
+    responder({
+        draw: peticion.draw,
+        recordsTotal: filas.length,
+        recordsFiltered: lista.length,
+        data: lista.slice(desde, desde + cuantas)
+    });
+}
+
 function construirTabla() {
     tabla = new DataTable("#tablaTitularidad", MEUI.opcionesTabla({
-        data: [],
-        // `deferRender` y `orderClasses:false` no son adorno: con cientos de
-        // miles de filas, pintarlas todas o recalcular clases al ordenar
-        // bloquea el navegador varios segundos.
-        deferRender: true,
+        serverSide: true,
+        ajax: fuenteDatos,
+        processing: true,        // «Procesando…» de la propia tabla
         orderClasses: false,
         pageLength: 50,
         lengthMenu: [25, 50, 100, 250],
         order: [],
-        columns: [
-            {
-                title: '<input type="checkbox" id="chkTodas" title="Marcar lo visible">',
-                data: null, orderable: false, width: "28px",
-                render: f => `<input type="checkbox" class="chk-fila" data-id="${esc(f.__id)}"${f.sel ? " checked" : ""}>`
-            },
-            { title: "Línea", data: "linea", render: l => `<span class="me-mono">${esc(l)}</span>` },
-            { title: "HLR/HSS", data: "hlrUbicacion", render: (v, t, f) => v ? badge(v, CLASE_UBICACION[v]) : celdaPaso(f.hlrPaso, f.hlrError) },
-            { title: "Estado línea (CM)", data: "cmEstado", render: (v, t, f) => v ? badge(v, CLASE_ESTADO_CM[v]) : celdaPaso(f.cmPaso, f.cmError) },
-            { title: "Claro", data: "hlrClaro", render: v => esc(v || "—") },
-            { title: "Tigo", data: "hlrTigo", render: v => esc(v || "—") },
-            { title: "Titular (CM)", data: "cmTitular", render: v => esc(v || "—") },
-            { title: "Documento", data: "documento", render: v => `<span class="me-mono">${esc(v)}</span>` },
-            { title: "Cuenta (BAN)", data: "cmCuenta", render: v => `<span class="me-mono">${esc(v || "—")}</span>` },
-            { title: "Operación", data: "operacion", render: v => badge(v, v === "Bloqueo" ? "err" : "ok") },
-            { title: "Resultado", data: "resultadoTexto", render: (v, t, f) => badge(v, infoResultado(f.resultado).clase) },
-            { title: "Fecha", data: "fecha", render: v => `<span class="me-mono">${esc(String(v).replace("T", " ").slice(0, 19))}</span>` },
-            { title: "Canal", data: "canal", render: v => esc(v || "—") },
-            { title: "Usuario", data: "usuario", render: v => esc(v || "—") },
-            { title: "Descripción", data: "descripcion", render: v => `<span class="desc" title="${esc(v)}">${esc(v)}</span>` },
-            { title: "ID", data: "id", render: v => `<span class="me-mono">${esc(v)}</span>` }
-        ]
+        columns: COLUMNAS
     }));
     if (MEUI.registrarTabla) MEUI.registrarTabla(tabla);
 
@@ -526,10 +604,11 @@ function actualizarResumenSeleccion() {
 }
 
 function render() {
+    // Todo cambio de datos o de filtros pasa por aquí, así que es el punto
+    // donde las vistas memorizadas dejan de valer.
+    invalidarVistas();
     if (!tabla) construirTabla();
-    const v = visibles();
-    tabla.clear();
-    tabla.rows.add(v);
+    // `draw` le pide los datos a `fuenteDatos`: no se le entrega el arreglo.
     tabla.draw(false);
     actualizarKpis();
     actualizarResumenSeleccion();
