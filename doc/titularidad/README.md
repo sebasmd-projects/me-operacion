@@ -171,10 +171,43 @@ Dos decisiones que importan con 200.000+ registros:
 Si Genesis dice una cuenta y entrega menos, se avisa en el registro en vez de
 dar la carga por buena.
 
-### Tabla
+### Tabla · por qué la tabla no tiene los datos
 
-DataTables con `deferRender` y `orderClasses: false` — con esta cantidad de
-filas, pintarlas todas o recalcular clases al ordenar bloquea el navegador.
+DataTables va en modo **`serverSide`**, pero el «servidor» es el arreglo en
+memoria de esta misma página. No es una elección de estilo; está medido en
+Chromium con DataTables 2.3.2 y los 208.249 registros reales:
+
+| | Con las 208.249 filas dentro de DataTables | Con las filas en un arreglo y la tabla en `serverSide` |
+|---|---|---|
+| Carga completa | **no terminó en 11 min** | **19,9 s** |
+| Filas que sostiene la tabla | 208.249 | **50** (la página visible) |
+| Heap | ~242 MB | ~179 MB |
+| Un repintado | **2.979 ms** | — (constante, solo pinta 50) |
+| Paginar | — | 34 ms |
+| Ordenar | — | 87 ms |
+| Aplicar un filtro | — | 237 ms |
+
+El dato que lo explica: un arreglo plano de 208.249 filas ocupa **48 MB** y
+filtrarlo cuesta **7 ms**, ordenarlo **26 ms** y sacar una página de 50,
+**0 ms**. Los datos no pesan; pesaba metérselos a la tabla.
+
+Por eso el filtrado, el orden y la paginación los hace esta herramienta
+(`fuenteDatos`, `ordenadas`, `filaPasaFiltros`) y a DataTables solo le llega
+la página que se está viendo. El buscador propio de la tabla se **suma** al de
+la barra de filtros, no compite con él.
+
+Las vistas intermedias (lo filtrado, y lo filtrado ya ordenado) se memorizan y
+se invalidan en `render()`, que es por donde pasa todo cambio: así paginar u
+ordenar no vuelve a filtrar 208.000 filas para nada.
+
+> **Un archivo temporal no habría servido.** Es la primera idea razonable
+> —«que el fetch escriba y la tabla lea»— pero resuelve el problema
+> equivocado: la memoria de los datos son 48 MB, no es lo que ahogaba. Y
+> DataTables necesita las filas **en memoria** para pintar, ordenar y
+> filtrar, así que leerlas de un archivo significa pagar la escritura, pagar
+> la lectura y después el mismo coste. El lanzador abre Edge con
+> `--allow-file-access-from-files`, así que técnicamente se podría (IndexedDB);
+> simplemente no hace falta.
 
 Columnas: casilla · **Línea** · **HLR/HSS** · **Estado línea (CM)** · Claro ·
 Tigo · Titular (CM) · Documento (Genesis) · Cuenta (BAN) · Operación ·
