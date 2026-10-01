@@ -133,9 +133,25 @@ herramientas, como siempre.
 
 ### Paso 2 · Datos de Genesis
 
-Trae el log **completo**. Avisa del avance («120.300 de 208.249, página 241 de
-417») y se puede cancelar: lo que ya llegó se conserva y se dice que la carga
-quedó a medias.
+Trae el log **completo**. Mientras carga:
+
+- el botón muestra **spinner** y queda deshabilitado;
+- la **barra de progreso** avanza con el conteo real («120.300 de 208.249,
+  página 241 de 417») y su porcentaje;
+- **la tabla se va llenando**, no espera al final. Con doscientos mil
+  registros, esperar al final son minutos mirando una barra sin ver un dato.
+
+El repintado se espacia según el volumen (0,5 s hasta 10.000 filas · 1,5 s
+hasta 50.000 · 3 s por encima): repintar cuesta proporcional a lo que ya hay,
+porque DataTables rehace el conjunto entero. Al principio se ve avanzar de
+verdad y con cien mil filas encima no se gasta el navegador redibujando lo
+mismo diez veces por segundo.
+
+Se puede cancelar: lo que ya llegó se conserva y se dice que quedó a medias.
+
+Los registros **no se guardan dos veces**: el cliente de Genesis entrega cada
+página y se queda solo con los ids ya vistos (para deduplicar), no con los
+registros, que ya los tiene la tabla.
 
 Dos decisiones que importan con 200.000+ registros:
 

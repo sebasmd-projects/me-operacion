@@ -281,16 +281,22 @@
     /**
      * Trae TODAS las páginas de FechaExpedicion.
      * @param {object} opciones
+     *   - alLote(nuevos) con los registros NUEVOS de cada página, para que
+     *     quien llama los pinte mientras siguen llegando. Si se pasa, este
+     *     módulo NO se los queda: con 200.000 registros, guardarlos aquí y
+     *     además en la tabla es duplicar cientos de megas para nada.
      *   - alProgresar({leidos, total, pagina, paginas}) por cada página
      *   - cancelado() -> true para cortar entre páginas
      *   - tam: tamaño de página a pedir (el servidor puede conceder menos)
      * @returns {{registros: Array, total: number, completo: boolean}}
+     *   `registros` viene vacío si se usó `alLote` (los tiene quien llamó).
      */
     async function cargarTodo(opciones) {
         const o = opciones || {};
         const tamPedido = Math.max(1, Number(o.tam) || CONFIG.paginaTam);
         const alProgresar = typeof o.alProgresar === "function" ? o.alProgresar : () => { };
         const cancelado = typeof o.cancelado === "function" ? o.cancelado : () => false;
+        const alLote = typeof o.alLote === "function" ? o.alLote : null;
 
         const primera = await pedirPagina(1, tamPedido, o.filtro);
         const total = Number(primera.paginacion && primera.paginacion.count) || primera.items.length;
@@ -306,14 +312,31 @@
             log(`Genesis concede páginas de ${tam} (se pidieron ${tamPedido}); se ajusta el recorrido.`, "info");
         }
 
-        const porId = new Map();
-        const agregar = items => items.forEach(it => {
-            if (it && it.id != null && !porId.has(it.id)) porId.set(it.id, aligerar(it));
-        });
+        /* El deduplicado necesita recordar qué ids ya se vieron, pero NO los
+           registros: un Set de números cuesta una fracción de lo que cuesta
+           guardar 200.000 objetos que ya tiene la tabla. Solo se retienen
+           cuando nadie los está recogiendo con `alLote`. */
+        const vistos = new Set();
+        const retenidos = alLote ? null : [];
+        let leidos = 0;
+
+        const agregar = items => {
+            const nuevos = [];
+            items.forEach(it => {
+                if (!it || it.id == null || vistos.has(it.id)) return;
+                vistos.add(it.id);
+                nuevos.push(aligerar(it));
+            });
+            leidos += nuevos.length;
+            if (retenidos) retenidos.push(...nuevos);
+            if (alLote && nuevos.length) alLote(nuevos);
+            return nuevos.length;
+        };
+
         agregar(primera.items);
 
         const paginas = Math.max(1, Math.ceil(total / tam));
-        alProgresar({ leidos: porId.size, total, pagina: 1, paginas });
+        alProgresar({ leidos, total, pagina: 1, paginas });
 
         let completo = true;
         for (let n = 2; n <= paginas; n++) {
@@ -321,10 +344,10 @@
             const p = await pedirPagina(n, tam, o.filtro);
             if (!p.items.length) break;          // el servidor se quedó sin datos antes de la cuenta
             agregar(p.items);
-            alProgresar({ leidos: porId.size, total, pagina: n, paginas });
+            alProgresar({ leidos, total, pagina: n, paginas });
         }
 
-        return { registros: Array.from(porId.values()), total, completo };
+        return { registros: retenidos || [], total, completo, leidos };
     }
 
     /** Vuelve a pedir la página donde cae un id, para ver su SOAP crudo.
