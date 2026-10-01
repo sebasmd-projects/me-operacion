@@ -261,7 +261,9 @@ Sin `-Version` ni `-Incremento`, lee `scripts\VERSION` y ofrece **Fix/documentac
 2. Copia el `.zip`, **vuelve a calcular el SHA-256 de la copia** y, solo si coincide, escribe `version.json` **al final**. Así nadie que abra `dame click.bat` en medio de la publicación ve una versión cuyo `.zip` no está completo.
 3. Deja `scripts\VERSION` en el número nuevo.
 
-Otras opciones: `-SinPublicar` (solo `release\`), `-Destino "<carpeta>"` (publicar en otra carpeta, para pruebas) y `-Puente` (ver abajo).
+Otras opciones: `-SinPublicar` (solo `release\`), `-Destino "<carpeta>"` (publicar en otra carpeta, para pruebas), `-TimeoutRed N` (segundos de espera para la carpeta, 8 por defecto) y `-Puente` (ver abajo).
+
+**Sin acceso a la carpeta de red** (sin VPN, NAS caído) el script **no se detiene**: avisa, genera la versión igual en `release\` y al final dice qué dos archivos copiar y en qué orden cuando vuelva el acceso. La comprobación corre en un runspace aparte con tope de tiempo, igual que la del lanzador: `Test-Path` sobre una UNC inalcanzable puede tardar un minuto en contestar y puede lanzar un error que, con `$ErrorActionPreference='Stop'`, mataría el script entero — que es justo lo que no se quiere, porque el paquete se genera local perfectamente sin ver la carpeta. Si la carpeta **sí** contesta pero la comprobación de «esta versión ya está publicada» falla, ahí sí se detiene: no se publica a ciegas sobre una release existente. Para saltarse la comprobación desde el principio, `-SinPublicar`.
 
 **Puente 2.x → 3.0.0.** Las copias 2.x solo consultan `https://sebasmd.com/me/operacion/`. La 3.0.0 se empaqueta con `-Puente`, que además de publicarla en la carpeta recuerda subir **esos mismos dos archivos** a `sebasmd.com` una última vez. Cada analista corre `actualizar.bat` (el suyo, 2.x): baja la 3.0.0 del dominio y desde ahí su lanzador y su actualizador ya leen la carpeta de red. Después no se vuelve a publicar en el dominio.
 
