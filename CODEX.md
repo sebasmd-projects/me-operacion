@@ -70,6 +70,7 @@ con `celdaUso`).
 | Prepagadas (`prepagadas`) | `reporte_prepagadas.html` | `logica-prepagadas.js` | Cruce SIME ⇄ CM; alta de suscripción y edición de recurrencias en SIME. | Sí, SIME |
 | Consumos (`consumos`) | `reporte_consumos.html` | `logica-consumos.js` + `logica-paquetes-carga.js` | Línea, titular, paquetes, movimientos y CDR; **carga de paquetes** en el CM. | Sí, CM |
 | Ajustes/Paquetes (`ajustes`) | `export_ajustes.html` | `logica-ajustes.js` | Ajustes de dinero y paquetes del CM. | No |
+| Titularidad (`titularidad`) | `titularidad.html` | `logica-titularidad.js` | Log de titularidad de **Genesis** cruzado con CM y HLR/HSS. Única que habla con Genesis. | No |
 | Tipificación (`tipificacion`) | `export_tipificacion.html` | `logica-tipificacion.js` | Exportación de casos. | No |
 | Casos masivos (`casos`) | `reporte_casos_masivos.html` | `logica-casos.js` | Cierre/anotación masiva (con simulación). | Sí, CM |
 | Rechazos (`rechazo`) | `generar_rechazo.html` | `logica-rechazo.js` | PDF de rechazo de portabilidad. | No |
@@ -334,6 +335,29 @@ Audio a MP3 1.0.0 · Base compartida/lanzador 3.0.0.
   justo antes de enviar; nota obligatoria.
 - «Activar» (`10005`) no está incluido: no hay captura de esa orden.
 
+### Titularidad · Bloqueos de SIM (1.0.0)
+
+- Única herramienta que habla con **Genesis** (`tulio.grupo-exito.com/apimew`,
+  ruta `/RXDUURMWEECCKC/FechaExpedicion`). Su paginación va en una cabecera
+  `pagination` en base64, no en la URL, y el servidor **puede conceder páginas
+  más chicas de las que se piden** (100 frente a 500 en la captura): se recorre
+  con el `pageSize` que DEVUELVE, no con el pedido. Avanzar con el pedido se
+  saltaría cuatro de cada cinco registros sin que nada lo avisara.
+- Orden ascendente por `id` + deduplicado: con descendente, cada registro nuevo
+  que entra durante la descarga corre las páginas y se repiten y pierden filas.
+- `request`/`response` (el SOAP crudo) se descartan al cargar: son ~2 KB por
+  registro y hay más de 200.000. El detalle se vuelve a pedir al abrir la fila.
+- Sesión propia (`genesis`), con **otro Keycloak** que el CM
+  (`genesisv2.grupo-exito.com`, realm `GrupoExito`, cliente
+  `genesismovilexito`). Desde `file://` el flujo de código no se puede
+  completar: o usuario y contraseña (si el realm lo permite) o pegar el token
+  de una sesión de Genesis abierta.
+- `assets/hlr-consulta.js` es una **TERCERA copia** de las reglas de
+  Claro/Tigo, junto a `logica-hlr-cruzado.js` y `logica-hlr-hss-ambos.js`.
+  Se copió sin cambiar una línea. Si se cambia una regla, va en las tres.
+- «En batch» aquí son **tandas controladas**: Claro no tiene servicio de lote,
+  su QDN es una petición por línea.
+
 ### Documentación
 
 - Todos los README usan la convención X.Y.Z en encabezado e historial.
@@ -391,6 +415,11 @@ Para una release:
 - Cobro de paquetes con precio y la `action` que retira un paquete en la carga
   de Consumos (sección 6 de `recarga-de-paquetes-cm.md`).
 - Catálogo PLU → bundles: no hay servicio conocido que lo liste.
+- Titularidad: confirmar si el cliente `genesismovilexito` permite iniciar
+  sesión con usuario y contraseña; si no, el único camino es pegar el token.
+- Titularidad: comparar el documento de Genesis contra el del titular en el CM
+  (la resolución subiendo por la cadena de cuentas ya existe en
+  `logica-consumos.js`; no se portó para no dejar una cuarta copia).
 - Revisar en el CM la orden `SOI7869437` (`SwitchCarrier` accidental, línea
   3338066365).
 

@@ -274,6 +274,34 @@ const PROYECTOS = [
         ]
     },
     {
+        id: "titularidad",
+        numero: 13,
+        nombre: "Titularidad · Bloqueos de SIM",
+        descripcion: "El log de comprobación de titularidad de Genesis, cruzado con el CM y con el HLR/HSS. Carga los más de doscientos mil registros, y sobre las líneas que se marquen (de 1 a n) trae titular y estado del CM y en qué red está la línea: Claro, Tigo, ambas o ninguna. Existe para que el call resuelva el bloqueo de SIM en la llamada, sin escalarlo.",
+        estado: "Consulta",
+        abrir: "herramientas/titularidad.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. Solo lee: Genesis, el CM y los HLR de Claro y Tigo. hlr-consulta.js es el motor de ubicación compartido.",
+                archivos: [
+                    { nombre: "titularidad.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/titularidad.html" },
+                    { nombre: "logica-titularidad.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-titularidad.js" },
+                    { nombre: "me-titularidad-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-titularidad-puente.js" },
+                    { nombre: "genesis-api.js", tipo: "JS · sesión y paginación de Genesis", icono: "bi-filetype-js", ruta: "assets/genesis-api.js" },
+                    { nombre: "hlr-consulta.js", tipo: "JS · Claro + Tigo (compartido)", icono: "bi-filetype-js", ruta: "assets/hlr-consulta.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "El endpoint de Genesis y su paginación por cabecera, cómo se inicia sesión y por qué las consultas de HLR van en tandas.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/titularidad/README.md" }
+                ]
+            }
+        ]
+    },
+    {
         id: "estado-lineas",
         numero: 11,
         nombre: "Estado de líneas",
