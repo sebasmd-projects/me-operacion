@@ -113,7 +113,8 @@ function filaDesdeGenesis(g) {
 ===================================================================== */
 let filas = [];
 let porLinea = new Map();      // línea -> [filas] (una línea puede repetirse)
-let cargando = false;
+let cargando = false;      // carga de Genesis en curso
+let trabajando = false;    // una tanda de CM o de HLR en curso
 let cancelar = false;
 let tabla = null;
 
@@ -143,11 +144,25 @@ function indexar() {
 function progreso(texto, pct) {
     const w = MEUI.$("#progresoWrap");
     if (!w) return;
-    w.style.display = texto ? "" : "none";
+    /* «block», no «»: la hoja de estilos trae `#progresoWrap { display:none }`
+       y vaciar el estilo en linea devuelve el control a esa regla, con lo que
+       la barra no se mostraba NUNCA. Tiene que ganar el estilo en linea. */
+    w.style.display = texto ? "block" : "none";
     if (!texto) return;
     MEUI.$("#progresoTexto").textContent = texto;
     MEUI.$("#progresoPct").textContent = (pct == null ? "" : Math.round(pct) + "%");
     MEUI.$("#progresoBar").style.width = (pct == null ? 0 : Math.max(0, Math.min(100, pct))) + "%";
+}
+
+/* Cada cuánto repintar la tabla mientras entra la carga. Repintar cuesta
+   proporcional a lo que ya hay (DataTables rehace el conjunto entero), así
+   que el intervalo crece con el volumen: al principio se ve avanzar de
+   verdad, y con cien mil filas encima no se gasta el navegador en redibujar
+   lo mismo diez veces por segundo. */
+function intervaloPintado() {
+    if (filas.length > 50000) return 3000;
+    if (filas.length > 10000) return 1500;
+    return 500;
 }
 
 async function cargarGenesis() {
@@ -158,45 +173,69 @@ async function cargarGenesis() {
         return;
     }
     cargando = true; cancelar = false;
-    MEUI.$("#btnCargar").disabled = true;
+    MEUI.ocupado("#btnCargar", "Cargando…");
     MEUI.$("#btnCancelar").classList.remove("d-none");
 
     const t0 = performance.now();
     try {
-        MEUI.log("Cargando el log de titularidad de Genesis…", "info");
-        const r = await GENESIS.cargarTodo({
-            tam: Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis,
-            cancelado: () => cancelar,
-            alProgresar: p => progreso(
-                `Genesis: ${p.leidos.toLocaleString("es-CO")} de ${p.total.toLocaleString("es-CO")} registros `
-                + `(página ${p.pagina} de ${p.paginas})`,
-                p.total ? (p.leidos / p.total) * 100 : null)
-        });
+            MEUI.log("Cargando el log de titularidad de Genesis…", "info");
 
-        filas = r.registros.map(filaDesdeGenesis);
-        indexar();
-        render();
+            // Se empieza de cero: una carga nueva reemplaza lo anterior, no se
+            // suma a ello.
+            filas = [];
+            porLinea = new Map();
+            let ultimoPintado = 0;
 
-        const seg = ((performance.now() - t0) / 1000).toFixed(1);
-        if (!r.completo) {
-            MEUI.log(`⚠ Carga cancelada: ${filas.length.toLocaleString("es-CO")} de `
-                + `${r.total.toLocaleString("es-CO")} registros. Lo que ves está completo hasta ahí.`, "warn");
-            MEUI.toast("Carga cancelada; se conserva lo que alcanzó a llegar.", "warn");
-        } else if (filas.length < r.total) {
-            // Genesis dijo una cuenta y entregó menos: se dice, no se calla.
-            MEUI.log(`⚠ Genesis reportó ${r.total.toLocaleString("es-CO")} registros pero entregó `
-                + `${filas.length.toLocaleString("es-CO")}. Puede que entraran registros nuevos durante la `
-                + `descarga, o que alguna página viniera vacía.`, "warn");
-        } else {
-            MEUI.log(`✔ ${filas.length.toLocaleString("es-CO")} registros de Genesis en ${seg} s.`, "ok");
-        }
-    } catch (e) {
-        MEUI.log("✖ No se pudo cargar Genesis: " + e.message, "err");
-        MEUI.toast("Falló la carga de Genesis. Mira el registro.", "err");
+            const r = await GENESIS.cargarTodo({
+                tam: Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis,
+                cancelado: () => cancelar,
+
+                // Cada página se agrega y se pinta: con 200.000 registros, esperar
+                // al final son minutos mirando una barra sin ver un solo dato.
+                alLote: nuevos => {
+                    nuevos.forEach(g => {
+                        const f = filaDesdeGenesis(g);
+                        filas.push(f);
+                        if (f.linea) {
+                            if (!porLinea.has(f.linea)) porLinea.set(f.linea, []);
+                            porLinea.get(f.linea).push(f);
+                        }
+                    });
+                    const ahora = performance.now();
+                    if (ahora - ultimoPintado >= intervaloPintado()) {
+                        ultimoPintado = ahora;
+                        render();
+                    }
+                },
+
+                alProgresar: p => progreso(
+                    `Genesis: ${p.leidos.toLocaleString("es-CO")} de ${p.total.toLocaleString("es-CO")} registros `
+                    + `(página ${p.pagina} de ${p.paginas})`,
+                    p.total ? (p.leidos / p.total) * 100 : null)
+            });
+
+            render();   // el pintado final, ya con todo
+
+            const seg = ((performance.now() - t0) / 1000).toFixed(1);
+            if (!r.completo) {
+                MEUI.log(`⚠ Carga cancelada: ${filas.length.toLocaleString("es-CO")} de `
+                    + `${r.total.toLocaleString("es-CO")} registros. Lo que ves está completo hasta ahí.`, "warn");
+                MEUI.toast("Carga cancelada; se conserva lo que alcanzó a llegar.", "warn");
+            } else if (filas.length < r.total) {
+                // Genesis dijo una cuenta y entregó menos: se dice, no se calla.
+                MEUI.log(`⚠ Genesis reportó ${r.total.toLocaleString("es-CO")} registros pero entregó `
+                    + `${filas.length.toLocaleString("es-CO")}. Puede que entraran registros nuevos durante la `
+                    + `descarga, o que alguna página viniera vacía.`, "warn");
+            } else {
+                MEUI.log(`✔ ${filas.length.toLocaleString("es-CO")} registros de Genesis en ${seg} s.`, "ok");
+            }
+        } catch (e) {
+            MEUI.log("✖ No se pudo cargar Genesis: " + e.message, "err");
+            MEUI.toast("Falló la carga de Genesis. Mira el registro.", "err");
     } finally {
         cargando = false; cancelar = false;
         progreso("");
-        MEUI.$("#btnCargar").disabled = false;
+        MEUI.libre("#btnCargar");
         MEUI.$("#btnCancelar").classList.add("d-none");
     }
 }
@@ -209,6 +248,7 @@ function aplicarACadaFila(linea, cambios) {
 }
 
 async function consultarCm() {
+    if (trabajando) { MEUI.toast("Espera a que termine la consulta en curso.", "warn"); return; }
     const lineas = lineasSeleccionadas();
     if (!lineas.length) { MEUI.toast("Marca al menos una línea.", "warn"); return; }
     if (lineas.length > CONFIG.maxSeleccion) {
@@ -218,6 +258,7 @@ async function consultarCm() {
     try { await MEAPI.auth.ensure(); }
     catch (e) { MEUI.toast("Inicia la sesión del CM primero.", "err"); MEUI.abrirPaso(1, true); return; }
 
+    trabajando = true;
     cancelar = false;
     MEUI.$("#btnCancelar").classList.remove("d-none");
     lineas.forEach(l => aplicarACadaFila(l, { cmPaso: PASO.CONSULTANDO }));
@@ -226,50 +267,57 @@ async function consultarCm() {
     let hechas = 0;
     MEUI.log(`CM: consultando ${lineas.length} línea(s) en tandas de ${CONFIG.concurrenciaCm}.`, "info");
 
-    await ejecutarPool(lineas, CONFIG.concurrenciaCm, async linea => {
-        if (cancelar) { aplicarACadaFila(linea, { cmPaso: PASO.PENDIENTE }); return; }
-        try {
-            const r = await CMLineas.resolverLinea(linea);
-            if (!r) {
-                aplicarACadaFila(linea, {
-                    cmPaso: PASO.LISTA, cmEstado: "No existe en el CM",
-                    cmTitular: "", cmCuenta: "", cmSim: "", cmError: ""
-                });
-            } else {
-                const c = r.elegida;
-                // `resolverLinea` da la línea y su estado, pero no el titular:
-                // ese vive en la cuenta de facturación, que es otra consulta.
-                let titular = "";
-                try {
-                    const cc = await CMLineas.cuentaCrm(c.ban);
-                    const a = cc && cc.cuenta;
-                    if (a) {
-                        titular = a.name
-                            || [a.givenName, a.familyName].filter(Boolean).join(" ").trim()
-                            || "";
-                    }
-                } catch (e) { /* el estado de la línea ya sirve; el nombre es un extra */ }
+    try {
+        await ejecutarPool(lineas, CONFIG.concurrenciaCm, async linea => {
+            if (cancelar) { aplicarACadaFila(linea, { cmPaso: PASO.PENDIENTE }); return; }
+            try {
+                const r = await CMLineas.resolverLinea(linea);
+                if (!r) {
+                    aplicarACadaFila(linea, {
+                        cmPaso: PASO.LISTA, cmEstado: "No existe en el CM",
+                        cmTitular: "", cmCuenta: "", cmSim: "", cmError: ""
+                    });
+                } else {
+                    const c = r.elegida;
+                    // `resolverLinea` da la línea y su estado, pero no el titular:
+                    // ese vive en la cuenta de facturación, que es otra consulta.
+                    let titular = "";
+                    try {
+                        const cc = await CMLineas.cuentaCrm(c.ban);
+                        const a = cc && cc.cuenta;
+                        if (a) {
+                            titular = a.name
+                                || [a.givenName, a.familyName].filter(Boolean).join(" ").trim()
+                                || "";
+                        }
+                    } catch (e) { /* el estado de la línea ya sirve; el nombre es un extra */ }
 
-                aplicarACadaFila(linea, {
-                    cmPaso: PASO.LISTA,
-                    cmEstado: c.estadoTexto || CMLineas.textoEstadoLinea(c.estado),
-                    cmTitular: titular,
-                    cmCuenta: c.ban || "",
-                    cmSim: c.simId || "",
-                    cmError: ""
-                });
+                    aplicarACadaFila(linea, {
+                        cmPaso: PASO.LISTA,
+                        cmEstado: c.estadoTexto || CMLineas.textoEstadoLinea(c.estado),
+                        cmTitular: titular,
+                        cmCuenta: c.ban || "",
+                        cmSim: c.simId || "",
+                        cmError: ""
+                    });
+                }
+            } catch (e) {
+                aplicarACadaFila(linea, { cmPaso: PASO.ERROR, cmError: e.message || String(e) });
             }
-        } catch (e) {
-            aplicarACadaFila(linea, { cmPaso: PASO.ERROR, cmError: e.message || String(e) });
-        }
-        hechas++;
-        progreso(`CM: ${hechas} de ${lineas.length} línea(s)`, (hechas / lineas.length) * 100);
-        if (hechas % 10 === 0 || hechas === lineas.length) render();
-    });
+            hechas++;
+            progreso(`CM: ${hechas} de ${lineas.length} línea(s)`, (hechas / lineas.length) * 100);
+            if (hechas % 10 === 0 || hechas === lineas.length) render();
+        });
 
-    progreso("");
-    MEUI.$("#btnCancelar").classList.add("d-none");
-    render();
+    } finally {
+        // Pase lo que pase, la herramienta queda utilizable: un flag que se
+        // quedara en true dejaría los botones muertos hasta recargar.
+        trabajando = false;
+        progreso("");
+        MEUI.$("#btnCancelar").classList.add("d-none");
+        filas.forEach(f => { if (f.cmPaso === PASO.CONSULTANDO) f.cmPaso = PASO.PENDIENTE; });
+        render();
+    }
     MEUI.log(`CM: ${hechas} línea(s) consultada(s).`, "ok");
 }
 
@@ -282,6 +330,7 @@ async function consultarCm() {
    en tandas, con progreso y sin tumbar el gateway.
 ===================================================================== */
 async function consultarHlr() {
+    if (trabajando) { MEUI.toast("Espera a que termine la consulta en curso.", "warn"); return; }
     const lineas = lineasSeleccionadas();
     if (!lineas.length) { MEUI.toast("Marca al menos una línea.", "warn"); return; }
     if (lineas.length > CONFIG.maxSeleccion) {
@@ -289,6 +338,7 @@ async function consultarHlr() {
         return;
     }
 
+    trabajando = true;
     cancelar = false;
     MEUI.$("#btnCancelar").classList.remove("d-none");
     lineas.forEach(l => aplicarACadaFila(l, { hlrPaso: PASO.CONSULTANDO }));
@@ -299,31 +349,35 @@ async function consultarHlr() {
     MEUI.log(`HLR/HSS: ${lineas.length} línea(s) en tandas de ${concurrencia} `
         + `(cada una consulta Claro y Tigo a la vez).`, "info");
 
-    await HLRConsulta.consultarVarias(lineas, {
-        concurrencia,
-        cancelado: () => cancelar,
-        alTerminarUna: (r, hechas, total) => {
-            aplicarACadaFila(r.msisdn, {
-                hlrPaso: PASO.LISTA,
-                hlrUbicacion: r.etiquetaUbicacion,
-                hlrClaro: r.etiquetaClaro,
-                hlrTigo: r.etiquetaTigo,
-                hlrImsi: r.imsi || "",
-                hlrError: r.ubicacion === "NO_CONCLUYENTE"
-                    ? [r.claro && r.claro.mensaje, r.tigo && r.tigo.mensaje].filter(Boolean).join(" · ")
-                    : ""
-            });
-            progreso(`HLR/HSS: ${hechas} de ${total} línea(s)`, (hechas / total) * 100);
-            if (hechas % 10 === 0 || hechas === total) render();
-        }
-    });
+    try {
+        await HLRConsulta.consultarVarias(lineas, {
+            concurrencia,
+            cancelado: () => cancelar,
+            alTerminarUna: (r, hechas, total) => {
+                aplicarACadaFila(r.msisdn, {
+                    hlrPaso: PASO.LISTA,
+                    hlrUbicacion: r.etiquetaUbicacion,
+                    hlrClaro: r.etiquetaClaro,
+                    hlrTigo: r.etiquetaTigo,
+                    hlrImsi: r.imsi || "",
+                    hlrError: r.ubicacion === "NO_CONCLUYENTE"
+                        ? [r.claro && r.claro.mensaje, r.tigo && r.tigo.mensaje].filter(Boolean).join(" · ")
+                        : ""
+                });
+                progreso(`HLR/HSS: ${hechas} de ${total} línea(s)`, (hechas / total) * 100);
+                if (hechas % 10 === 0 || hechas === total) render();
+            }
+        });
 
-    // Lo que quedó marcado como «consultando» es lo que se canceló.
-    filas.forEach(f => { if (f.hlrPaso === PASO.CONSULTANDO) f.hlrPaso = PASO.PENDIENTE; });
-
-    progreso("");
-    MEUI.$("#btnCancelar").classList.add("d-none");
-    render();
+    } finally {
+        trabajando = false;
+        progreso("");
+        MEUI.$("#btnCancelar").classList.add("d-none");
+        // Lo que quedó marcado como «consultando» es lo que se canceló o lo
+        // que se quedó a medias por un error.
+        filas.forEach(f => { if (f.hlrPaso === PASO.CONSULTANDO) f.hlrPaso = PASO.PENDIENTE; });
+        render();
+    }
     MEUI.log("HLR/HSS: consulta terminada.", "ok");
 }
 
@@ -455,7 +509,10 @@ function actualizarResumenSeleccion() {
     }
     ["btnConsultarCm", "btnConsultarHlr"].forEach(id => {
         const b = MEUI.$("#" + id);
-        if (b) b.disabled = n === 0;
+        // Un botón con spinner (MEUI.ocupado) se queda deshabilitado hasta
+        // que termine. Sin esto, el repintado de mitad de tanda lo volvía a
+        // habilitar y se podía lanzar una segunda consulta encima.
+        if (b && !b.dataset.meOcupado) b.disabled = n === 0;
     });
 }
 
@@ -540,39 +597,39 @@ async function verDetalle(id) {
     MEUI.$("#mdCrudo").textContent = "Pidiendo el detalle a Genesis…";
     new bootstrap.Modal("#modalDetalle").show();
     try {
-        const d = await GENESIS.detalleDe(f.id, Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis);
-        MEUI.$("#mdCrudo").textContent = d
-            ? `--- request ---\n${d.request || "(vacío)"}\n\n--- response ---\n${d.response || "(vacío)"}`
-            : "Genesis ya no devuelve ese registro en la página esperada.";
-    } catch (e) {
-        MEUI.$("#mdCrudo").textContent = "No se pudo traer el detalle: " + e.message;
+            const d = await GENESIS.detalleDe(f.id, Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis);
+            MEUI.$("#mdCrudo").textContent = d
+                ? `--- request ---\n${d.request || "(vacío)"}\n\n--- response ---\n${d.response || "(vacío)"}`
+                : "Genesis ya no devuelve ese registro en la página esperada.";
+        } catch (e) {
+            MEUI.$("#mdCrudo").textContent = "No se pudo traer el detalle: " + e.message;
+        }
     }
-}
 
-/* =====================================================================
-   13 · LO QUE USA EL PUENTE
-===================================================================== */
+    /* =====================================================================
+       13 · LO QUE USA EL PUENTE
+    ===================================================================== */
 
-/** Corta la carga de Genesis o una tanda de consultas, entre elementos.
-    No aborta la petición en vuelo: deja terminar la que ya salió y no
-    manda más. Lo que ya llegó se conserva. */
-function cancelarTrabajo() { cancelar = true; }
+    /** Corta la carga de Genesis o una tanda de consultas, entre elementos.
+        No aborta la petición en vuelo: deja terminar la que ya salió y no
+        manda más. Lo que ya llegó se conserva. */
+    function cancelarTrabajo() { cancelar = true; }
 
-function fijarFiltro(campo, valor) {
-    if (!(campo in filtros)) return;
-    filtros[campo] = valor || "";
-    render();
-}
+    function fijarFiltro(campo, valor) {
+        if (!(campo in filtros)) return;
+        filtros[campo] = valor || "";
+        render();
+    }
 
-function limpiarFiltros() {
-    Object.keys(filtros).forEach(k => { filtros[k] = ""; });
-    render();
-}
+    function limpiarFiltros() {
+        Object.keys(filtros).forEach(k => { filtros[k] = ""; });
+        render();
+    }
 
-/* =====================================================================
-   14 · ARRANQUE
-===================================================================== */
-function inicializarTitularidad() {
-    render();   // deja la tabla montada y el mensaje de «sin datos» a la vista
-}
-inicializarTitularidad();
+    /* =====================================================================
+       14 · ARRANQUE
+    ===================================================================== */
+    function inicializarTitularidad() {
+        render();   // deja la tabla montada y el mensaje de «sin datos» a la vista
+    }
+    inicializarTitularidad();
