@@ -141,11 +141,16 @@ Trae el log **completo**. Mientras carga:
 - **la tabla se va llenando**, no espera al final. Con doscientos mil
   registros, esperar al final son minutos mirando una barra sin ver un dato.
 
-El repintado se espacia según el volumen (0,5 s hasta 10.000 filas · 1,5 s
-hasta 50.000 · 3 s por encima): repintar cuesta proporcional a lo que ya hay,
-porque DataTables rehace el conjunto entero. Al principio se ve avanzar de
-verdad y con cien mil filas encima no se gasta el navegador redibujando lo
-mismo diez veces por segundo.
+El repintado sigue una pauta por **tiempo de carga**, no por número de filas:
+
+| Momento | Repinta cada | Por qué |
+|---|---|---|
+| Primeros **2 s** | **0,5 s** | Es cuando hay que ver que arrancó y que entran datos de verdad. |
+| De ahí en adelante | **5 s** | Eso ya se sabe; lo que falta es que termine, y repintar seguido solo le quita tiempo. |
+
+DataTables rehace el conjunto **entero** en cada repintado, así que el coste
+sube con cada página que llega. En una carga de 14 s medida, la pauta da 6
+repintados (`0,4 · 0,9 · 1,5 · 2,0 · 7,1 · 12,1 s`) en lugar de casi treinta.
 
 Se puede cancelar: lo que ya llegó se conserva y se dice que quedó a medias.
 

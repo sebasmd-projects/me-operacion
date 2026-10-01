@@ -154,15 +154,24 @@ function progreso(texto, pct) {
     MEUI.$("#progresoBar").style.width = (pct == null ? 0 : Math.max(0, Math.min(100, pct))) + "%";
 }
 
-/* Cada cuánto repintar la tabla mientras entra la carga. Repintar cuesta
-   proporcional a lo que ya hay (DataTables rehace el conjunto entero), así
-   que el intervalo crece con el volumen: al principio se ve avanzar de
-   verdad, y con cien mil filas encima no se gasta el navegador en redibujar
-   lo mismo diez veces por segundo. */
-function intervaloPintado() {
-    if (filas.length > 50000) return 3000;
-    if (filas.length > 10000) return 1500;
-    return 500;
+/* Cada cuánto repintar la tabla mientras entra la carga.
+
+   DataTables rehace el conjunto ENTERO en cada repintado, así que el coste
+   sube con cada página que llega. La pauta separa dos momentos que sirven
+   para cosas distintas:
+
+     · los primeros 2 s, cada 0,5 s → es cuando hay que ver que la cosa
+       arrancó y que están entrando datos de verdad;
+     · de ahí en adelante, cada 5 s → eso ya se sabe; lo que falta es que
+       termine, y repintar seguido solo le quita tiempo a eso.
+
+   Se mide por TIEMPO DE CARGA, no por número de filas: lo que hay que
+   cubrir es la incertidumbre de los primeros segundos, y esa no depende de
+   cuántos registros traiga el día. */
+const PINTADO = { rapido: 500, lento: 5000, cambioMs: 2000 };
+
+function intervaloPintado(msDesdeInicio) {
+    return msDesdeInicio < PINTADO.cambioMs ? PINTADO.rapido : PINTADO.lento;
 }
 
 async function cargarGenesis() {
@@ -178,60 +187,60 @@ async function cargarGenesis() {
 
     const t0 = performance.now();
     try {
-            MEUI.log("Cargando el log de titularidad de Genesis…", "info");
+        MEUI.log("Cargando el log de titularidad de Genesis…", "info");
 
-            // Se empieza de cero: una carga nueva reemplaza lo anterior, no se
-            // suma a ello.
-            filas = [];
-            porLinea = new Map();
-            let ultimoPintado = 0;
+        // Se empieza de cero: una carga nueva reemplaza lo anterior, no se
+        // suma a ello.
+        filas = [];
+        porLinea = new Map();
+        let ultimoPintado = 0;
 
-            const r = await GENESIS.cargarTodo({
-                tam: Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis,
-                cancelado: () => cancelar,
+        const r = await GENESIS.cargarTodo({
+            tam: Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis,
+            cancelado: () => cancelar,
 
-                // Cada página se agrega y se pinta: con 200.000 registros, esperar
-                // al final son minutos mirando una barra sin ver un solo dato.
-                alLote: nuevos => {
-                    nuevos.forEach(g => {
-                        const f = filaDesdeGenesis(g);
-                        filas.push(f);
-                        if (f.linea) {
-                            if (!porLinea.has(f.linea)) porLinea.set(f.linea, []);
-                            porLinea.get(f.linea).push(f);
-                        }
-                    });
-                    const ahora = performance.now();
-                    if (ahora - ultimoPintado >= intervaloPintado()) {
-                        ultimoPintado = ahora;
-                        render();
+            // Cada página se agrega y se pinta: con 200.000 registros, esperar
+            // al final son minutos mirando una barra sin ver un solo dato.
+            alLote: nuevos => {
+                nuevos.forEach(g => {
+                    const f = filaDesdeGenesis(g);
+                    filas.push(f);
+                    if (f.linea) {
+                        if (!porLinea.has(f.linea)) porLinea.set(f.linea, []);
+                        porLinea.get(f.linea).push(f);
                     }
-                },
+                });
+                const ahora = performance.now();
+                if (ahora - ultimoPintado >= intervaloPintado(ahora - t0)) {
+                    ultimoPintado = ahora;
+                    render();
+                }
+            },
 
-                alProgresar: p => progreso(
-                    `Genesis: ${p.leidos.toLocaleString("es-CO")} de ${p.total.toLocaleString("es-CO")} registros `
-                    + `(página ${p.pagina} de ${p.paginas})`,
-                    p.total ? (p.leidos / p.total) * 100 : null)
-            });
+            alProgresar: p => progreso(
+                `Genesis: ${p.leidos.toLocaleString("es-CO")} de ${p.total.toLocaleString("es-CO")} registros `
+                + `(página ${p.pagina} de ${p.paginas})`,
+                p.total ? (p.leidos / p.total) * 100 : null)
+        });
 
-            render();   // el pintado final, ya con todo
+        render();   // el pintado final, ya con todo
 
-            const seg = ((performance.now() - t0) / 1000).toFixed(1);
-            if (!r.completo) {
-                MEUI.log(`⚠ Carga cancelada: ${filas.length.toLocaleString("es-CO")} de `
-                    + `${r.total.toLocaleString("es-CO")} registros. Lo que ves está completo hasta ahí.`, "warn");
-                MEUI.toast("Carga cancelada; se conserva lo que alcanzó a llegar.", "warn");
-            } else if (filas.length < r.total) {
-                // Genesis dijo una cuenta y entregó menos: se dice, no se calla.
-                MEUI.log(`⚠ Genesis reportó ${r.total.toLocaleString("es-CO")} registros pero entregó `
-                    + `${filas.length.toLocaleString("es-CO")}. Puede que entraran registros nuevos durante la `
-                    + `descarga, o que alguna página viniera vacía.`, "warn");
-            } else {
-                MEUI.log(`✔ ${filas.length.toLocaleString("es-CO")} registros de Genesis en ${seg} s.`, "ok");
-            }
-        } catch (e) {
-            MEUI.log("✖ No se pudo cargar Genesis: " + e.message, "err");
-            MEUI.toast("Falló la carga de Genesis. Mira el registro.", "err");
+        const seg = ((performance.now() - t0) / 1000).toFixed(1);
+        if (!r.completo) {
+            MEUI.log(`⚠ Carga cancelada: ${filas.length.toLocaleString("es-CO")} de `
+                + `${r.total.toLocaleString("es-CO")} registros. Lo que ves está completo hasta ahí.`, "warn");
+            MEUI.toast("Carga cancelada; se conserva lo que alcanzó a llegar.", "warn");
+        } else if (filas.length < r.total) {
+            // Genesis dijo una cuenta y entregó menos: se dice, no se calla.
+            MEUI.log(`⚠ Genesis reportó ${r.total.toLocaleString("es-CO")} registros pero entregó `
+                + `${filas.length.toLocaleString("es-CO")}. Puede que entraran registros nuevos durante la `
+                + `descarga, o que alguna página viniera vacía.`, "warn");
+        } else {
+            MEUI.log(`✔ ${filas.length.toLocaleString("es-CO")} registros de Genesis en ${seg} s.`, "ok");
+        }
+    } catch (e) {
+        MEUI.log("✖ No se pudo cargar Genesis: " + e.message, "err");
+        MEUI.toast("Falló la carga de Genesis. Mira el registro.", "err");
     } finally {
         cargando = false; cancelar = false;
         progreso("");
