@@ -42,6 +42,10 @@
     O con un archivo .pfx suelto:
         scripts\empaquetar-release.bat -CertPfx C:\ruta\certificado.pfx
 
+    SIN ACCESO A LA CARPETA DE RED (sin VPN, NAS caido) el script NO se
+    detiene: avisa, genera la version igual en .\release\ y al final dice
+    que dos archivos copiar y en que orden cuando vuelva el acceso.
+
     Que genera, dentro de .\release\ (en la raiz del proyecto) y copia a
     la carpeta de red (-Destino):
         me-operacion-<version>.zip
@@ -53,6 +57,9 @@
 
     Otras opciones:
         -SinPublicar   solo genera en release\ (no toca la carpeta de red)
+        -TimeoutRed N  segundos de espera para la carpeta de red (8 por
+                       defecto). Sin VPN la comprobacion no revienta ni se
+                       cuelga: avisa, genera en release\ y dice que copiar.
         -Forzar        reemplaza un .zip de la misma version ya publicado
         -Puente        recuerda subir tambien a https://sebasmd.com/me/operacion/
                        (solo para la 3.0.0: las copias 2.x solo miran ahi)
@@ -104,7 +111,11 @@ param(
     [string]$Destino = '\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release',
     [switch]$SinPublicar,
     [switch]$Forzar,
-    [switch]$Puente
+    [switch]$Puente,
+    # Tope de espera para hablar con la carpeta de red. Fuera de la VPN,
+    # SMB puede bloquear 20-60 s CADA acceso a la ruta; no hay que quedarse
+    # esperando eso para algo que al final se genera local igual.
+    [int]$TimeoutRed = 8
 )
 
 $ErrorActionPreference = 'Stop'
@@ -179,6 +190,43 @@ if ($versionNueva -le $versionActual) {
     throw "La version nueva ($versionNueva) debe ser mayor que la actual ($versionActual)."
 }
 
+# ---------- Acceso a la carpeta de red, sin bloquear ni reventar ----------
+# `Test-Path` sobre una UNC inalcanzable no siempre devuelve $false: puede
+# tardar un minuto en contestar y puede lanzar un error que, con
+# $ErrorActionPreference='Stop', mata el script entero. Y matarlo aqui es
+# justo lo que no queremos: el paquete se puede generar local perfectamente
+# sin ver la carpeta de red.
+#
+# Mismo patron que `Leer-JsonUtf8` en lanzador.ps1 y actualizar.ps1: la
+# comprobacion corre en un runspace aparte con tope de tiempo, y si no
+# contesta se abandona (Stop/Dispose tambien se quedarian bloqueados).
+#
+# Devuelve 'si', 'no' o 'sinacceso' -los tres casos son distintos y el que
+# llama decide: "no existe" no es lo mismo que "no pude preguntar"-.
+function Probar-Ruta($ruta, $tipo, $timeoutSec) {
+    $ps = [PowerShell]::Create()
+    [void]$ps.AddScript('param($r, $t) Test-Path -LiteralPath $r -PathType $t').AddArgument($ruta).AddArgument($tipo)
+    $h = $ps.BeginInvoke()
+    if (-not $h.AsyncWaitHandle.WaitOne($timeoutSec * 1000)) {
+        [void]$ps.BeginStop($null, $null)
+        return 'sinacceso'
+    }
+    try {
+        $res = $ps.EndInvoke($h)
+        if ($ps.Streams.Error.Count -gt 0) { return 'sinacceso' }
+        if (-not $res -or $res.Count -lt 1) { return 'sinacceso' }
+        # Se desenvuelve el PSObject a proposito, igual que Leer-JsonUtf8:
+        # el runspace devuelve el booleano envuelto y no hay que depender de
+        # que la conversion implicita lo destape bien.
+        if ([bool]$res[0].psobject.BaseObject) { return 'si' }
+        return 'no'
+    } catch {
+        return 'sinacceso'
+    } finally {
+        $ps.Dispose()
+    }
+}
+
 # ---------- 1b. Carpeta de red ----------
 # Se revisa ANTES de tocar nada (scripts\VERSION, release\): si la version
 # ya esta publicada, se detiene aqui. Sin acceso (sin VPN) no se detiene:
@@ -187,12 +235,28 @@ $publicar = -not $SinPublicar
 if ($publicar) {
     Write-Host ""
     Write-Host "  Comprobando la carpeta de releases..." -ForegroundColor Gray
-    if (-not (Test-Path -LiteralPath $Destino -PathType Container)) {
+    $acceso = Probar-Ruta $Destino 'Container' $TimeoutRed
+    if ($acceso -ne 'si') {
         Write-Host ("  ATENCION  No se pudo acceder a {0}" -f $Destino) -ForegroundColor Yellow
-        Write-Host "            (sin VPN o ruta mal escrita). El paquete se genera igual en release\." -ForegroundColor Yellow
+        if ($acceso -eq 'sinacceso') {
+            Write-Host ("            No contesto en {0} s: sin VPN, sin red o el NAS caido." -f $TimeoutRed) -ForegroundColor Yellow
+        } else {
+            Write-Host "            La ruta no existe (ruta mal escrita?)." -ForegroundColor Yellow
+        }
+        Write-Host "            El paquete se genera igual en release\ y al final se dice que copiar." -ForegroundColor Yellow
+        Write-Host "            Para saltarse esta comprobacion desde el principio: -SinPublicar" -ForegroundColor DarkGray
         $publicar = $false
-    } elseif ((Test-Path -LiteralPath (Join-Path $Destino ("me-operacion-{0}.zip" -f $versionNueva))) -and -not $Forzar) {
-        throw ("La version {0} ya esta publicada en la carpeta de red. No se reutiliza un numero: sube la version (o usa -Forzar si de verdad hay que reemplazarla)." -f $versionNueva)
+    } else {
+        # La carpeta SI contesta: aqui el guardia de "version ya publicada"
+        # tiene que valerse. Si justo esta consulta falla, se para en vez de
+        # arriesgarse a pisar una release publicada.
+        $yaEsta = Probar-Ruta (Join-Path $Destino ("me-operacion-{0}.zip" -f $versionNueva)) 'Leaf' $TimeoutRed
+        if ($yaEsta -eq 'sinacceso') {
+            throw ("La carpeta de red contesto pero no se pudo comprobar si la version {0} ya esta publicada. No se publica a ciegas: vuelve a intentarlo, o usa -SinPublicar para generar solo en release\." -f $versionNueva)
+        }
+        if ($yaEsta -eq 'si' -and -not $Forzar) {
+            throw ("La version {0} ya esta publicada en la carpeta de red. No se reutiliza un numero: sube la version (o usa -Forzar si de verdad hay que reemplazarla)." -f $versionNueva)
+        }
     }
 }
 
@@ -350,9 +414,13 @@ if ($publicar) {
 } elseif ($SinPublicar) {
     Write-Host "  Listo. Generado solo en release\ (-SinPublicar)." -ForegroundColor Yellow
 } else {
-    Write-Host ("  Copia estos dos archivos a {0} :" -f $Destino) -ForegroundColor Yellow
-    Write-Host ("    1. {0}" -f $rutaZip)
-    Write-Host ("    2. {0}   <- SIEMPRE al final" -f $rutaJson)
+    Write-Host ("  Listo. La version {0} quedo generada en release\, SIN publicar:" -f $versionNueva) -ForegroundColor Yellow
+    Write-Host ("    - {0}" -f $rutaZip)
+    Write-Host ("    - {0}" -f $rutaJson)
+    Write-Host ""
+    Write-Host ("  Cuando tengas acceso, copia esos dos archivos a {0}" -f $Destino) -ForegroundColor Yellow
+    Write-Host "  en este orden: primero el .zip, version.json SIEMPRE al final." -ForegroundColor Yellow
+    Write-Host "  (Asi nadie ve una version cuyo .zip todavia no esta completo.)" -ForegroundColor DarkGray
 }
 if ($Puente) {
     Write-Host ""
