@@ -66,6 +66,7 @@
         { id: "consumos", titulo: "Bolsillos, Paquetes, Consumos", icono: "bi-bar-chart", url: "reporte_consumos.html" },
         { id: "tipificacion", titulo: "Exportar casos tipificación", icono: "bi-download", url: "export_tipificacion.html" },
         { id: "ajustes", titulo: "Ajustes y paquetes", icono: "bi-cash-coin", url: "export_ajustes.html" },
+        { id: "titularidad", titulo: "Titularidad · Bloqueos de SIM", icono: "bi-shield-check", url: "titularidad.html" },
       ]
     },
     {
@@ -101,7 +102,7 @@
     umbralAviso: 60                // segundos en los que el chip se pone naranja
   };
 
-  const NOMBRE_SESION = { cm: "CM", sime: "SIME", qdn: "QDN" };
+  const NOMBRE_SESION = { cm: "CM", sime: "SIME", qdn: "QDN", genesis: "Genesis" };
 
   /* =====================================================================
      1 · SESIÓN COMPARTIDA

@@ -1,0 +1,361 @@
+<!-- titularidad.html · v1.0.0
+     ---------------------------------------------------------------------
+     Solo marcado. La lógica vive en:
+
+       assets/me-ui.css / me-ui.js       shell, pasos, tablas, exportación
+       assets/me-api.js                  sesión y consultas del CM
+       assets/genesis-api.js             sesión y paginación de Genesis
+       assets/hlr-consulta.js            Claro + Tigo (¿en qué HLR está?)
+       assets/cm-lineas.js               resolver la línea en el CM
+       assets/logica-titularidad.js      reglas de esta herramienta
+       assets/me-titularidad-puente.js   enganche con el shell
+
+     Qué resuelve: las llamadas al call por «me bloquearon la SIM» salen
+     casi siempre del proceso de comprobación de titularidad. Genesis
+     guarda el log de ese proceso pero no dice en qué red está la línea,
+     y sin eso el asesor no cierra la llamada. Aquí se juntan las tres
+     fuentes: Genesis (qué pasó), CM (titular y estado) y HLR/HSS (Claro,
+     Tigo, ambos o ninguno).
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Titularidad · Bloqueos de SIM</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* Propio de esta herramienta. Lo estructural vive en me-ui.css. */
+        .badge-estado {
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .03em;
+            border-radius: .35rem;
+            padding: .3em .55em;
+            white-space: nowrap;
+        }
+
+        .badge-estado.ok { background: #E2F2E8; color: var(--me-ok); }
+        .badge-estado.off { background: #ECECEA; color: var(--me-off); }
+        .badge-estado.warn { background: #FBEED8; color: var(--me-warn); }
+        .badge-estado.info { background: #E2E9F2; color: var(--me-info); }
+        .badge-estado.err { background: #FBE2DF; color: var(--me-err); }
+        .badge-estado.neutro { background: #F0F0EC; color: var(--me-suave); }
+
+        .paso-pend { color: #B9B9B2; }
+
+        /* La descripción de Genesis es una frase larga; se corta en la celda
+           y se ve completa en el tooltip y en el detalle. */
+        td .desc {
+            display: inline-block;
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+        }
+
+        #tablaTitularidad td,
+        #tablaTitularidad th { font-size: .8rem; }
+
+        #progresoWrap { display: none; }
+
+        .sesion-ayuda {
+            font-size: .72rem;
+            color: var(--me-suave);
+            border-left: 2px solid var(--me-borde-2);
+            padding-left: .5rem;
+            margin-top: .35rem;
+        }
+
+        .acciones-sel {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+        }
+
+        #resumenSeleccion {
+            font-size: .76rem;
+            font-family: var(--me-mono);
+            color: var(--me-suave);
+        }
+
+        .modal-header { background: var(--me-negro); color: #fff; }
+        .modal-header .modal-title { font-weight: 800; }
+        .modal-header .modal-title span { color: var(--me-amarillo); }
+
+        .dl-grid {
+            display: grid;
+            grid-template-columns: 190px 1fr;
+            gap: .25rem .9rem;
+            font-size: .82rem;
+        }
+
+        .dl-grid dt { color: var(--me-suave); font-weight: 500; }
+        .dl-grid dd { font-family: var(--me-mono); margin: 0; word-break: break-word; }
+
+        #mdCrudo {
+            max-height: 45vh;
+            overflow: auto;
+            background: #FAFAF7;
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            padding: .6rem .7rem;
+            font-size: .68rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi neutro" style="cursor:default">
+            <div class="n" id="kpiTotal">0</div>
+            <div class="lbl">Registros a la vista</div>
+        </div>
+        <div class="me-kpi info" style="cursor:default">
+            <div class="n" id="kpiLineas">0</div>
+            <div class="lbl">Líneas únicas</div>
+        </div>
+        <div class="me-kpi err" style="cursor:default">
+            <div class="n" id="kpiBloqueos">0</div>
+            <div class="lbl">Bloqueos</div>
+        </div>
+        <div class="me-kpi warn" style="cursor:default">
+            <div class="n" id="kpiRevisar">0</div>
+            <div class="lbl">HLR a revisar</div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Sesiones -->
+            <section data-me-paso="1" data-me-titulo="Conexión" data-me-abierto="sin-sesion">
+                <div class="me-lbl mb-1">Genesis <span class="text-muted">(obligatoria)</span></div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="gUser">Usuario</label>
+                        <input class="form-control form-control-sm me-mono" id="gUser" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="gPass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="gPass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-ink w-100" id="btnLoginGenesis" type="button">Iniciar sesión en
+                            Genesis</button>
+                    </div>
+                    <div class="col-12">
+                        <label class="me-lbl" for="gToken">…o pega el token de una sesión de Genesis abierta</label>
+                        <textarea id="gToken" class="form-control form-control-sm me-mono" rows="2"
+                            placeholder="eyJhbGciOi…"></textarea>
+                        <button class="btn btn-sm btn-me-line w-100 mt-1" id="btnTokenGenesis" type="button">Usar este
+                            token</button>
+                    </div>
+                    <div class="col-12 sesion-ayuda">
+                        Genesis inicia sesión por el navegador (flujo de código), y eso no se puede completar desde
+                        una página local. Si el usuario y la contraseña no funcionan, el realm no permite ese
+                        camino: abre Genesis, copia el token de una petición (DevTools → Red → cabecera
+                        <code>Authorization</code>) y pégalo aquí.
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div class="me-lbl mb-1">CM <span class="text-muted">(solo para titular y estado)</span></div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="user">Usuario</label>
+                        <input class="form-control form-control-sm me-mono" id="user" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="pass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="pass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-line w-100" id="btnLogin" type="button">Iniciar sesión en el
+                            CM</button>
+                    </div>
+                    <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas:
+                        si ya iniciaste sesión en otra pestaña, llegan solas.</div>
+                </div>
+            </section>
+
+            <!-- 2 · Carga -->
+            <section data-me-paso="2" data-me-titulo="Datos de Genesis" data-me-abierto="con-sesion">
+                <div class="me-hint mb-2">Trae el log completo de comprobación de titularidad. Son más de doscientos
+                    mil registros: tarda, avisa del avance y se puede cancelar sin perder lo que ya llegó.</div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgPagina">Registros por página</label>
+                        <input type="number" id="cfgPagina" class="form-control form-control-sm me-mono" value="500"
+                            min="50" max="5000" step="50">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="cfgConcurrencia">HLR en paralelo</label>
+                        <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono"
+                            value="5" min="1" max="15">
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-me flex-grow-1" id="btnCargar" type="button">Cargar de Genesis</button>
+                        <button class="btn btn-outline-danger d-none" id="btnCancelar" type="button">Cancelar</button>
+                    </div>
+                </div>
+
+                <div id="progresoWrap" class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="me-mono" id="progresoTexto">…</small>
+                        <small class="me-mono" id="progresoPct"></small>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3 · Registro -->
+            <section data-me-paso="3" data-me-titulo="Registro" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= DERECHA: filtros + tabla ================= -->
+        <div class="me-trabajo-datos">
+
+            <div class="me-filtros" id="barraFiltros">
+                <input class="form-control form-control-sm" id="fTexto" style="max-width:220px"
+                    placeholder="Buscar línea, documento, titular…">
+                <select class="form-select form-select-sm" id="fOperacion" style="width:auto"></select>
+                <select class="form-select form-select-sm" id="fResultado" style="width:auto"></select>
+                <select class="form-select form-select-sm" id="fUbicacion" style="width:auto"></select>
+                <select class="form-select form-select-sm" id="fCanal" style="width:auto"></select>
+                <select class="form-select form-select-sm" id="fSel" style="width:auto">
+                    <option value="">Marcadas: todas</option>
+                    <option value="marcadas">Solo marcadas</option>
+                    <option value="sin-marcar">Solo sin marcar</option>
+                </select>
+                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar <i
+                        class="bi bi-x-circle"></i></button>
+
+                <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button class="btn btn-sm btn-me-line" id="btnCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+                    <button class="btn btn-sm btn-me-line" id="btnXLSX"><i class="bi bi-file-earmark-excel"></i>
+                        Excel</button>
+                    <button class="btn btn-sm btn-me-line" id="btnJSON"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                </div>
+            </div>
+
+            <div class="me-filtros acciones-sel">
+                <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar lo filtrado</button>
+                <button class="btn btn-sm btn-me-line" id="btnDesmarcar" type="button">Desmarcar todo</button>
+                <span id="resumenSeleccion">Nada marcado</span>
+                <div class="me-filtros-der">
+                    <button class="btn btn-sm btn-me-ink" id="btnConsultarCm" type="button" disabled>
+                        <i class="bi bi-person-badge"></i> Consultar CM</button>
+                    <button class="btn btn-sm btn-me" id="btnConsultarHlr" type="button" disabled>
+                        <i class="bi bi-broadcast-pin"></i> Consultar HLR/HSS</button>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaTitularidad" class="table table-striped table-hover align-middle w-100"></table>
+                <div class="me-hint p-2" id="msgVacio">
+                    Inicia sesión en Genesis y presiona <strong>Cargar de Genesis</strong>. Después marca las líneas
+                    que te interesen y consulta su <strong>HLR/HSS</strong> (Claro / Tigo / ambos) y sus datos en el
+                    <strong>CM</strong>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MODAL DETALLE ============ -->
+    <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title mb-0">Línea <span id="mdLinea" class="me-mono"></span>
+                        <button type="button" class="btn-copy" data-copy-target="mdLinea"
+                            title="Copiar línea">⧉</button>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mdResumen" class="mb-3"></div>
+                    <h6 class="fw-bold mb-1">Petición y respuesta en el CM <small class="text-muted fw-normal">—
+                            se vuelve a pedir a Genesis: no se guarda en memoria</small></h6>
+                    <pre id="mdCrudo" class="me-mono"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "titularidad",
+            version: "1.0.0",
+            doc: "../doc/titularidad/README.md",
+            titulo: "Titularidad · Bloqueos de SIM",
+            descripcion: "Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS",
+            sesiones: ["genesis", "cm"],
+            instrucciones: [
+                "Para qué sirve: la mayoría de las llamadas por «me bloquearon la SIM» vienen del proceso de comprobación de titularidad. Genesis dice qué pasó, pero no en qué red está la línea; sin eso no se cierra la llamada.",
+                "1 · Conexión: Genesis es obligatoria. Si el usuario y la contraseña no funcionan, el realm solo permite el flujo del navegador: abre Genesis, copia el token de una petición y pégalo. El CM es opcional y solo hace falta para el titular y el estado de la línea.",
+                "2 · Datos de Genesis: trae el log completo (más de doscientos mil registros). Avisa del avance y se puede cancelar: lo que ya llegó se conserva.",
+                "3 · Marca de 1 a n líneas (o usa «Marcar lo filtrado») y presiona «Consultar HLR/HSS» para saber si están en Claro, en Tigo, en ambas o en ninguna.",
+                "4 · «Consultar CM» agrega titular, cuenta y estado de la línea de las mismas líneas marcadas.",
+                "Claro no tiene servicio de lote: su consulta es una por línea, así que se hace en tandas controladas (el campo «HLR en paralelo»). Mil líneas salen en tandas, no de golpe.",
+                "Una misma línea puede aparecer en varios registros: se consulta UNA vez y el resultado se copia a todas sus filas.",
+                "Los filtros y la exportación trabajan sobre lo mismo: lo que exportas es exactamente lo que ves.",
+                "El SOAP crudo de cada operación no se guarda en memoria (serían cientos de megas): al abrir el detalle de una fila se vuelve a pedir a Genesis."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Accesos: CM, Genesis, HLR y operaciones de línea -->
+    <script src="../assets/me-api.js"></script>
+    <script src="../assets/genesis-api.js"></script>
+    <script src="../assets/hlr-consulta.js"></script>
+    <script src="../assets/cm-lineas.js"></script>
+
+    <!-- 3 · Reglas de esta herramienta -->
+    <script src="../assets/logica-titularidad.js"></script>
+
+    <!-- 4 · Enganche con el shell -->
+    <script src="../assets/me-titularidad-puente.js"></script>
+</body>
+
+</html>
