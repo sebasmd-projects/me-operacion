@@ -137,20 +137,23 @@
     }
 
     /* --- 5 · Carga y acciones sobre lo marcado ------------------------- */
-    // Rango de fechas: el aviso de «son N días / N consultas» se rehace con
+    // Rango de fechas: el aviso de «N días · N tramos · N peticiones» se rehace con
     // cada cambio, ANTES de que nadie pulse el botón.
     el("fDesde").addEventListener("input", () => actualizarAvisoRango());
     el("fHasta").addEventListener("input", () => actualizarAvisoRango());
+    // Tres formas de cargar, de la más barata a la más cara (ver «Qué se
+    // carga» en la lógica): los más nuevos (por defecto), un rango, o todo.
     el("btnCargar").addEventListener("click", () => cargarGenesis());
+    el("btnCargarRango").addEventListener("click", () => cargarGenesis({ modo: "rango" }));
 
-    // Traer TODO sin rango: cerrado por defecto y con casilla. Son miles de
-    // peticiones y de 5 a 10 minutos; no debe ser el camino fácil ni algo que
+    // Traer TODO sin rango ni tope: cerrado por defecto y con casilla. Son miles
+    // de peticiones y de 5 a 10 minutos; no debe ser el camino fácil ni algo que
     // se lance con un clic suelto. La casilla se vuelve a desmarcar tras cada
     // uso: cada carga completa se confirma de nuevo.
     const armarTodo = () => { el("btnCargarTodo").disabled = !el("chkEntiendoTodo").checked; };
     el("chkEntiendoTodo").addEventListener("change", armarTodo);
     el("btnCargarTodo").addEventListener("click", () => {
-        const lanzada = cargarGenesis({ todo: true });
+        const lanzada = cargarGenesis({ modo: "todo" });
         el("chkEntiendoTodo").checked = false;
         Promise.resolve(lanzada).finally(armarTodo);   // `libre` lo habilita al terminar; sin casilla, debe quedar apagado
         armarTodo();

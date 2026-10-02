@@ -202,12 +202,27 @@ function intervaloPintado(msDesdeInicio) {
 }
 
 /* ---------------------------------------------------------------------
-   Rango de fechas
+   Qué se carga
    ---------------------------------------------------------------------
-   Por defecto se carga el MES EN CURSO, no todo el log: traer los más de
-   200.000 registros son miles de peticiones y de 5 a 10 minutos, y casi
-   nunca hace falta. El analista que busca un bloqueo reciente necesita días,
-   no años. «Traer todo» sigue existiendo, pero aparte y con confirmación.
+   Hay TRES formas, de la más barata a la más cara, y el orden de los botones
+   es ese:
+
+     · «Cargar los más nuevos» (por defecto): los últimos N registros, con N =
+       GENESIS.CONFIG.topeRegistros. Como Genesis ordena DESC, la página 1
+       son los más nuevos, así que son unas pocas peticiones y la herramienta
+       sirve en segundos, en vez de esperar un mes entero antes de poder
+       mirar nada. NO es la carga completa y la interfaz lo dice.
+     · «Cargar rango»: un rango de fechas, SIN tope. Se descompone en tramos
+       (año / mes / días sueltos) porque el filtro de Genesis es un
+       «contiene» sobre dd/MM/yyyy: un mes completo es UNA consulta, no 31.
+       Ya no hace falta limitarlo a un mes.
+     · «Traer todo»: sin rango ni tope; miles de peticiones, de 5 a 10
+       minutos. Cerrado y con casilla de confirmación.
+
+   Los dos campos de fecha arrancan con el mes en curso solo como sugerencia
+   visible: el botón por defecto NO los usa. Si lo hiciera, quien solo quiere
+   «ver lo último» esperaría un mes de datos, y quien dejó las fechas por
+   defecto sin mirarlas cargaría algo que no pidió.
 
    Las fechas viajan como cadenas «YYYY-MM-DD» (lo que da <input type=date>)
    y GENESIS las valida y las convierte; aquí no se pasan por `new Date`
@@ -215,7 +230,8 @@ function intervaloPintado(msDesdeInicio) {
    anterior.
 --------------------------------------------------------------------- */
 
-/** Día 1 y último día del mes de `ahora`, en la zona del proyecto. */
+/** Día 1 y último día del mes de `ahora`, en la zona del proyecto: la sugerencia
+    con que arrancan los campos de fecha. */
 function rangoMesEnCurso(ahora) {
     const partes = new Intl.DateTimeFormat("en-US", {
         timeZone: CONFIG.zona, year: "numeric", month: "2-digit", day: "2-digit"
@@ -227,28 +243,37 @@ function rangoMesEnCurso(ahora) {
     return { desde: `${y}-${dos(m)}-01`, hasta: `${y}-${dos(m)}-${dos(ultimo)}` };
 }
 
-/** Lee los dos campos y dice cuántas consultas implica, ANTES de lanzar. Es
-    la misma cuenta que hace GENESIS.cargarTodo, para que el aviso y lo que
-    de verdad pasa no puedan decir cosas distintas. */
+/** Lee los dos campos y dice cuánto cuesta el rango, ANTES de lanzar. Es la
+    misma cuenta que hace GENESIS.cargarTodo (`tramosDeRango`), para que el
+    aviso y lo que de verdad pasa no puedan decir cosas distintas.
+
+    Se cuenta en TRAMOS, no en días: Genesis filtra por «contiene» sobre
+    dd/MM/yyyy, así que un mes completo es UN tramo (una petición como mínimo)
+    y no 31. Decir «31 días = 31 consultas» sería falso. */
 function infoRango() {
     const desde = (MEUI.$("#fDesde") || {}).value || "";
     const hasta = (MEUI.$("#fHasta") || {}).value || "";
     try {
-        const r = GENESIS.rangoDias(desde, hasta);
-        const n = r.dias.length;
-        const consultas = `${n.toLocaleString("es-CO")} consulta${n === 1 ? "" : "s"}`;
+        const r = GENESIS.tramosDeRango(desde, hasta);
+        const f = n => n.toLocaleString("es-CO");
+        const k = r.tramos.length;
+        const etiquetas = k > 6
+            ? r.tramos.slice(0, 6).map(t => t.etiqueta).join(", ") + "…"
+            : r.tramos.map(t => t.etiqueta).join(", ");
+        const dias = `${f(r.dias)} día${r.dias === 1 ? "" : "s"}`;
         return {
-            ok: true, desde: r.desde, hasta: r.hasta, dias: n, largo: r.largo,
+            ok: true, desde: r.desde, hasta: r.hasta, dias: r.dias, tramos: k, largo: r.largo,
             texto: r.largo
-                ? `⚠ ${n.toLocaleString("es-CO")} días: al menos ${consultas}, una por día. Va a tardar; ¿cabe un rango más corto?`
-                : `${n.toLocaleString("es-CO")} día${n === 1 ? "" : "s"} · al menos ${consultas} a Genesis (una por día, más páginas si algún día trae mucho).`
+                ? `⚠ ${dias} en ${f(k)} tramos (${etiquetas}): al menos ${f(k)} peticiones. Va a tardar; ¿cabe un rango más corto?`
+                : `${dias} · ${f(k)} tramo${k === 1 ? "" : "s"} (${etiquetas}): al menos ${f(k)} ${k === 1 ? "petición" : "peticiones"} a Genesis, más páginas si alguno trae mucho.`
         };
     } catch (e) {
-        return { ok: false, desde, hasta, dias: 0, largo: false, texto: e.message };
+        return { ok: false, desde, hasta, dias: 0, tramos: 0, largo: false, texto: e.message };
     }
 }
 
-/** Pinta el aviso bajo las fechas y habilita o no «Cargar rango». */
+/** Pinta el aviso bajo las fechas y habilita o no «Cargar rango». («Cargar los
+    más nuevos» no depende de las fechas.) */
 function actualizarAvisoRango() {
     const info = infoRango();
     const aviso = MEUI.$("#rangoAviso");
@@ -256,7 +281,7 @@ function actualizarAvisoRango() {
         ponerTexto(aviso, info.texto);
         aviso.className = "rango-aviso" + (!info.ok ? " error" : info.largo ? " largo" : "");
     }
-    const b = MEUI.$("#btnCargar");
+    const b = MEUI.$("#btnCargarRango");
     // Un botón con spinner (MEUI.ocupado) se queda deshabilitado hasta que
     // termine la carga; no se le debe volver a habilitar desde aquí.
     if (b && !b.dataset.meOcupado) b.disabled = !info.ok;
@@ -274,56 +299,71 @@ function textoVacio(html) {
     e.innerHTML = html == null ? _vacioOriginal : html;
 }
 
-/** Qué decir mientras carga. Con rango, `total` CRECE (solo suma los días ya
-    consultados), así que «X de Y» sería una cuenta que se mueve: se dice el
-    día en curso y cuántos registros van. */
+/** Qué decir mientras carga. Con rango, `total` CRECE (solo suma los tramos ya
+    consultados), así que «X de Y» sería una cuenta que se mueve: se dice qué
+    tramo va y cuántos registros llegan. Con tope, el objetivo es el menor de
+    (tope, lo que Genesis dice que hay): «249 de 2.000» sería mentira si en
+    total hay 249. */
+const NOMBRE_TRAMO = { dia: "día", mes: "mes", anio: "año" };
+
+function objetivoTope(p) { return Math.min(p.tope, p.total || p.tope); }
+
 function textoProgreso(p) {
     const f = n => n.toLocaleString("es-CO");
-    if (p.dia != null) {
-        return `Genesis · día ${p.dia} de ${p.dias} (${p.fecha}) · ${f(p.leidos)} registros`
-            + (p.paginas > 1 ? ` · página ${p.pagina} de ${p.paginas}` : "");
+    const pag = p.paginas > 1 ? ` · página ${p.pagina} de ${p.paginas}` : "";
+    if (p.tramo != null) {
+        return `Genesis · ${NOMBRE_TRAMO[p.granularidad] || "tramo"} ${p.etiqueta} (tramo ${p.tramo} de ${p.tramos}) · `
+            + `${f(p.leidos)} registros` + pag;
     }
+    if (p.tope) return `Genesis: ${f(p.leidos)} de ${f(objetivoTope(p))} registros (los más nuevos)` + pag;
     return `Genesis: ${f(p.leidos)} de ${f(p.total)} registros (página ${p.pagina} de ${p.paginas})`;
 }
 
-/** Porcentaje de 0 a 100. `fraccion` es monótona también con rango;
-    leidos/total NO lo es (el total crece y la barra retrocedería). */
+/** Porcentaje de 0 a 100. `fraccion` es monótona con rango; leidos/total NO
+    lo es (el total crece y la barra retrocedería). Con tope, `fraccion` es
+    leidos/tope, y si la tabla tiene menos que el tope la barra se quedaría en
+    el 12 %: se mide contra lo que de verdad se va a leer. */
 function porcentajeProgreso(p) {
+    if (p.tope && p.tramo == null) return Math.min(100, (p.leidos / objetivoTope(p)) * 100);
     if (p.fraccion != null) return p.fraccion * 100;
     return p.total ? (p.leidos / p.total) * 100 : null;
 }
 
-/** Lo que se dice al terminar, que tiene que ser cierto en los DOS modos.
-    Con rango, `r.total` es la suma de lo que Genesis contó en cada día
-    consultado y `cargadas` ya viene sin los repetidos entre días: comparar
-    una con la otra como se hace sin rango («Genesis reportó X pero entregó
-    Y») daría un aviso falso en el caso normal, y un «X de Y» no tendría
-    sentido cuando Y solo cuenta los días que se llegaron a consultar.
+/** Lo que se dice al terminar, que tiene que ser cierto en los TRES modos.
+
+    · Con tope, llegar al tope no es cancelar ni es una carga completa: es
+      «los N más nuevos de T», y se dice así, sin rodeos.
+    · Con rango, `r.total` es la suma de lo que Genesis contó en cada tramo
+      consultado y `cargadas` ya viene sin los repetidos entre tramos: comparar
+      una con la otra como se hace sin rango («Genesis reportó X pero entregó
+      Y») daría un aviso falso en el caso normal, y un «X de Y» no tendría
+      sentido cuando Y solo cuenta los tramos que se llegaron a consultar.
     Devuelve {nivel, texto}; el llamador lo registra. */
 function resumenCarga(r, cargadas, seg) {
     const f = n => n.toLocaleString("es-CO");
     if (r.rango) {
-        const dias = `${r.diasRecorridos} de ${r.diasTotal} días`;
+        const tramos = `${r.tramosRecorridos} de ${r.tramosTotal} tramos`;
         const lapso = `${r.rango.desde} a ${r.rango.hasta}`;
         if (!r.completo) {
-            const cortado = (r.detalleDias || []).find(d => !d.completo);
+            const cortado = (r.detalleTramos || []).find(d => !d.completo);
             return {
                 nivel: "warn",
-                texto: `⚠ Carga cancelada: ${f(cargadas)} registros, ${dias} leídos por completo (${lapso}).`
-                    + (cortado ? ` El día ${cortado.fecha} quedó a medias.` : "")
-                    + ` Los días que faltan no se consultaron.`
+                texto: `⚠ Carga cancelada: ${f(cargadas)} registros, ${tramos} completos (${lapso}).`
+                    + (cortado ? ` El tramo ${cortado.etiqueta} quedó a medias.` : "")
+                    + ` Lo que falta no se consultó.`
             };
         }
         if (!cargadas) {
-            return { nivel: "info", texto: `Genesis no devolvió registros entre ${lapso} (${f(r.consultas)} consulta(s)).` };
+            return { nivel: "info", texto: `Genesis no devolvió registros entre ${lapso} (${f(r.consultas)} petición(es)).` };
         }
-        const base = `✔ ${f(cargadas)} registros de Genesis (${lapso}: ${r.diasTotal} día(s), ${f(r.consultas)} consulta(s)) en ${seg} s.`;
+        const base = `✔ ${f(cargadas)} registros de Genesis (${lapso}: ${f(r.rango.dias)} día(s) · `
+            + `${f(r.tramosTotal)} tramo(s) · ${f(r.consultas)} petición(es)) en ${seg} s.`;
         const repetidos = r.total - cargadas;
         if (repetidos > 0) {
             return {
                 nivel: "warn",
-                texto: `${base} Sumando los días, Genesis contó ${f(r.total)}: ${f(repetidos)} no se guardaron. `
-                    + `Lo normal es que sean registros repetidos entre días contiguos (se descartan a propósito), `
+                texto: `${base} Sumando los tramos, Genesis contó ${f(r.total)}: ${f(repetidos)} no se guardaron. `
+                    + `Lo normal es que sean registros repetidos entre tramos contiguos (se descartan a propósito), `
                     + `pero también puede ser una página que vino vacía.`
             };
         }
@@ -332,7 +372,15 @@ function resumenCarga(r, cargadas, seg) {
     if (!r.completo) {
         return {
             nivel: "warn",
-            texto: `⚠ Carga cancelada: ${f(cargadas)} de ${f(r.total)} registros. Lo que ves está completo hasta ahí.`
+            texto: `⚠ Carga cancelada: ${f(cargadas)} de ${f(r.total)} registros`
+                + (r.tope ? " (los más nuevos)" : "") + `. Lo que ves está completo hasta ahí.`
+        };
+    }
+    if (r.topeAlcanzado) {
+        return {
+            nivel: "warn",
+            texto: `⚠ ${f(cargadas)} registros (los más nuevos) de ${f(r.total)}. No es la carga completa: `
+                + `elige un rango de fechas para ver más.`
         };
     }
     if (cargadas < r.total) {
@@ -343,17 +391,46 @@ function resumenCarga(r, cargadas, seg) {
                 + `registros nuevos durante la descarga, o que alguna página viniera vacía.`
         };
     }
-    return { nivel: "ok", texto: `✔ ${f(cargadas)} registros de Genesis en ${seg} s.` };
+    return { nivel: "ok", texto: `✔ ${f(cargadas)} registros de Genesis${r.tope ? " (todos los que hay)" : ""} en ${seg} s.` };
+}
+
+/** Lo que queda escrito bajo los botones mientras haya datos: qué es lo que
+    se está viendo. Una carga con tope no debe poder confundirse con la
+    completa. {texto, tope:boolean} */
+function notaDeCarga(r, cargadas, modo) {
+    const f = n => n.toLocaleString("es-CO");
+    if (r.rango) {
+        return { texto: `Viendo ${f(cargadas)} registros del ${r.rango.desde} al ${r.rango.hasta}`
+            + (r.completo ? "." : " (carga cancelada: puede faltar lo último)."), tope: !r.completo };
+    }
+    if (modo === "ultimos") {
+        return r.topeAlcanzado
+            ? { texto: `Viendo los ${f(cargadas)} registros más nuevos de ${f(r.total)}. Elige un rango de fechas para ver más.`, tope: true }
+            : { texto: r.completo
+                ? `Viendo los ${f(cargadas)} registros que hay.`
+                : `Viendo ${f(cargadas)} registros (carga cancelada).`, tope: !r.completo };
+    }
+    return { texto: `Viendo ${f(cargadas)} de ${f(r.total)} registros${r.completo ? " (todo el log)" : " (carga cancelada)"}.`, tope: !r.completo };
 }
 
 /** Qué se cargó, para el resumen del paso 2. */
 let etiquetaCarga = "";
 
-/** Carga el log de Genesis. Por defecto, el RANGO de los dos campos de
-    fecha; con `{ todo: true }`, todo el log sin rango (lento, y por eso va
-    por otro botón). */
+/** Los tres modos de carga y el botón de cada uno. */
+const MODOS_CARGA = { ultimos: "#btnCargar", rango: "#btnCargarRango", todo: "#btnCargarTodo" };
+
+/** Cuántos registros trae «los más nuevos». Sale de GENESIS.CONFIG: es la
+    decisión de ese módulo, no se repite aquí a mano. */
+const topeUltimos = () => Number(GENESIS.CONFIG.topeRegistros) || 2000;
+
+/** Carga el log de Genesis.
+    `opciones.modo`:
+      · "ultimos" (por defecto) los N más nuevos;
+      · "rango"   el rango de los dos campos de fecha, sin tope;
+      · "todo"    todo el log, sin rango ni tope (lento). */
 async function cargarGenesis(opciones) {
-    const todo = !!(opciones && opciones.todo);
+    const modo = (opciones && opciones.modo) || "ultimos";
+    if (!MODOS_CARGA[modo]) throw new Error("Modo de carga desconocido: " + modo);
     if (cargando) { MEUI.toast("Ya hay una carga en curso.", "warn"); return; }
     if (!GENESIS.auth.token) {
         MEUI.toast("Inicia la sesión de Genesis primero.", "warn");
@@ -363,29 +440,33 @@ async function cargarGenesis(opciones) {
     // Se valida el rango ANTES de tocar nada: un «hasta» anterior a «desde»
     // no debe vaciar la tabla ni gastar una sola consulta.
     let rango = null;
-    if (!todo) {
+    if (modo === "rango") {
         const info = actualizarAvisoRango();
         if (!info.ok) { MEUI.toast(info.texto, "err"); return; }
         rango = { desde: info.desde, hasta: info.hasta };
     }
+    const tope = modo === "ultimos" ? topeUltimos() : 0;
 
     cargando = true; cancelar = false;
-    const btn = todo ? "#btnCargarTodo" : "#btnCargar";
+    const btn = MODOS_CARGA[modo];
     MEUI.ocupado(btn, "Cargando…");
     MEUI.$("#btnCancelar").classList.remove("d-none");
+    ponerNotaCarga("", false);
 
     const t0 = performance.now();
     try {
-        MEUI.log(todo
-            ? "Cargando TODO el log de titularidad de Genesis (sin rango)…"
-            : `Cargando el log de titularidad de Genesis: ${rango.desde} a ${rango.hasta}…`, "info");
+        MEUI.log(modo === "todo" ? "Cargando TODO el log de titularidad de Genesis (sin rango ni tope)…"
+            : modo === "rango" ? `Cargando el log de titularidad de Genesis: ${rango.desde} a ${rango.hasta}…`
+            : `Cargando los ${tope.toLocaleString("es-CO")} registros más nuevos del log de titularidad de Genesis…`, "info");
 
         // Se empieza de cero: una carga nueva reemplaza lo anterior, no se
         // suma a ello.
         filas = [];
         porLinea = new Map();
         nOcultas = 0;
-        etiquetaCarga = todo ? "todo el log" : `${rango.desde} a ${rango.hasta}`;
+        etiquetaCarga = modo === "todo" ? "todo el log"
+            : modo === "rango" ? `${rango.desde} a ${rango.hasta}`
+            : `los ${tope.toLocaleString("es-CO")} más nuevos`;
         // Sin `render()` aquí: la tabla sigue mostrando lo anterior hasta que
         // llega la primera tanda (que la reemplaza). Repintar ahora sería un
         // dibujado más, vacío, justo antes del primero de verdad.
@@ -416,17 +497,18 @@ async function cargarGenesis(opciones) {
             },
 
             alProgresar: p => progreso(textoProgreso(p), porcentajeProgreso(p))
-        }, rango || {}));
+        }, rango || {}, tope ? { tope } : {}));
 
         // Solo si la carga terminó: una carga cancelada sin filas no es «no hay registros».
-        if (!filas.length) textoVacio(!r.completo ? null : todo
-            ? "Genesis no devolvió registros."
-            : `Genesis no devolvió registros entre <strong>${esc(rango.desde)}</strong> y <strong>${esc(rango.hasta)}</strong>. Prueba con otro rango.`);
+        if (!filas.length) textoVacio(!r.completo ? null : modo === "rango"
+            ? `Genesis no devolvió registros entre <strong>${esc(rango.desde)}</strong> y <strong>${esc(rango.hasta)}</strong>. Prueba con otro rango.`
+            : "Genesis no devolvió registros.");
         render();   // el pintado final, ya con todo
 
         const seg = ((performance.now() - t0) / 1000).toFixed(1);
         const fin = resumenCarga(r, filas.length, seg);
         MEUI.log(fin.texto, fin.nivel);
+        if (filas.length) { const n = notaDeCarga(r, filas.length, modo); ponerNotaCarga(n.texto, n.tope); }
         if (!r.completo) MEUI.toast("Carga cancelada; se conserva lo que alcanzó a llegar.", "warn");
     } catch (e) {
         MEUI.log("✖ No se pudo cargar Genesis: " + e.message, "err");
@@ -437,8 +519,16 @@ async function cargarGenesis(opciones) {
         progreso("");
         MEUI.libre(btn);
         MEUI.$("#btnCancelar").classList.add("d-none");
-        actualizarAvisoRango();    // devuelve el botón a lo que digan las fechas
+        actualizarAvisoRango();    // devuelve el botón de rango a lo que digan las fechas
     }
+}
+
+/** La nota fija bajo los botones (paso 2). `tope` la resalta: lo que se ve no es todo. */
+function ponerNotaCarga(texto, tope) {
+    const e = MEUI.$("#cargaNota");
+    if (!e) return;
+    ponerTexto(e, texto);
+    e.className = "carga-nota mt-2" + (tope ? " tope" : "");
 }
 
 /* =====================================================================
@@ -779,7 +869,10 @@ const COLUMNAS = [
     { title: "Línea", data: "linea", render: l => `<span class="me-mono">${esc(l)}</span>` },
     { title: "Operación", data: "operacion", render: v => badge(v, v === "Bloqueo" ? "err" : "ok") },
     { title: "Resultado", data: "resultadoTexto", render: (v, t, f) => badge(v, infoResultado(f.resultado).clase) },
-    { title: "Fecha", data: "fecha", plano: true, render: v => `<span class="me-mono">${esc(String(v).replace("T", " ").slice(0, 19))}</span>` },
+    // `orderSequence` sin el estado «sin orden»: con DataTables 2 el tercer clic
+    // quita el orden, y como lo más nuevo primero ya es el de respaldo, el
+    // primer clic sobre «Fecha» (ya en descendente) parecería no hacer nada.
+    { title: "Fecha", data: "fecha", plano: true, orderSequence: ["desc", "asc"], render: v => `<span class="me-mono">${esc(String(v).replace("T", " ").slice(0, 19))}</span>` },
     { title: "HLR/HSS", data: "hlrUbicacion", render: (v, t, f) => v ? badge(v, CLASE_UBICACION[v]) : celdaPaso(f.hlrPaso, f.hlrError) },
     { title: "Estado línea (CM)", data: "cmEstado", render: (v, t, f) => v ? badge(v, CLASE_ESTADO_CM[v]) : celdaPaso(f.cmPaso, f.cmError) },
     { title: "Claro", data: "hlrClaro", render: v => esc(v || "—") },
@@ -1094,10 +1187,17 @@ function cuerpoScroll() {
     return t ? t.closest(".dt-scroll-body") : null;
 }
 
-/** Dibuja la página actual SIN perder el scroll. DataTables reemplaza las
-    filas y el cuerpo se encoge un instante: el navegador manda el scroll al
-    principio, y con la carga repintando cada pocos segundos eso se veía como
-    «salta al principio varias veces». */
+/** Dibuja la página actual conservando el scroll del cuerpo de la tabla.
+
+    Es un seguro, no la causa demostrada: medido en Chromium con DataTables
+    2.3.2 real, el scroll del cuerpo sobrevivía a un `draw(false)` incluso
+    antes de este cambio (ver doc/titularidad/README.md), así que lo de
+    «salta al principio» que reporta el analista puede venir de otro lado
+    (la página, el panel lateral, o que Edge/CSS reales se comporten
+    distinto). Esto cubre el caso en que DataTables o el navegador SÍ lo
+    reinicien al reemplazar las filas: se lee antes y se devuelve después,
+    solo si lo que se dibujó es la misma vista (misma página, orden y
+    filtros). Si cambió la vista, arrancar arriba es lo esperado. */
 function dibujar() {
     const cuerpo = cuerpoScroll();
     const arriba = cuerpo ? cuerpo.scrollTop : 0;
@@ -1203,8 +1303,42 @@ function filasParaExportar() { return exportables(); }
 /* =====================================================================
    12 · DETALLE DE UNA FILA
    El SOAP crudo no se guarda en memoria (ver genesis-api.js): se vuelve a
-   pedir la página de ese id cuando alguien lo abre.
+   pedir cuando alguien abre la fila.
+
+   `GENESIS.detalleDe` calcula la página como ceil(id / tamaño), lo que solo
+   vale con orden ascendente, ids correlativos y un servidor que conceda el
+   tamaño pedido. Genesis ordena DESC y concede 100 aunque se pidan 500, así
+   que esa cuenta cae en otra página y casi nunca encuentra el registro
+   (medido con un servidor simulado que respeta el orden). Aquí se busca
+   dentro del DÍA de la fila: es el filtro confirmado, deja unos cientos de
+   registros (pocas páginas) y no depende del orden ni del tamaño concedido.
 ===================================================================== */
+async function buscarEnSuDia(f, tamPedido) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f.fecha || ""));
+    if (!m || typeof GENESIS.pedirPagina !== "function") return null;
+    const filtro = {
+        filter: "FechaHoraTransaccion",
+        filterValue: GENESIS.fechaGenesis({ y: +m[1], m: +m[2], d: +m[3] }),
+        valor: null, valor2: null
+    };
+    const MAX_PAGINAS = 40;            // un día con más de ~4.000 registros no es normal: no insistir
+    let paginas = 1;
+    for (let n = 1; n <= paginas && n <= MAX_PAGINAS; n++) {
+        const p = await GENESIS.pedirPagina(n, tamPedido, filtro);
+        const hit = p.items.find(x => String(x.id) === String(f.id));
+        if (hit) return hit;
+        if (n === 1) {
+            // Se recorre con el tamaño que CONCEDE el servidor, no con el pedido.
+            const eco = Number(p.paginacion && p.paginacion.pageSize) || p.items.length;
+            const tam = p.items.length ? Math.min(eco, p.items.length) : tamPedido;
+            const total = Number(p.paginacion && p.paginacion.count) || p.items.length;
+            paginas = Math.max(1, Math.ceil(total / Math.max(1, tam)));
+        }
+        if (!p.items.length) break;
+    }
+    return null;
+}
+
 async function verDetalle(id) {
     const f = filas.find(x => String(x.__id) === String(id));
     if (!f) return;
@@ -1223,7 +1357,9 @@ async function verDetalle(id) {
     MEUI.$("#mdCrudo").textContent = "Pidiendo el detalle a Genesis…";
     new bootstrap.Modal("#modalDetalle").show();
     try {
-        const d = await GENESIS.detalleDe(f.id, Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis);
+        const tam = Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis;
+        // Primero dentro de SU día; si no aparece, el método general de GENESIS.
+        const d = (await buscarEnSuDia(f, tam)) || await GENESIS.detalleDe(f.id, tam);
         MEUI.$("#mdCrudo").textContent = d
             ? `--- request ---\n${d.request || "(vacío)"}\n\n--- response ---\n${d.response || "(vacío)"}`
             : "Genesis ya no devuelve ese registro en la página esperada.";
@@ -1264,6 +1400,9 @@ function inicializarTitularidad() {
     if (d && !d.value) d.value = mes.desde;
     if (h && !h.value) h.value = mes.hasta;
     actualizarAvisoRango();
+    // El botón por defecto dice cuántos trae, con el tope de GENESIS.CONFIG.
+    const b = MEUI.$("#btnCargar");
+    if (b) b.textContent = `Cargar los últimos ${topeUltimos().toLocaleString("es-CO")}`;
     llenarOperadores();
     render();   // deja la tabla montada y el mensaje de «sin datos» a la vista
 }
