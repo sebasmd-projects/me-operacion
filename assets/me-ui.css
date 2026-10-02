@@ -362,6 +362,17 @@ code.me-mono {
     box-shadow: 0 0 0 3px rgba(196, 48, 37, .16);
 }
 
+/* Sesión OPCIONAL y sin iniciar: el chip se ve, pero apagado, para que no
+   parezca un error ni una tarea pendiente. En cuanto se inicia (ok / warn /
+   err) vuelve al aspecto normal, porque entonces su estado SÍ importa. */
+.me-sesion[data-me-opcional="1"][data-estado="off"] {
+    opacity: .55;
+}
+
+.me-sesion[data-me-opcional="1"][data-estado="off"]:hover {
+    opacity: 1;
+}
+
 .me-sesion .me-sesion-quien {
     font-weight: 600;
 }

@@ -94,7 +94,14 @@
   const CFG = {
     app: "", version: "1.0", titulo: document.title || "Herramienta",
     descripcion: "", marca: "Herramientas", submarca: "Operación · Móvil Éxito",
-    sesiones: ["sime", "cm"],      // qué chips se muestran en la cabecera
+    sesiones: ["sime", "cm"],      // sesiones NECESARIAS: sin ellas la herramienta no sirve
+
+    /* Sesiones OPCIONALES. Sale su chip y se puede iniciar, pero la
+       herramienta no las exige para abrirse. Es para los sistemas que solo
+       usa parte de la gente: Genesis, por ejemplo, requiere un login
+       corporativo con 2FA que muchos analistas no tienen, y pedírselo a todos
+       al entrar convierte un paso opcional en un muro. */
+    sesionesOpcionales: [],
     instrucciones: [],             // líneas que abren el registro
     doc: "",                       // README.md de la herramienta (pie + modal XL)
     apps: APPS,
@@ -237,9 +244,20 @@
         </a>`).join("")}`).join("");
   }
 
+  /** Las necesarias y las opcionales, en ese orden y sin repetidas. */
+  function todasLasSesiones() {
+    const vistas = new Set();
+    return [].concat(CFG.sesiones || [], CFG.sesionesOpcionales || [])
+      .filter(c => c && !vistas.has(c) && vistas.add(c));
+  }
+
+  const esOpcional = clave => (CFG.sesionesOpcionales || []).indexOf(clave) >= 0;
+
   function chipHTML(clave) {
+    const opc = esOpcional(clave);
     return `<button type="button" class="me-sesion" data-me-sesion="${clave}" data-estado="off"
-              title="Sesión ${esc(NOMBRE_SESION[clave] || clave)}">
+              ${opc ? 'data-me-opcional="1"' : ""}
+              title="Sesión ${esc(NOMBRE_SESION[clave] || clave)}${opc ? " (opcional)" : ""}">
         <span class="me-dot"></span>
         <span class="me-sesion-txt">
           <span class="me-sesion-quien">${esc(NOMBRE_SESION[clave] || clave)}</span>
@@ -284,7 +302,7 @@
             <small>${esc(CFG.descripcion)}</small>
           </div>
           <div class="me-top-derecha">
-            ${CFG.sesiones.map(chipHTML).join("")}
+            ${todasLasSesiones().map(chipHTML).join("")}
           </div>
         </header>
         <div class="me-content" id="meContent"></div>
@@ -445,7 +463,7 @@
   const fotoSesion = {};
 
   function pintarSesiones() {
-    CFG.sesiones.forEach(clave => {
+    todasLasSesiones().forEach(clave => {
       const chip = $(`[data-me-sesion="${clave}"]`);
       if (!chip) return;
       const st = sesion.estado(clave);
@@ -461,7 +479,7 @@
       reloj.textContent = st.restan !== null
         ? (st.restan > 0 ? " · " + st.restan + "s" : " · expirada")
         : (st.estado === "ok" ? " · activa" : st.estado === "err" ? " · expirada" : " · sin sesión");
-      chip.title = `${NOMBRE_SESION[clave] || clave} — ` + ({
+      chip.title = `${NOMBRE_SESION[clave] || clave}${esOpcional(clave) ? " (opcional)" : ""} — ` + ({
         ok: "sesión activa", warn: "por expirar", err: "sesión expirada", off: "sin sesión"
       })[st.estado] + " · clic para iniciar o cerrar sesión";
 
@@ -643,8 +661,11 @@
     aplicar(leer("me.pasos") === "mini");
   }
 
+  /** ¿Se puede trabajar? Solo lo deciden las sesiones NECESARIAS. Una
+      opcional sin iniciar no bloquea nada: quien la necesite la inicia desde
+      su chip cuando le toque. */
   function haySesionValida() {
-    return CFG.sesiones.every(c => {
+    return (CFG.sesiones || []).every(c => {
       const e = sesion.estado(c).estado;
       return e === "ok" || e === "warn";
     });
@@ -1099,6 +1120,9 @@
     separador, exportarCSV, exportarXLSX, exportarJSON, descargar,
     montarPasos, aplicarAperturaPasos, montarTogglePasos,
     almacenBloqueado: () => almacenBloqueado,
+
+    /** ¿Están listas las sesiones NECESARIAS? Las opcionales no cuentan. */
+    haySesionValida, sesionOpcional: esOpcional,
 
     /** Texto gris al lado del título de un paso ("41 líneas · hoja Datos"). */
     resumenPaso(nPaso, texto) {

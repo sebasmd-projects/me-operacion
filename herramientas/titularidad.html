@@ -459,7 +459,12 @@
             doc: "../doc/titularidad/README.md",
             titulo: "Titularidad · Bloqueos de SIM",
             descripcion: "Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS",
-            sesiones: ["genesis", "cm"],
+            /* El CM es necesario: sin él la herramienta no puede resolver el
+               estado de una línea. Genesis es OPCIONAL: su login es el
+               corporativo con 2FA y no todos lo tienen, así que el chip sale
+               apagado y se inicia solo cuando alguien va a cargar el log. */
+            sesiones: ["cm"],
+            sesionesOpcionales: ["genesis"],
             instrucciones: [
                 "Para qué sirve: la mayoría de las llamadas por «me bloquearon la SIM» vienen del proceso de comprobación de titularidad. Genesis dice qué pasó, pero no en qué red está la línea; sin eso no se cierra la llamada.",
                 "1 · Conexión: Genesis es obligatoria. Si el usuario y la contraseña no funcionan, el realm solo permite el flujo del navegador: abre Genesis, copia el token de una petición y pégalo. El CM es opcional y solo hace falta para el titular y el estado de la línea.",
