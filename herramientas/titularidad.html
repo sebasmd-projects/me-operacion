@@ -224,6 +224,25 @@
             opacity: .88;
         }
 
+        /* Secundario a propósito: el paso 1 (arrastrar el favorito) es el que
+           tiene que destacar; esto solo abre Genesis si no lo tienes abierto. */
+        .g-favorito-abrir {
+            display: inline-block;
+            padding: .28rem .65rem;
+            border: 1px solid var(--me-borde);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--me-negro);
+            font-size: .78rem;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .g-favorito-abrir:hover {
+            color: var(--me-negro);
+            background: var(--me-fondo-suave, #f6f6f4);
+        }
+
         .g-avanzado>summary {
             font-size: .78rem;
             color: var(--me-suave);
@@ -414,6 +433,15 @@
                             <div class="g-favorito-txt">
                                 En tu pestaña de <b>Genesis</b>, púlsalo: copia el token solo. Vuelve aquí y pega
                                 (<kbd>Ctrl</kbd>+<kbd>V</kbd>).
+                                <div class="mt-2">
+                                    <!-- rel="noopener": sin esto, la pestaña que se abre recibe un
+                                         `window.opener` que apunta aquí y podría navegar esta página. -->
+                                    <a class="g-favorito-abrir" id="abrirGenesis" target="_blank"
+                                        rel="noopener noreferrer"
+                                        href="https://genesisme.grupo-exito.com/apimew/genesis/shell/">
+                                        <i class="bi bi-box-arrow-up-right"></i> Abrir Genesis
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
