@@ -335,7 +335,7 @@ Audio a MP3 1.0.0 · Base compartida/lanzador 3.0.0.
   justo antes de enviar; nota obligatoria.
 - «Activar» (`10005`) no está incluido: no hay captura de esa orden.
 
-### Titularidad · Bloqueos de SIM (1.0.0)
+### Titularidad · Bloqueos de SIM (1.1.0)
 
 - Única herramienta que habla con **Genesis** (`tulio.grupo-exito.com/apimew`,
   ruta `/RXDUURMWEECCKC/FechaExpedicion`). Su paginación va en una cabecera
@@ -343,10 +343,35 @@ Audio a MP3 1.0.0 · Base compartida/lanzador 3.0.0.
   más chicas de las que se piden** (100 frente a 500 en la captura): se recorre
   con el `pageSize` que DEVUELVE, no con el pedido. Avanzar con el pedido se
   saltaría cuatro de cada cinco registros sin que nada lo avisara.
-- Orden ascendente por `id` + deduplicado: con descendente, cada registro nuevo
-  que entra durante la descarga corre las páginas y se repiten y pierden filas.
+- Orden **descendente** por `id` + deduplicado. DESC no es un gusto: es el
+  único `sortOrder` que hemos visto responder contra el servidor real (lo usan
+  las dos capturas, producción y QA). Lo que protegía el ascendente —que un
+  registro nuevo durante la descarga corra las páginas y se repitan o pierdan
+  filas— lo cubre el deduplicado por `id`, que es la garantía de verdad. Y a
+  cambio DESC da gratis que **la página 1 sean los más nuevos**, que es lo que
+  hace posible la carga por defecto.
+- `filterValue` es un **«contiene»**, no una igualdad: filtra sobre la fecha ya
+  formateada `dd/MM/yyyy`. Probado contra QA (02/10/2026, con `pageSize: 1`
+  para leer solo el `count`): `"12/03/2026"` → 200, `"03/2026"` → 200 (todo
+  marzo), `"/2026"` → 219 (todo 2026). Por eso un rango **no** se recorre día
+  por día: se descompone en los tramos más grandes que lo cubren EXACTO (año
+  `/yyyy`, mes `MM/yyyy`, días sueltos de las puntas), y un mes cuesta **una**
+  serie de peticiones en vez de 31. Nunca se agrupa un tramo que se salga del
+  rango: para un rango que acaba el 30 de marzo no se usa `"03/2026"`, porque
+  traería el 31 que nadie pidió.
+- Tres modos de carga, y el de por defecto **no** trae todo: «los últimos N»
+  (`cargarTodo({tope})`, N en `GENESIS.CONFIG.topeRegistros`) son unas pocas
+  peticiones gracias a DESC; «cargar rango» trae el rango sin tope; «traer
+  todo» está detrás de un aviso y una casilla. Llegar al tope **no** es
+  cancelar: `completo` sigue en `true` y lo delata `topeAlcanzado`.
 - `request`/`response` (el SOAP crudo) se descartan al cargar: son ~2 KB por
-  registro y hay más de 200.000. El detalle se vuelve a pedir al abrir la fila.
+  registro y hay cientos de miles. El detalle se vuelve a pedir al abrir la
+  fila, y a `GENESIS.detalleDe(id, {fecha})` **hay que pasarle la fecha**: con
+  ella acota al día del registro (pocas páginas, exacto); sin ella adivina la
+  página desde el `id`, y con DESC y huecos de ids eso falla casi siempre.
+- El total de registros **no es una constante**: sale del `count` que devuelve
+  el servidor en cada carga. Los «208.249» que aparecen en comentarios y
+  mediciones son la foto de una captura, no un dato vigente.
 - Sesión propia (`genesis`), con **otro Keycloak** que el CM
   (`genesisv2.grupo-exito.com`, realm `GrupoExito`, cliente
   `genesismovilexito`). Desde `file://` el flujo de código no se puede

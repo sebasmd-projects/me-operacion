@@ -58,6 +58,11 @@
         rangoLargoTramos: 31,
 
 
+        /* Tope de páginas al buscar el detalle de una fila dentro de su día.
+           Un día con más de ~20.000 registros no es un día normal: si no
+           apareció, es que ya no está, y seguir pidiendo no lo va a traer. */
+        detalleMaxPaginas: 40,
+
         /* Cuántos registros trae la carga por defecto, la que no lleva
            fechas. Son los MÁS NUEVOS porque el orden es DESC, y 2.000 es lo
            que cabe en unas pocas peticiones (a 500 por página, cuatro). */
@@ -738,15 +743,81 @@
         };
     }
 
-    /** Vuelve a pedir la página donde cae un id, para ver su SOAP crudo.
-        Con orden ascendente e ids correlativos la página es calculable, pero
-        no se supone: se pide y se busca el id dentro. */
-    async function detalleDe(id, tam) {
-        const t = Math.max(1, Number(tam) || CONFIG.paginaTam);
-        const n = Math.max(1, Math.ceil(Number(id) / t));
+    /**
+     * Vuelve a pedir el registro completo de un id, para ver su SOAP crudo
+     * (`cargarTodo` descarta `request` y `response` para no cargar cientos de
+     * megas que nadie mira).
+     *
+     * @param {number|string} id
+     * @param {object|number} opciones  {fecha, tam}. Por compatibilidad, un
+     *   número se interpreta como `tam`.
+     *   - fecha: la fecha del registro. Vale el `fechaHoraTransaccion` tal
+     *     como viene ("2026-03-12T19:40:05.767"), un "YYYY-MM-DD" o un Date.
+     *     PÁSALA SIEMPRE que la tengas: es la diferencia entre encontrarlo y
+     *     no encontrarlo (abajo se explica).
+     *
+     * Con la fecha se acota al día y se recorren sus páginas: un día son
+     * cientos de registros, así que son una o dos peticiones y el resultado
+     * es exacto.
+     *
+     * Sin la fecha hay que ADIVINAR la página, y con el orden DESC adivinar
+     * es frágil: la página de un id es `ceil((idMayor - id + 1) / tam)`, que
+     * necesita saber el id mayor (una petición más) y además supone que los
+     * ids no tienen huecos. Si hay huecos —y los hay en cuanto se borra algo—
+     * el cálculo se desvía y el registro no aparece. Antes se calculaba
+     * `ceil(id / tam)`, que era lo correcto para ASCENDENTE y dejó de serlo
+     * al pasar a DESC: no encontraba nada. Por eso este camino es el de
+     * último recurso y puede devolver null legítimamente.
+     */
+    async function detalleDe(id, opciones) {
+        const o = (opciones && typeof opciones === "object") ? opciones : { tam: opciones };
+        const tamPedido = Math.max(1, Number(o.tam) || CONFIG.paginaTam);
+        const dia = o.fecha != null ? diaDe(o.fecha) : null;
+        return dia ? buscarEnElDia(id, dia, tamPedido) : adivinarPagina(id, tamPedido);
+    }
+
+    /** Tolera lo que traiga la fila: "2026-03-12T19:40:05.767", "2026-03-12"
+        o un Date. Devuelve null en vez de lanzar: no encontrar el detalle de
+        una fila no debe tumbar la pantalla. */
+    function diaDe(valor) {
+        try {
+            const v = typeof valor === "string" ? valor.slice(0, 10) : valor;
+            return partesDeFecha(v, "fecha");
+        } catch (e) { return null; }
+    }
+
+    /** Recorre las páginas de UN día buscando el id. Con el tamaño que el
+        servidor CONCEDE, no con el pedido: si se piden 500 y concede 100,
+        avanzar de 500 en 500 se saltaría cuatro de cada cinco páginas. */
+    async function buscarEnElDia(id, dia, tamPedido) {
+        const filtro = filtroDeTramo({ filtro: fechaGenesis(dia) });
+        let paginas = 1;
+        for (let n = 1; n <= paginas && n <= CONFIG.detalleMaxPaginas; n++) {
+            const p = await pedirPagina(n, tamPedido, filtro);
+            const hit = p.items.find(x => String(x.id) === String(id));
+            if (hit) return hit;
+            if (!p.items.length) break;
+            if (n === 1) {
+                const eco = Number(p.paginacion && p.paginacion.pageSize) || p.items.length;
+                const tam = Math.max(1, Math.min(eco, p.items.length));
+                const total = Number(p.paginacion && p.paginacion.count) || p.items.length;
+                paginas = Math.max(1, Math.ceil(total / tam));
+            }
+        }
+        return null;
+    }
+
+    /** Último recurso, sin fecha. Ver la advertencia de `detalleDe`. */
+    async function adivinarPagina(id, tamPedido) {
+        const cabeza = await pedirPagina(1, 1);            // con DESC, el id mayor
+        const mayor = Number(cabeza.items[0] && cabeza.items[0].id);
+        if (!mayor || !Number.isFinite(Number(id))) return null;
+        const eco = Number(cabeza.paginacion && cabeza.paginacion.pageSize) || 1;
+        const tam = Math.max(1, Math.min(tamPedido, eco === 1 ? tamPedido : eco));
+        const n = Math.max(1, Math.ceil((mayor - Number(id) + 1) / tam));
         for (const intento of [n, n + 1, n - 1]) {
             if (intento < 1) continue;
-            const p = await pedirPagina(intento, t);
+            const p = await pedirPagina(intento, tam);
             const hit = p.items.find(x => String(x.id) === String(id));
             if (hit) return hit;
         }

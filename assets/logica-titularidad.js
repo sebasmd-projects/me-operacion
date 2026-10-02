@@ -7,7 +7,7 @@
    qué red está la línea, y sin eso el asesor no puede resolver en la
    llamada. Esta herramienta junta las tres cosas en una tabla:
 
-     1. Genesis   · el bloqueo/desbloqueo y cómo terminó  (se carga al abrir)
+     1. Genesis   · el bloqueo/desbloqueo y cómo terminó  (los más nuevos, o un rango)
      2. CM        · titular, cuenta y estado de la línea   (bajo demanda)
      3. HLR/HSS   · Claro, Tigo, ambos o ninguno           (bajo demanda)
 
@@ -1305,40 +1305,11 @@ function filasParaExportar() { return exportables(); }
    El SOAP crudo no se guarda en memoria (ver genesis-api.js): se vuelve a
    pedir cuando alguien abre la fila.
 
-   `GENESIS.detalleDe` calcula la página como ceil(id / tamaño), lo que solo
-   vale con orden ascendente, ids correlativos y un servidor que conceda el
-   tamaño pedido. Genesis ordena DESC y concede 100 aunque se pidan 500, así
-   que esa cuenta cae en otra página y casi nunca encuentra el registro
-   (medido con un servidor simulado que respeta el orden). Aquí se busca
-   dentro del DÍA de la fila: es el filtro confirmado, deja unos cientos de
-   registros (pocas páginas) y no depende del orden ni del tamaño concedido.
+   Se le pasa la FECHA de la fila, y eso no es opcional: con ella
+   `GENESIS.detalleDe` acota la búsqueda al día del registro (pocas páginas,
+   resultado exacto); sin ella tiene que adivinar la página a partir del id,
+   que con el orden DESC y los huecos de ids falla casi siempre.
 ===================================================================== */
-async function buscarEnSuDia(f, tamPedido) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f.fecha || ""));
-    if (!m || typeof GENESIS.pedirPagina !== "function") return null;
-    const filtro = {
-        filter: "FechaHoraTransaccion",
-        filterValue: GENESIS.fechaGenesis({ y: +m[1], m: +m[2], d: +m[3] }),
-        valor: null, valor2: null
-    };
-    const MAX_PAGINAS = 40;            // un día con más de ~4.000 registros no es normal: no insistir
-    let paginas = 1;
-    for (let n = 1; n <= paginas && n <= MAX_PAGINAS; n++) {
-        const p = await GENESIS.pedirPagina(n, tamPedido, filtro);
-        const hit = p.items.find(x => String(x.id) === String(f.id));
-        if (hit) return hit;
-        if (n === 1) {
-            // Se recorre con el tamaño que CONCEDE el servidor, no con el pedido.
-            const eco = Number(p.paginacion && p.paginacion.pageSize) || p.items.length;
-            const tam = p.items.length ? Math.min(eco, p.items.length) : tamPedido;
-            const total = Number(p.paginacion && p.paginacion.count) || p.items.length;
-            paginas = Math.max(1, Math.ceil(total / Math.max(1, tam)));
-        }
-        if (!p.items.length) break;
-    }
-    return null;
-}
-
 async function verDetalle(id) {
     const f = filas.find(x => String(x.__id) === String(id));
     if (!f) return;
@@ -1358,8 +1329,7 @@ async function verDetalle(id) {
     new bootstrap.Modal("#modalDetalle").show();
     try {
         const tam = Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis;
-        // Primero dentro de SU día; si no aparece, el método general de GENESIS.
-        const d = (await buscarEnSuDia(f, tam)) || await GENESIS.detalleDe(f.id, tam);
+        const d = await GENESIS.detalleDe(f.id, { fecha: f.fecha, tam });
         MEUI.$("#mdCrudo").textContent = d
             ? `--- request ---\n${d.request || "(vacío)"}\n\n--- response ---\n${d.response || "(vacío)"}`
             : "Genesis ya no devuelve ese registro en la página esperada.";
