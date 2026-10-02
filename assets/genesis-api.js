@@ -284,8 +284,15 @@
            "filter": "FechaHoraTransaccion", "filterValue": "12/03/2026"
 
        con el día en dd/MM/yyyy (día/mes/año; "12/03/2026" es el 12 de marzo).
-       Con él, `count` baja a lo que tiene ese día (200 en la captura, frente
-       a 208.249 sin filtro).
+       Con él, `count` baja a lo que tiene ese día: en la captura de
+       producción, 200 ese día frente a 208.249 sin filtro.
+
+       OJO con esos 208.249: es la foto del momento en que se capturó, no una
+       constante. La tabla crece cada vez que se bloquea o desbloquea una SIM.
+       Aquí y en los comentarios aparece solo como orden de magnitud, para
+       justificar decisiones («con esto no se puede cargar todo de golpe»). El
+       código NUNCA lo supone: el total sale del `count` que devuelve el
+       servidor en la primera página de cada tramo, en cada carga.
 
        Pero `filterValue` NO es una igualdad: es un «contiene» sobre la fecha ya
        formateada como dd/MM/yyyy. Probado contra QA el 02/10/2026, con
@@ -712,7 +719,8 @@
             /* Llegar al tope NO es cancelar: es haber traído lo que se pidió.
                Por eso `completo` sigue en true y lo que se informa aparte es
                `topeAlcanzado`, para que quien llama pueda decir «2.000 de
-               208.249, los más nuevos» en vez de «carga incompleta». */
+               los N que hay, los más nuevos» —con la N que haya devuelto el
+               servidor en `total`— en vez de «carga incompleta». */
             if (topeAlcanzado) break;
         }
 
