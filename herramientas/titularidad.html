@@ -45,14 +45,39 @@
             white-space: nowrap;
         }
 
-        .badge-estado.ok { background: #E2F2E8; color: var(--me-ok); }
-        .badge-estado.off { background: #ECECEA; color: var(--me-off); }
-        .badge-estado.warn { background: #FBEED8; color: var(--me-warn); }
-        .badge-estado.info { background: #E2E9F2; color: var(--me-info); }
-        .badge-estado.err { background: #FBE2DF; color: var(--me-err); }
-        .badge-estado.neutro { background: #F0F0EC; color: var(--me-suave); }
+        .badge-estado.ok {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
 
-        .paso-pend { color: #B9B9B2; }
+        .badge-estado.off {
+            background: #ECECEA;
+            color: var(--me-off);
+        }
+
+        .badge-estado.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .badge-estado.info {
+            background: #E2E9F2;
+            color: var(--me-info);
+        }
+
+        .badge-estado.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .badge-estado.neutro {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        .paso-pend {
+            color: #B9B9B2;
+        }
 
         /* La descripción de Genesis es una frase larga; se corta en la celda
            y se ve completa en el tooltip y en el detalle. */
@@ -66,14 +91,20 @@
         }
 
         #tablaTitularidad td,
-        #tablaTitularidad th { font-size: .8rem; }
+        #tablaTitularidad th {
+            font-size: .8rem;
+        }
 
-        #progresoWrap { display: none; }
+        #progresoWrap {
+            display: none;
+        }
 
         /* Mismo lenguaje que «Estado de líneas» y «Cierre masivo de casos»:
            la fila oculta se queda a la vista, atenuada y tachada, mientras se
            pide verla con «Ver ocultas». */
-        tr.fila-oculta { opacity: .45; }
+        tr.fila-oculta {
+            opacity: .45;
+        }
 
         tr.fila-oculta td {
             text-decoration: line-through;
@@ -81,13 +112,32 @@
         }
 
         /* Qué se cargó (paso 2): la verdad sobre el tope, a la vista y no solo en el registro */
-        .carga-nota { font-size: .74rem; color: var(--me-suave); }
-        .carga-nota.tope { color: var(--me-warn); font-weight: 600; }
+        .carga-nota {
+            font-size: .74rem;
+            color: var(--me-suave);
+        }
+
+        .carga-nota.tope {
+            color: var(--me-warn);
+            font-weight: 600;
+        }
 
         /* Rango de fechas del paso 2 */
-        .rango-aviso { font-size: .74rem; color: var(--me-suave); margin-top: .35rem; }
-        .rango-aviso.largo { color: var(--me-warn); font-weight: 600; }
-        .rango-aviso.error { color: var(--me-err); font-weight: 600; }
+        .rango-aviso {
+            font-size: .74rem;
+            color: var(--me-suave);
+            margin-top: .35rem;
+        }
+
+        .rango-aviso.largo {
+            color: var(--me-warn);
+            font-weight: 600;
+        }
+
+        .rango-aviso.error {
+            color: var(--me-err);
+            font-weight: 600;
+        }
 
         .todo-aviso {
             font-size: .74rem;
@@ -110,8 +160,15 @@
             text-underline-offset: 2px;
         }
 
-        .btn-texto:hover { color: var(--me-negro); }
-        .btn-texto:disabled { color: var(--me-off); text-decoration: none; cursor: default; }
+        .btn-texto:hover {
+            color: var(--me-negro);
+        }
+
+        .btn-texto:disabled {
+            color: var(--me-off);
+            text-decoration: none;
+            cursor: default;
+        }
 
         .g-favorito {
             display: flex;
@@ -136,8 +193,16 @@
             justify-content: center;
         }
 
-        .g-favorito-txt { font-size: .8rem; line-height: 1.45; }
-        .g-favorito-nota { font-size: .72rem; color: var(--me-suave); margin-top: .35rem; }
+        .g-favorito-txt {
+            font-size: .8rem;
+            line-height: 1.45;
+        }
+
+        .g-favorito-nota {
+            font-size: .72rem;
+            color: var(--me-suave);
+            margin-top: .35rem;
+        }
 
         /* Parece un botón pero es un <a href="javascript:…">: tiene que ser un
            enlace de verdad para que arrastrarlo a la barra de favoritos cree el
@@ -154,16 +219,26 @@
             cursor: grab;
         }
 
-        .g-favorito-arrastrar:hover { color: #fff; opacity: .88; }
+        .g-favorito-arrastrar:hover {
+            color: #fff;
+            opacity: .88;
+        }
 
-        .g-avanzado > summary {
+        .g-avanzado>summary {
             font-size: .78rem;
             color: var(--me-suave);
             cursor: pointer;
         }
 
-        .ambos-bloque { flex: 0 0 100%; }
-        .ambos-porque { font-size: .72rem; color: var(--me-suave); margin: .1rem 0 0 1.5rem; }
+        .ambos-bloque {
+            flex: 0 0 100%;
+        }
+
+        .ambos-porque {
+            font-size: .72rem;
+            color: var(--me-suave);
+            margin: .1rem 0 0 1.5rem;
+        }
 
         .sesion-ayuda {
             font-size: .72rem;
@@ -186,9 +261,18 @@
             color: var(--me-suave);
         }
 
-        .modal-header { background: var(--me-negro); color: #fff; }
-        .modal-header .modal-title { font-weight: 800; }
-        .modal-header .modal-title span { color: var(--me-amarillo); }
+        .modal-header {
+            background: var(--me-negro);
+            color: #fff;
+        }
+
+        .modal-header .modal-title {
+            font-weight: 800;
+        }
+
+        .modal-header .modal-title span {
+            color: var(--me-amarillo);
+        }
 
         .dl-grid {
             display: grid;
@@ -197,8 +281,16 @@
             font-size: .82rem;
         }
 
-        .dl-grid dt { color: var(--me-suave); font-weight: 500; }
-        .dl-grid dd { font-family: var(--me-mono); margin: 0; word-break: break-word; }
+        .dl-grid dt {
+            color: var(--me-suave);
+            font-weight: 500;
+        }
+
+        .dl-grid dd {
+            font-family: var(--me-mono);
+            margin: 0;
+            word-break: break-word;
+        }
 
         #mdCrudo {
             max-height: 45vh;
@@ -359,7 +451,8 @@
                 <div class="row g-2">
                     <div class="col-12 d-flex gap-2">
                         <!-- El texto («Cargar los últimos 2.000») lo pone la lógica con el tope de GENESIS.CONFIG -->
-                        <button class="btn btn-me flex-grow-1" id="btnCargar" type="button">Cargar los más nuevos</button>
+                        <button class="btn btn-me flex-grow-1" id="btnCargar" type="button">Cargar los más
+                            nuevos</button>
                         <button class="btn btn-outline-danger d-none" id="btnCancelar" type="button">Cancelar</button>
                     </div>
 
@@ -380,7 +473,8 @@
                         <div class="rango-aviso" id="rangoAviso" aria-live="polite"></div>
                     </div>
                     <div class="col-12">
-                        <button class="btn btn-sm btn-me-ink w-100" id="btnCargarRango" type="button">Cargar rango</button>
+                        <button class="btn btn-sm btn-me-ink w-100" id="btnCargarRango" type="button">Cargar
+                            rango</button>
                     </div>
 
                     <div class="col-6">
@@ -390,15 +484,16 @@
                     </div>
                     <div class="col-6">
                         <label class="me-lbl" for="cfgConcurrencia">HLR en paralelo</label>
-                        <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono"
-                            value="5" min="1" max="15">
+                        <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono" value="5"
+                            min="1" max="15">
                     </div>
                     <div class="col-12">
                         <!-- Traer TODO sin rango existe, pero cerrado y con casilla de
                              confirmación: son miles de peticiones y 5 a 10 minutos. No
                              debe ser el camino fácil ni uno que se lance por accidente. -->
                         <details id="detTodo">
-                            <summary class="me-hint" style="cursor:pointer">Traer todo el log, sin rango ni tope…</summary>
+                            <summary class="me-hint" style="cursor:pointer">Traer todo el log, sin rango ni tope…
+                            </summary>
                             <div class="todo-aviso">
                                 Son más de 200.000 registros: <strong>miles de peticiones</strong> a Genesis y
                                 entre <strong>5 y 10 minutos</strong> de espera (los más nuevos son unas pocas
@@ -410,8 +505,8 @@
                                 <label class="form-check-label small" for="chkEntiendoTodo">Entiendo cuánto tarda y
                                     quiero traerlo todo</label>
                             </div>
-                            <button class="btn btn-sm btn-me-line w-100" id="btnCargarTodo" type="button"
-                                disabled>Traer todo sin rango</button>
+                            <button class="btn btn-sm btn-me-line w-100" id="btnCargarTodo" type="button" disabled>Traer
+                                todo sin rango</button>
                         </details>
                     </div>
                 </div>
@@ -484,7 +579,8 @@
                      Estas dos acciones son para lo demás: todo lo filtrado, o el tope. -->
                 <button class="btn-texto" id="btnSelTodos" type="button" disabled>Seleccionar todos (0)</button>
                 <button class="btn-texto" id="btnSelPrimeros" type="button" disabled
-                    title="Marca las primeras filas, en el orden en que se ven, hasta el tope de consultas">Seleccionar primeros 2.000</button>
+                    title="Marca las primeras filas, en el orden en que se ven, hasta el tope de consultas">Seleccionar
+                    primeros 2.000</button>
                 <button class="btn-texto" id="btnDesmarcar" type="button">Desmarcar todo</button>
                 <span class="text-muted">|</span>
                 <button class="btn btn-sm btn-me-line" id="btnOcultarSel" type="button">Ocultar marcadas</button>
@@ -504,10 +600,10 @@
                             HLR/HSS</label>
                     </div>
                     <div class="ambos-porque" id="ambosPorque">
-                        Por qué importa: normalmente se pregunta a Tigo y <strong>solo si no la encuentra</strong>
-                        se pregunta a Claro (cascada). Así una línea dada de alta en las <strong>dos</strong> redes
-                        sale como «Tigo» y no se detecta: a Claro nunca se le preguntó. «Ambos — revisar» solo puede
-                        aparecer con esta casilla marcada (cuesta dos consultas por línea).
+                        Normalmente se pregunta a Tigo y <strong>solo si no la encuentra</strong>
+                        se pregunta a Claro. Así una línea dada de alta en las <strong>2</strong> redes
+                        sale solo como «Tigo» y no «Ambos — revisar»; aparece si esta casilla esta marcada pero es más
+                        demorado (hasta 10 veces más lento).
                     </div>
                 </div>
             </div>
@@ -515,7 +611,8 @@
             <div class="me-tabla-panel">
                 <table id="tablaTitularidad" class="table table-striped table-hover align-middle w-100"></table>
                 <div class="me-hint p-2" id="msgVacio">
-                    Inicia sesión en Genesis y presiona <strong>Cargar los más nuevos</strong> (o elige un rango de fechas). Después marca
+                    Inicia sesión en Genesis y presiona <strong>Cargar los más nuevos</strong> (o elige un rango de
+                    fechas). Después marca
                     las líneas que te interesen y consulta su <strong>HLR/HSS</strong> (Claro / Tigo) y sus datos en
                     el <strong>CM</strong>.
                 </div>
