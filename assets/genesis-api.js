@@ -52,7 +52,17 @@
         clientId: "genesismovilexito",
 
         paginaTam: 500,      // lo que se PIDE; manda lo que el servidor conceda
-        rangoLargoDias: 93,  // más allá se avisa (no se prohíbe): cada día es al menos una consulta
+        /* Más allá de esto se avisa (no se prohíbe). Se cuenta en TRAMOS, no
+           en días: con el «contiene», un año entero es un tramo y 30 días
+           sueltos son 30. Lo que duele son las peticiones. */
+        rangoLargoTramos: 31,
+
+
+        /* Cuántos registros trae la carga por defecto, la que no lleva
+           fechas. Son los MÁS NUEVOS porque el orden es DESC, y 2.000 es lo
+           que cabe en unas pocas peticiones (a 500 por página, cuatro). */
+        topeRegistros: 2000,
+
         margenRenovacion: 30
     };
 
@@ -277,14 +287,37 @@
        Con él, `count` baja a lo que tiene ese día (200 en la captura, frente
        a 208.249 sin filtro).
 
-       NO hay ningún filtro de rango confirmado. Las capturas traen `valor` y
-       `valor2` siempre en null, y sospechamos que podrían ser desde/hasta,
-       pero NO ESTÁ PROBADO, así que no se usan: se mandan en null. Si alguien
-       consigue una captura de Genesis filtrando por un rango, `valor` y
-       `valor2` se podrían usar para colapsar el bucle de días en una sola
-       consulta (N días = N series de peticiones hoy, 1 entonces). Hasta que
-       exista esa captura, el recorrido día por día es lo único que sabemos
-       que funciona, y por eso es lo que se implementa.
+       Pero `filterValue` NO es una igualdad: es un «contiene» sobre la fecha ya
+       formateada como dd/MM/yyyy. Probado contra QA el 02/10/2026, con
+       `pageSize: 1` para leer solo el `count`:
+
+           "12/03/2026"  ->  count    200   (un día)
+           "03/2026"     ->  count    200   (todo marzo de 2026)
+           "/2026"       ->  count    219   (todo 2026)
+           "request" / "soapenv:Envelope" -> count 23.551 (la tabla entera)
+
+       Las tres primeras son coherentes entre sí: en QA, los 200 registros de
+       marzo están todos el día 12, y el año tiene 19 más en otros meses. La
+       cuarta prueba que `filter` acepta CUALQUIER campo, no solo la fecha.
+
+       La consecuencia práctica es grande: un mes NO son 31 series de
+       peticiones, es UNA. Por eso un rango no se recorre día por día a
+       ciegas, sino que se descompone en los tramos más grandes que lo
+       cubren exactamente (ver `tramosDeRango`): años completos, meses
+       completos y los días sueltos de las puntas.
+
+       Qué queda sin probar, por honestidad:
+
+         · Si el «contiene» es en cualquier posición o solo al final. Los tres
+           valores probados ("12/03/2026", "03/2026", "/2026") son los tres
+           SUFIJOS de dd/MM/yyyy, así que los datos no distinguen una cosa de
+           la otra. Da igual para lo que se usa aquí —día, mes y año son
+           sufijos—, pero significa que un "12/03" (prefijo) podría no filtrar
+           nada. No se usa.
+         · `valor` y `valor2`. Siempre llegan en null en las capturas y
+           sospechamos que son un desde/hasta, pero no está probado: se
+           mandan en null, como viaja la petición real. Con el «contiene» ya
+           no hacen falta.
     ===================================================================== */
     const dos = n => (n < 10 ? "0" : "") + n;
 
@@ -320,8 +353,9 @@
     }
 
     /**
-     * Lista los días de un rango, ambos extremos incluidos.
-     * @returns {{desde:string, hasta:string, dias:Array, largo:boolean}}
+     * Lista los días de un rango, ambos extremos incluidos. Es la base de
+     * `tramosDeRango`; para cargar, usa esa, que agrupa y pide mucho menos.
+     * @returns {{desde:string, hasta:string, dias:Array}}
      *   cada día: {y, m, d, iso:"YYYY-MM-DD", fecha:"dd/MM/yyyy"}.
      * Exige los DOS extremos: con uno solo habría que adivinar si el otro es
      * «hoy» o «el mismo día», y adivinar aquí significa traer datos que nadie
@@ -345,21 +379,91 @@
             p.fecha = fechaGenesis(p);
             dias.push(p);
         }
+        return { desde: dias[0].iso, hasta: dias[dias.length - 1].iso, dias };
+    }
+
+    /** Lo que se suma a la cabecera `pagination` para acotar a un tramo.
+        `valor` y `valor2` van en null a propósito: ver el comentario de la
+        sección. Se mandan explícitos porque así viaja la petición capturada. */
+    function filtroDeTramo(tramo) {
         return {
-            desde: dias[0].iso, hasta: dias[dias.length - 1].iso, dias,
-            largo: dias.length > CONFIG.rangoLargoDias
+            filter: "FechaHoraTransaccion",
+            filterValue: tramo.filtro,
+            valor: null,
+            valor2: null
         };
     }
 
-    /** Lo que se suma a la cabecera `pagination` para acotar a un día.
-        `valor` y `valor2` van en null a propósito: ver el comentario de la
-        sección. Se mandan explícitos porque así viaja la petición capturada. */
-    function filtroDeDia(dia) {
+    const ULTIMO_DIA = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+    /**
+     * Descompone un rango en los tramos MÁS GRANDES que lo cubren exacto, sin
+     * sobrar ni faltar un día. Aprovecha que `filterValue` es un «contiene»
+     * sobre dd/MM/yyyy: un año completo se pide con "/yyyy", un mes completo
+     * con "MM/yyyy" y un día con "dd/MM/yyyy".
+     *
+     * Es una descomposición voraz de izquierda a derecha: en cada posición se
+     * intenta el tramo más grande que CABE ENTERO en el rango (año, luego mes,
+     * luego día). Eso da el mínimo de peticiones sin traer ni un registro de
+     * fuera del rango, que es la condición que no se puede negociar: pedir
+     * "03/2026" para un rango que termina el 15 de marzo traería medio mes de
+     * más, y la tabla mostraría datos que nadie pidió.
+     *
+     *   2026-03-01 .. 2026-03-31  ->  1 tramo  (mes 03/2026)      antes: 31
+     *   2026-01-01 .. 2026-12-31  ->  1 tramo  (año /2026)        antes: 365
+     *   2026-02-15 .. 2026-04-10  ->  14 días + 03/2026 + 10 días antes: 55
+     *   2026-03-12 .. 2026-03-12  ->  1 tramo  (día)              antes: 1
+     *
+     * @returns {{desde:string, hasta:string, tramos:Array, dias:number, largo:boolean}}
+     *   cada tramo: {tipo:"anio"|"mes"|"dia", filtro, etiqueta, dias,
+     *                desde:"YYYY-MM-DD", hasta:"YYYY-MM-DD"}.
+     *   `dias` (el de arriba) son los días naturales que abarca el rango, para
+     *   poder decir «un mes» o «tres meses»; `tramos.length` es lo que de
+     *   verdad cuesta en peticiones, y es lo que hay que mirar.
+     */
+    function tramosDeRango(desde, hasta) {
+        const r = rangoDias(desde, hasta);
+        const dias = r.dias;
+        const tramos = [];
+        let i = 0;
+        while (i < dias.length) {
+            const p = dias[i];
+            const quedan = dias.length - i;
+
+            // ¿Cabe el año entero? Solo si empieza el 1 de enero y el 31 de
+            // diciembre de ese año sigue dentro del rango.
+            const delAnio = ((p.y % 4 === 0 && p.y % 100 !== 0) || p.y % 400 === 0) ? 366 : 365;
+            if (p.m === 1 && p.d === 1 && quedan >= delAnio) {
+                tramos.push({
+                    tipo: "anio", filtro: `/${p.y}`, etiqueta: String(p.y),
+                    dias: delAnio, desde: p.iso, hasta: dias[i + delAnio - 1].iso
+                });
+                i += delAnio;
+                continue;
+            }
+
+            const delMes = ULTIMO_DIA(p.y, p.m);
+            if (p.d === 1 && quedan >= delMes) {
+                tramos.push({
+                    tipo: "mes", filtro: `${dos(p.m)}/${p.y}`, etiqueta: `${dos(p.m)}/${p.y}`,
+                    dias: delMes, desde: p.iso, hasta: dias[i + delMes - 1].iso
+                });
+                i += delMes;
+                continue;
+            }
+
+            tramos.push({
+                tipo: "dia", filtro: p.fecha, etiqueta: p.fecha,
+                dias: 1, desde: p.iso, hasta: p.iso
+            });
+            i += 1;
+        }
         return {
-            filter: "FechaHoraTransaccion",
-            filterValue: dia.fecha,
-            valor: null,
-            valor2: null
+            desde: r.desde, hasta: r.hasta, tramos,
+            dias: dias.length,
+            // El aviso ahora mira PETICIONES, no días: un año son 365 días y
+            // una sola petición, y avisar «365 consultas» sería mentir.
+            largo: tramos.length > CONFIG.rangoLargoTramos
         };
     }
 
@@ -368,11 +472,16 @@
        ---------------------------------------------------------------------
        Dos decisiones que importan con 200.000+ registros:
 
-       · Se ordena por id ASCENDENTE. Con DESC, cada registro nuevo que entra
-         mientras se descarga corre todas las páginas una posición y se
-         empiezan a repetir y a perder filas. Ascendente, lo nuevo se agrega
-         al final y las páginas ya leídas no se mueven. Aun así se deduplica
-         por `id`, que es la única garantía real.
+       · Se ordena por id DESCENDENTE (ver el comentario de `paginaPedida`:
+         es el único valor que hemos visto responder contra el servidor
+         real). Lo que eso cuesta —que un registro nuevo durante la descarga
+         corra las páginas y se repitan o se pierdan filas— lo cubre el
+         deduplicado por `id`, que es la única garantía real.
+
+         A cambio, DESC da gratis algo que la herramienta necesita: la
+         página 1 son los registros MÁS NUEVOS. Por eso «últimos N» (la
+         carga por defecto) es simplemente leer sin filtro hasta juntar N,
+         y no hay que recorrer 200.000 filas para ver las de hoy.
 
        · Se DESCARTAN `request` y `response`. Son el SOAP/JSON crudo de cada
          operación: unos 2 KB por registro, que a 200.000 registros son
@@ -380,12 +489,13 @@
          herramienta los vuelve a pedir, de a una página, cuando alguien abre
          el detalle de una fila.
 
-       Con rango, cada día es una serie completa e independiente de páginas
-       (con su propia primera página, su propio `count` y su propio
-       `pageSize` concedido). La deduplicación por `id` es UNA sola para toda
-       la carga y NO se reinicia por día: un registro cerca de medianoche
-       puede caer en dos consultas contiguas (zona horaria del servidor,
-       reintentos), y contarlo dos veces ensuciaría la tabla.
+       Con rango, cada TRAMO (ver `tramosDeRango`: un año, un mes o un día)
+       es una serie completa e independiente de páginas, con su propia
+       primera página, su propio `count` y su propio `pageSize` concedido.
+       La deduplicación por `id` es UNA sola para toda la carga y NO se
+       reinicia por tramo: un registro en el límite de dos tramos puede caer
+       en dos consultas contiguas (zona horaria del servidor, reintentos), y
+       contarlo dos veces ensuciaría la tabla.
     ===================================================================== */
     const LIGERO = ["id", "fechaHoraTransaccion", "tipoOperacion", "linea",
         "canal", "documento", "resultado", "usuario", "descripcionResultado"];
@@ -397,45 +507,62 @@
     }
 
     /**
-     * Trae TODAS las páginas de FechaExpedicion, o las de un rango de días.
+     * Trae las páginas de FechaExpedicion: un rango de fechas, los N más
+     * nuevos, o la tabla entera.
+     *
+     * Hay TRES formas de llamarla, y conviene elegir a conciencia:
+     *
+     *   cargarTodo({desde, hasta})  un rango, descompuesto en tramos
+     *   cargarTodo({tope: 2000})    los 2.000 más nuevos (4 peticiones)
+     *   cargarTodo({})              TODO (200.000+ registros; muy lento)
+     *
      * @param {object} opciones
      *   - desde, hasta: acotan la carga a un rango de fechas, AMBOS
      *     extremos incluidos. Cada uno es una cadena "YYYY-MM-DD" (la forma
      *     recomendada) o un Date (se usa su día LOCAL). Se piden los dos o
-     *     ninguno. Sin rango, se trae todo, como siempre. Con rango se hace
-     *     UNA SERIE DE PETICIONES POR DÍA (el filtro confirmado es de un
-     *     solo día): un mes son 31 series, no una.
+     *     ninguno. El rango se descompone en tramos (año/mes/día) con
+     *     `tramosDeRango`, así que un mes completo cuesta UNA serie de
+     *     peticiones y no 31.
+     *   - tope: corta la carga al juntar esos registros. Como el orden es
+     *     DESC, son los MÁS NUEVOS, y es la forma barata de arrancar («los
+     *     últimos 2.000» son 4 peticiones). Llegar al tope NO es cancelar:
+     *     `completo` sigue en true y lo que lo cuenta es `topeAlcanzado`.
+     *     Se combina con el rango si se quiere «los últimos N de marzo».
      *   - alLote(nuevos) con los registros NUEVOS de cada página, para que
      *     quien llama los pinte mientras siguen llegando. Si se pasa, este
      *     módulo NO se los queda: con 200.000 registros, guardarlos aquí y
      *     además en la tabla es duplicar cientos de megas para nada.
      *   - alProgresar(p) por cada página, con
      *       {leidos, total, pagina, paginas}           (siempre; no cambian)
-     *       {dia, dias, fecha, leidosDia, totalDia, fraccion}  (añadidos)
-     *     `pagina`/`paginas` son las del día en curso. `leidos` y `total` son
-     *     de TODA la carga; con rango, `total` suma los `count` de los días
-     *     ya consultados, así que CRECE a medida que se avanza (no se puede
-     *     saber lo que tiene un día sin preguntarle): no lo uses solo para un
-     *     porcentaje, para eso está `fraccion` (0 a 1, por días y páginas).
-     *     Sin rango, `dia`, `dias` y `fecha` son null y `fraccion` es
-     *     leidos/total.
-     *   - cancelado() -> true para cortar entre páginas y entre días
+     *       {tramo, tramos, etiqueta, granularidad,
+     *        leidosTramo, totalTramo, tope, fraccion}  (añadidos)
+     *     `pagina`/`paginas` son las del tramo en curso; `etiqueta` es cómo
+     *     se llama ese tramo ("12/03/2026", "03/2026", "2026") y
+     *     `granularidad` es "dia" | "mes" | "anio". `leidos` y `total` son
+     *     de TODA la carga; con rango, `total` suma los `count` de los
+     *     tramos ya consultados, así que CRECE a medida que se avanza (no se
+     *     puede saber lo que tiene un tramo sin preguntarle): no lo uses
+     *     solo para un porcentaje, para eso está `fraccion` (0 a 1). Sin
+     *     rango, `tramo`, `tramos`, `etiqueta` y `granularidad` son null.
+     *   - cancelado() -> true para cortar entre páginas y entre tramos
      *   - tam: tamaño de página a pedir (el servidor puede conceder menos)
      *   - filtro: campos extra para la cabecera `pagination`; si hay rango,
      *     `filter` y `filterValue` los pone el rango y mandan sobre estos.
      * @returns {{registros: Array, total: number, completo: boolean,
-     *            leidos: number, cancelado: boolean, rango: object|null,
-     *            diasTotal: number|null, diasRecorridos: number|null,
-     *            consultas: number, detalleDias: Array}}
+     *            leidos: number, cancelado: boolean, tope: number|null,
+     *            topeAlcanzado: boolean, rango: object|null,
+     *            tramosTotal: number|null, tramosRecorridos: number|null,
+     *            consultas: number, detalleTramos: Array}}
      *   `registros` viene vacío si se usó `alLote` (los tiene quien llamó).
-     *   `completo` es false si se canceló. Con rango: `diasRecorridos` son
-     *   los días leídos hasta el final (un día cortado a medias NO cuenta),
-     *   `diasTotal` los del rango, `rango` = {desde, hasta, largo} y
-     *   `detalleDias` = [{fecha, total, leidos, completo}] de los días que
-     *   se llegaron a consultar. `total` suma solo los días consultados: si
-     *   se canceló, los que faltaban no están en la cuenta. `consultas` es
-     *   cuántas peticiones HTTP se hicieron. Sin rango, `rango`, `diasTotal`
-     *   y `diasRecorridos` son null.
+     *   `completo` es false SOLO si se canceló (no si se llegó al tope).
+     *   Con rango: `tramosRecorridos` son los tramos leídos hasta el final
+     *   (uno cortado a medias NO cuenta), `tramosTotal` los del rango,
+     *   `rango` = {desde, hasta, dias, largo} y `detalleTramos` =
+     *   [{etiqueta, tipo, total, leidos, completo}] de los que se llegaron a
+     *   consultar. `total` suma solo los tramos consultados: si se canceló,
+     *   los que faltaban no están en la cuenta. `consultas` es cuántas
+     *   peticiones HTTP se hicieron. Sin rango, `rango`, `tramosTotal` y
+     *   `tramosRecorridos` son null.
      */
     async function cargarTodo(opciones) {
         const o = opciones || {};
@@ -447,17 +574,16 @@
         /* Se valida el rango ANTES de la primera petición: un «hasta» antes
            que «desde» o un día inexistente debe fallar sin haber gastado ni
            una consulta. */
-        const rango = (o.desde != null || o.hasta != null) ? rangoDias(o.desde, o.hasta) : null;
-        const dias = rango ? rango.dias : [null];
+        const rango = (o.desde != null || o.hasta != null) ? tramosDeRango(o.desde, o.hasta) : null;
+        const tramos = rango ? rango.tramos : [null];
         if (rango) {
-            const n = dias.length;
+            const n = tramos.length;
+            const serie = `${n} serie${n === 1 ? "" : "s"} de consultas (${rango.dias} día${rango.dias === 1 ? "" : "s"})`;
             if (rango.largo) {
-                log(`⚠ Rango de ${n} días (${rango.desde} a ${rango.hasta}): son al menos ${n} consultas `
-                    + `al servidor, una serie por día, más páginas si algún día trae mucho. `
-                    + `Va a tardar; se puede cancelar.`, "warn");
+                log(`⚠ Rango ${rango.desde} a ${rango.hasta}: ${serie}, más páginas si algún tramo `
+                    + `trae mucho. Va a tardar; se puede cancelar.`, "warn");
             } else {
-                log(`Rango ${rango.desde} a ${rango.hasta}: ${n} día${n === 1 ? "" : "s"}, `
-                    + `una serie de consultas por día.`, "info");
+                log(`Rango ${rango.desde} a ${rango.hasta}: ${serie} · ${tramos.map(t => t.etiqueta).join(", ")}.`, "info");
             }
         }
 
@@ -471,14 +597,26 @@
         let leidos = 0;
         let consultas = 0;
 
+        /* Tope de registros: la carga por defecto («los últimos N») es leer
+           sin filtro de fecha hasta juntar N. Funciona porque el orden es
+           DESC y la página 1 son los más nuevos. Se corta EXACTO en N y no
+           «en la página donde se pase», para que «últimos 2.000» sean 2.000
+           y no 2.000 y pico: la diferencia se nota en la tabla y en lo que
+           dice el contador. */
+        const tope = Math.max(0, Number(o.tope) || 0);
+        let topeAlcanzado = false;
+
         const agregar = items => {
+            const cupo = tope ? tope - leidos : Infinity;
             const nuevos = [];
             items.forEach(it => {
+                if (nuevos.length >= cupo) return;
                 if (!it || it.id == null || vistos.has(it.id)) return;
                 vistos.add(it.id);
                 nuevos.push(aligerar(it));
             });
             leidos += nuevos.length;
+            if (tope && leidos >= tope) topeAlcanzado = true;
             if (retenidos) retenidos.push(...nuevos);
             if (alLote && nuevos.length) alLote(nuevos);
             return nuevos.length;
@@ -492,26 +630,26 @@
         let completo = true;
         let totalPrevio = 0;          // suma de los `count` de los días ya cerrados
         let tamAvisado = null;        // para no repetir el aviso de página concedida en cada día
-        let diasRecorridos = 0;
-        const detalleDias = [];
+        let tramosRecorridos = 0;
+        const detalleTramos = [];
 
-        for (let i = 0; i < dias.length; i++) {
-            const dia = dias[i];
-            /* Entre días se mira `cancelado` ANTES de empezar el siguiente:
-               si no, cancelar en el último segundo de un día dispararía igual
-               la primera petición del día que viene. */
-            if (dia && cancelado()) { completo = false; break; }
+        for (let i = 0; i < tramos.length; i++) {
+            const tramo = tramos[i];
+            /* Entre tramos se mira `cancelado` ANTES de empezar el siguiente:
+               si no, cancelar en el último segundo de un tramo dispararía
+               igual la primera petición del que viene. */
+            if (tramo && cancelado()) { completo = false; break; }
 
-            const filtro = dia ? Object.assign({}, o.filtro, filtroDeDia(dia)) : o.filtro;
+            const filtro = tramo ? Object.assign({}, o.filtro, filtroDeTramo(tramo)) : o.filtro;
 
             const primera = await pedir(1, tamPedido, filtro);
-            const totalDia = Number(primera.paginacion && primera.paginacion.count) || primera.items.length;
+            const totalTramo = Number(primera.paginacion && primera.paginacion.count) || primera.items.length;
 
             /* Cuánto concedió DE VERDAD el servidor. Si se pide 500 y entrega 100,
                avanzar de 500 en 500 se saltaría cuatro de cada cinco registros, y
                la carga quedaría incompleta sin que nada lo avisara. Se calcula en
-               cada día, porque cada día arranca con su propia primera página y
-               nada garantiza que el servidor conceda lo mismo siempre. */
+               cada tramo, porque cada tramo arranca con su propia primera
+               página y nada garantiza que el servidor conceda lo mismo. */
             const eco = Number(primera.paginacion && primera.paginacion.pageSize) || 0;
             const tam = primera.items.length
                 ? Math.min(eco || primera.items.length, primera.items.length)
@@ -521,64 +659,74 @@
                 log(`Genesis concede páginas de ${tam} (se pidieron ${tamPedido}); se ajusta el recorrido.`, "info");
             }
 
-            const leidosAntesDia = leidos;
-            const paginas = Math.max(1, Math.ceil(totalDia / tam));
+            const leidosAntesTramo = leidos;
+            const paginas = Math.max(1, Math.ceil(totalTramo / tam));
 
             const avisar = pagina => {
-                const total = totalPrevio + totalDia;
+                const total = totalPrevio + totalTramo;
                 alProgresar({
                     leidos, total, pagina, paginas,
-                    dia: dia ? i + 1 : null,
-                    dias: dia ? dias.length : null,
-                    fecha: dia ? dia.fecha : null,
-                    leidosDia: leidos - leidosAntesDia,
-                    totalDia,
+                    tramo: tramo ? i + 1 : null,
+                    tramos: tramo ? tramos.length : null,
+                    etiqueta: tramo ? tramo.etiqueta : null,
+                    granularidad: tramo ? tramo.tipo : null,
+                    leidosTramo: leidos - leidosAntesTramo,
+                    totalTramo,
+                    tope: tope || null,
                     // Avance real de 0 a 1. Con rango el `total` va creciendo y
-                    // leidos/total daría ~100% en cada día; esto cuenta los días
-                    // cerrados más la fracción de páginas del actual.
-                    fraccion: dia
-                        ? Math.min(1, (i + pagina / paginas) / dias.length)
-                        : (total ? Math.min(1, leidos / total) : 0)
+                    // leidos/total daría ~100% en cada tramo; esto cuenta los
+                    // tramos cerrados más la fracción de páginas del actual.
+                    fraccion: tope
+                        ? Math.min(1, leidos / tope)
+                        : (tramo
+                            ? Math.min(1, (i + pagina / paginas) / tramos.length)
+                            : (total ? Math.min(1, leidos / total) : 0))
                 });
             };
 
             agregar(primera.items);
             avisar(1);
 
-            let diaCompleto = true;
-            for (let n = 2; n <= paginas; n++) {
-                if (cancelado()) { diaCompleto = false; completo = false; break; }
+            let tramoCompleto = true;
+            for (let n = 2; n <= paginas && !topeAlcanzado; n++) {
+                if (cancelado()) { tramoCompleto = false; completo = false; break; }
                 const p = await pedir(n, tam, filtro);
                 if (!p.items.length) break;          // el servidor se quedó sin datos antes de la cuenta
                 agregar(p.items);
                 avisar(n);
             }
 
-            totalPrevio += totalDia;
-            if (dia) {
-                detalleDias.push({
-                    fecha: dia.fecha, total: totalDia,
-                    leidos: leidos - leidosAntesDia, completo: diaCompleto
+            totalPrevio += totalTramo;
+            if (tramo) {
+                detalleTramos.push({
+                    etiqueta: tramo.etiqueta, tipo: tramo.tipo, total: totalTramo,
+                    leidos: leidos - leidosAntesTramo, completo: tramoCompleto
                 });
-                if (diaCompleto) {
-                    diasRecorridos++;
-                    log(`Día ${i + 1}/${dias.length} · ${dia.fecha}: ${totalDia.toLocaleString("es-CO")} registros.`, "info");
+                if (tramoCompleto) {
+                    tramosRecorridos++;
+                    log(`Tramo ${i + 1}/${tramos.length} · ${tramo.etiqueta}: `
+                        + `${totalTramo.toLocaleString("es-CO")} registros.`, "info");
                 }
             }
-            if (!diaCompleto) break;
+            if (!tramoCompleto) break;
+            /* Llegar al tope NO es cancelar: es haber traído lo que se pidió.
+               Por eso `completo` sigue en true y lo que se informa aparte es
+               `topeAlcanzado`, para que quien llama pueda decir «2.000 de
+               208.249, los más nuevos» en vez de «carga incompleta». */
+            if (topeAlcanzado) break;
         }
 
         if (rango && !completo) {
-            log(`Rango cortado: ${diasRecorridos} de ${dias.length} días leídos por completo.`, "warn");
+            log(`Rango cortado: ${tramosRecorridos} de ${tramos.length} tramos leídos por completo.`, "warn");
         }
 
         return {
             registros: retenidos || [], total: totalPrevio, completo, leidos,
-            cancelado: !completo,
-            rango: rango ? { desde: rango.desde, hasta: rango.hasta, largo: rango.largo } : null,
-            diasTotal: rango ? dias.length : null,
-            diasRecorridos: rango ? diasRecorridos : null,
-            consultas, detalleDias
+            cancelado: !completo, tope: tope || null, topeAlcanzado,
+            rango: rango ? { desde: rango.desde, hasta: rango.hasta, dias: rango.dias, largo: rango.largo } : null,
+            tramosTotal: rango ? tramos.length : null,
+            tramosRecorridos: rango ? tramosRecorridos : null,
+            consultas, detalleTramos
         };
     }
 
@@ -602,6 +750,7 @@
     global.GENESIS = {
         CONFIG, auth, cargarTodo, detalleDe, pedirPagina,
         configurar, vencimientoJwt, usuarioJwt,
-        rangoDias, fechaGenesis      // para avisar «son N consultas» ANTES de cargar
+        // para avisar «son N consultas» ANTES de cargar
+        tramosDeRango, rangoDias, fechaGenesis
     };
 })(window);
