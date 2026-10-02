@@ -257,6 +257,16 @@
         if (chk) verDetalle(chk.dataset.id);
     });
 
+    /* Conmutador Formateado | Crudo de cada bloque del detalle. Delegado en el
+       contenedor: los botones no se recrean, pero así no hay que cablear dos
+       veces lo mismo. «Copiar» no necesita nada aquí: es el .btn-copy común
+       de me-ui.js, y copia lo que el bloque muestra en ese momento. */
+    el("mdPayloads").addEventListener("click", ev => {
+        const b = ev.target.closest("[data-vista]");
+        const bloque = b && b.closest("[data-payload]");
+        if (bloque) cambiarVistaPayload(bloque.dataset.payload, b.dataset.vista);
+    });
+
     /* --- 8 · Exportación ---------------------------------------------- */
     const base = "titularidad";
     el("btnCSV").addEventListener("click", () => {

@@ -166,6 +166,7 @@ Si el navegador bloquea el almacenamiento (Edge lo hace en `file://` con la prev
 - `MEUI.parseLineas(texto)` acepta espacio, tabulación, salto de línea, `,`, `;` y `|`, y limpia `+57`, guiones y paréntesis.
 - `MEUI.leerLibro(file)` / `filasDeHoja` / `detectarColumna` leen Excel y CSV con SheetJS.
 - `MEUI.exportarCSV / exportarXLSX / exportarJSON` con separador **`;` por defecto**, cambiable desde cualquier control `data-me-sep` y compartido entre herramientas.
+- `MEUI.formatearPayload(texto)` → `{ tipo: "json"|"xml"|"texto", texto }`: sangra (2 espacios) JSON y XML/SOAP para leerlos; si no es ni uno ni otro, o está roto, devuelve el original idéntico. Función pura. `MEUI.htmlPayload({tipo, texto})` devuelve ese texto como HTML con la sintaxis pintada (clases `me-sx-*`, tokens `--me-sx-*` en `me-ui.css`); **escapa cada trozo del texto** antes de envolverlo, así que es seguro para datos de sistemas externos. Úsalas siempre juntas: no hagas `innerHTML` con texto del servidor por tu cuenta.
 
 ---
 

@@ -292,9 +292,47 @@
             word-break: break-word;
         }
 
-        #mdCrudo {
-            max-height: 45vh;
+        /* Petición y respuesta del detalle: dos bloques, cada uno con su
+           conmutador y su botón de copiar. El cuerpo del modal ya hace scroll
+           (modal-dialog-scrollable); cada bloque se topa en 32vh para que una
+           carga larga desplace por dentro y no empuje a la otra fuera de
+           alcance. Con el resumen arriba no caben los dos enteros en una
+           pantalla de ~900 px: el segundo asoma y se llega con un scroll. */
+        .payload+.payload {
+            margin-top: .9rem;
+        }
+
+        .payload-cab {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .5rem;
+            margin-bottom: .3rem;
+        }
+
+        .payload-cab h6 {
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .payload-tipo {
+            font-size: .62rem;
+            letter-spacing: .04em;
+            padding: .05rem .4rem;
+            border-radius: .3rem;
+            background: #EBEAE4;
+            color: var(--me-tinta);
+        }
+
+        .payload-cab .conmutador {
+            margin-left: auto;
+        }
+
+        .payload-pre {
+            max-height: 32vh;
+            min-height: 3rem;
             overflow: auto;
+            margin: 0;
             background: #FAFAF7;
             border: 1px solid var(--me-borde);
             border-radius: .45rem;
@@ -302,6 +340,11 @@
             font-size: .68rem;
             white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .payload-pre:empty::before {
+            content: "(vacío)";
+            color: var(--me-suave);
         }
     </style>
 </head>
@@ -634,9 +677,47 @@
                 </div>
                 <div class="modal-body">
                     <div id="mdResumen" class="mb-3"></div>
-                    <h6 class="fw-bold mb-1">Petición y respuesta en el CM <small class="text-muted fw-normal">—
-                            se vuelve a pedir a Genesis: no se guarda en memoria</small></h6>
-                    <pre id="mdCrudo" class="me-mono"></pre>
+                    <!-- No dice «en el CM»: segun el registro, lo que Genesis guardo
+                         puede ser una orden del CM (JSON) o un SOAP contra Redknee. Poner
+                         el sistema en el titulo era inexacto en la mitad de los casos. -->
+                    <h6 class="fw-bold mb-1">Petición y respuesta <small class="text-muted fw-normal">—
+                            lo que Genesis registró; se vuelve a pedir al abrir la fila porque no se
+                            guarda en memoria</small></h6>
+                    <p id="mdEstado" class="text-muted small mb-0" role="status"></p>
+                    <div id="mdPayloads" hidden>
+                        <section class="payload" data-payload="req">
+                            <div class="payload-cab">
+                                <h6>Petición</h6>
+                                <span class="payload-tipo me-mono" data-payload-tipo></span>
+                                <div class="btn-group btn-group-sm conmutador" role="group" aria-label="Vista de la petición"
+                                    data-payload-conm>
+                                    <button type="button" class="btn btn-outline-secondary active" data-vista="fmt"
+                                        aria-pressed="true">Formateado</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-vista="crudo"
+                                        aria-pressed="false">Crudo</button>
+                                </div>
+                                <button type="button" class="btn-copy" data-copy-target="mdReqTxt" data-payload-copiar
+                                    title="Copiar lo que se ve (formateado o crudo)">⧉</button>
+                            </div>
+                            <pre id="mdReqTxt" class="payload-pre me-mono"></pre>
+                        </section>
+                        <section class="payload" data-payload="res">
+                            <div class="payload-cab">
+                                <h6>Respuesta</h6>
+                                <span class="payload-tipo me-mono" data-payload-tipo></span>
+                                <div class="btn-group btn-group-sm conmutador" role="group" aria-label="Vista de la respuesta"
+                                    data-payload-conm>
+                                    <button type="button" class="btn btn-outline-secondary active" data-vista="fmt"
+                                        aria-pressed="true">Formateado</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-vista="crudo"
+                                        aria-pressed="false">Crudo</button>
+                                </div>
+                                <button type="button" class="btn-copy" data-copy-target="mdResTxt" data-payload-copiar
+                                    title="Copiar lo que se ve (formateado o crudo)">⧉</button>
+                            </div>
+                            <pre id="mdResTxt" class="payload-pre me-mono"></pre>
+                        </section>
+                    </div>
                 </div>
             </div>
         </div>

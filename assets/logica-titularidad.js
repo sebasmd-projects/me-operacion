@@ -1325,17 +1325,76 @@ async function verDetalle(id) {
           <dt>HLR/HSS</dt><dd>${esc(f.hlrUbicacion || "sin consultar")}</dd>
           <dt>Estado en el CM</dt><dd>${esc(f.cmEstado || "sin consultar")}</dd>
         </dl>`;
-    MEUI.$("#mdCrudo").textContent = "Pidiendo el detalle a Genesis…";
+    const mi = ++_detalleSeq;
+    _payloads = null;
+    mostrarEstadoDetalle("Pidiendo el detalle a Genesis…");
     new bootstrap.Modal("#modalDetalle").show();
     try {
         const tam = Number(MEUI.$("#cfgPagina").value) || CONFIG.paginaGenesis;
         const d = await GENESIS.detalleDe(f.id, { fecha: f.fecha, tam });
-        MEUI.$("#mdCrudo").textContent = d
-            ? `--- request ---\n${d.request || "(vacío)"}\n\n--- response ---\n${d.response || "(vacío)"}`
-            : "Genesis ya no devuelve ese registro en la página esperada.";
+        if (mi !== _detalleSeq) return;         // se abrió otra fila mientras esta cargaba
+        if (d) mostrarPayloads(d);
+        else mostrarEstadoDetalle("Genesis ya no devuelve ese registro en la página esperada.");
     } catch (e) {
-        MEUI.$("#mdCrudo").textContent = "No se pudo traer el detalle: " + e.message;
+        if (mi !== _detalleSeq) return;
+        mostrarEstadoDetalle("No se pudo traer el detalle: " + e.message);
     }
+}
+
+/* ---------------------------------------------------------------------
+   Petición y respuesta del detalle: dos bloques, cada uno con su vista
+   «Formateado» (sangrado y con la sintaxis pintada) o «Crudo» (tal como
+   llegó). El formateo es de MEUI.formatearPayload y el HTML con colores, de
+   MEUI.htmlPayload, que escapa todo lo que viene del servidor; aquí solo se
+   decide qué vista se ve. Se guarda únicamente el detalle abierto (el crudo
+   de miles de filas no cabe en memoria, ver genesis-api.js).
+--------------------------------------------------------------------- */
+let _payloads = null;       // { req|res: { crudo, fmt: {tipo, texto}, vista } } del detalle abierto
+let _detalleSeq = 0;        // descarta la respuesta de una fila que ya no es la abierta
+
+function mostrarEstadoDetalle(texto) {
+    MEUI.$("#mdEstado").textContent = texto;
+    MEUI.$("#mdPayloads").hidden = true;
+}
+
+function mostrarPayloads(d) {
+    const nuevo = txt => {
+        const crudo = txt === null || txt === undefined ? "" : String(txt);
+        return { crudo, fmt: MEUI.formatearPayload(crudo), vista: "fmt" };
+    };
+    _payloads = { req: nuevo(d.request), res: nuevo(d.response) };
+    MEUI.$("#mdEstado").textContent = "";
+    MEUI.$("#mdPayloads").hidden = false;
+    pintarPayload("req");
+    pintarPayload("res");
+}
+
+function pintarPayload(clave) {
+    const p = _payloads && _payloads[clave];
+    const bloque = MEUI.$(`#mdPayloads [data-payload="${clave}"]`);
+    if (!p || !bloque) return;
+    const pre = MEUI.$("pre", bloque);
+    const formateable = p.fmt.tipo !== "texto";
+    const formateado = formateable && p.vista === "fmt";
+    /* innerHTML SOLO con lo que devuelve MEUI.htmlPayload (cada trozo va por
+       esc). El crudo y el texto plano van con textContent. */
+    if (formateado) pre.innerHTML = MEUI.htmlPayload(p.fmt);
+    else pre.textContent = p.crudo;
+    MEUI.$("[data-payload-tipo]", bloque).textContent = p.crudo.trim() ? p.fmt.tipo.toUpperCase() : "";
+    MEUI.$("[data-payload-conm]", bloque).hidden = !formateable;
+    MEUI.$$("[data-vista]", bloque).forEach(b => {
+        const activo = b.dataset.vista === (formateado ? "fmt" : "crudo");
+        b.classList.toggle("active", activo);
+        b.setAttribute("aria-pressed", String(activo));
+    });
+    MEUI.$("[data-payload-copiar]", bloque).disabled = !p.crudo.trim();
+}
+
+function cambiarVistaPayload(clave, vista) {
+    const p = _payloads && _payloads[clave];
+    if (!p || (vista !== "fmt" && vista !== "crudo")) return;
+    p.vista = vista;
+    pintarPayload(clave);
 }
 
 /* =====================================================================

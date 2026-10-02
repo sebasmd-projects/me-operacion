@@ -1100,6 +1100,196 @@
   });
 
   /* =====================================================================
+     8.1 · Cargas JSON / XML legibles (petición y respuesta de los sistemas)
+     ---------------------------------------------------------------------
+     `formatearPayload(texto)` → { tipo: "json" | "xml" | "texto", texto }
+     `htmlPayload({ tipo, texto })` → HTML ya escapado, con la sintaxis pintada
+
+     Reglas que no se negocian:
+       · Funciones PURAS: no tocan el DOM ni guardan estado.
+       · Nunca lanzan ni pierden contenido: si lo recibido no es JSON ni XML
+         bien formado, `texto` vuelve IDÉNTICO al original y `tipo` es "texto".
+       · El JSON NO se re-serializa con JSON.stringify(JSON.parse(x)): eso
+         altera enteros de más de 15 dígitos, `1.0`, `1e3`, el orden de las
+         claves numéricas y las claves repetidas. Aquí se valida con
+         JSON.parse y la sangría se hace sobre el texto original, dejando
+         intactos cadenas y números tal como llegaron.
+       · El HTML sale de trocear el texto CRUDO y escapar cada trozo con `esc`
+         (también el que va entre etiquetas <span>). Nunca se aplica una
+         expresión regular sobre texto ya escapado y jamás se concatena texto
+         del servidor sin pasar por `esc`: el contenido viene de sistemas
+         externos y lleva <, > y & de verdad.
+     ===================================================================== */
+  const SANGRIA = "  ";
+
+  /** Sangra un JSON YA VALIDADO sin tocar cadenas ni números. */
+  function sangrarJSON(t) {
+    const out = []; let nivel = 0, i = 0;
+    const n = t.length;
+    const salto = () => "\n" + SANGRIA.repeat(nivel);
+    const blanco = c => c === " " || c === "\n" || c === "\r" || c === "\t";
+    while (i < n) {
+      const c = t[i];
+      if (c === '"') {
+        let j = i + 1;
+        while (j < n && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+        out.push(t.slice(i, j + 1)); i = j + 1;
+      } else if (c === "{" || c === "[") {
+        let j = i + 1;
+        while (j < n && blanco(t[j])) j++;
+        if (t[j] === (c === "{" ? "}" : "]")) { out.push(c + t[j]); i = j + 1; }   // vacío: {} / []
+        else { nivel++; out.push(c + salto()); i++; }
+      } else if (c === "}" || c === "]") {
+        nivel--; out.push(salto() + c); i++;
+      } else if (c === ",") { out.push("," + salto()); i++; }
+      else if (c === ":") { out.push(": "); i++; }
+      else if (blanco(c)) i++;
+      else {                                   // número, true, false, null
+        let j = i;
+        while (j < n && !blanco(t[j]) && ",:{}[]\"".indexOf(t[j]) < 0) j++;
+        out.push(t.slice(i, j)); i = j;
+      }
+    }
+    return out.join("");
+  }
+
+  /** Trocea XML en {k, s}: txt | com | cdata | pi | decl | open | close | self.
+      Devuelve null si algo no cuadra (etiqueta sin cerrar, `<` suelto…). */
+  function tokensXML(t) {
+    const toks = []; const n = t.length; let i = 0;
+    const hasta = (marca, desde, largo) => { const f = t.indexOf(marca, desde); return f < 0 ? -1 : f + largo; };
+    while (i < n) {
+      if (t[i] !== "<") {
+        let j = t.indexOf("<", i); if (j < 0) j = n;
+        toks.push({ k: "txt", s: t.slice(i, j) }); i = j; continue;
+      }
+      let fin, k;
+      if (t.startsWith("<!--", i)) { k = "com"; fin = hasta("-->", i + 4, 3); }
+      else if (t.startsWith("<![CDATA[", i)) { k = "cdata"; fin = hasta("]]>", i + 9, 3); }
+      else if (t.startsWith("<?", i)) { k = "pi"; fin = hasta("?>", i + 2, 2); }
+      else if (t.startsWith("<!", i)) {
+        k = "decl";                              // <!DOCTYPE …> (con o sin subconjunto interno [ … ])
+        const c = t.indexOf("[", i), g = t.indexOf(">", i);
+        fin = (c >= 0 && g >= 0 && c < g) ? hasta("]>", c, 2) : (g < 0 ? -1 : g + 1);
+      } else {
+        let j = i + 1, q = null;
+        for (; j < n; j++) {                     // `>` dentro de un atributo entrecomillado no cierra
+          const ch = t[j];
+          if (q) { if (ch === q) q = null; }
+          else if (ch === '"' || ch === "'") q = ch;
+          else if (ch === ">") break;
+          else if (ch === "<") return null;
+        }
+        if (j >= n) return null;
+        const s = t.slice(i, j + 1);
+        if (!/^<\/?[A-Za-z_:][^\s\/>]*/.test(s)) return null;      // «a < b», «<3»…: no es una etiqueta
+        k = s[1] === "/" ? "close" : (s[s.length - 2] === "/" ? "self" : "open");
+        fin = j + 1;
+      }
+      if (fin < 0) return null;
+      toks.push({ k, s: t.slice(i, fin) }); i = fin;
+    }
+    return toks;
+  }
+  const nombreEtiqueta = s => /^<\/?([^\s\/>]+)/.exec(s)[1];
+
+  /** Sangra XML bien formado. Quita solo el espacio que separa etiquetas y
+      recorta los bordes del texto; el texto, comentarios, CDATA y atributos
+      se conservan tal cual. null si no está bien formado. */
+  function sangrarXML(t) {
+    const toks = tokensXML(t);
+    if (!toks) return null;
+    const pila = [], lineas = [];
+    let hayEtiqueta = false;
+    const pon = s => lineas.push(SANGRIA.repeat(pila.length) + s);
+    for (let x = 0; x < toks.length; x++) {
+      const { k, s } = toks[x];
+      if (k === "txt") { const r = s.trim(); if (r) pon(r); continue; }
+      if (k === "open") {
+        hayEtiqueta = true;
+        /* Hoja (solo texto/CDATA/nada dentro): va en una línea, <a>valor</a>. */
+        const a = toks[x + 1], b = toks[x + 2];
+        if (a && a.k === "close" && nombreEtiqueta(a.s) === nombreEtiqueta(s)) { pon(s + a.s); x += 1; continue; }
+        if (a && b && (a.k === "txt" || a.k === "cdata") && b.k === "close" && nombreEtiqueta(b.s) === nombreEtiqueta(s)) {
+          pon(s + (a.k === "txt" ? a.s.trim() : a.s) + b.s); x += 2; continue;
+        }
+        pon(s); pila.push(nombreEtiqueta(s)); continue;
+      }
+      if (k === "close") {
+        if (!pila.length || pila.pop() !== nombreEtiqueta(s)) return null;
+        pon(s); continue;
+      }
+      if (k === "self") hayEtiqueta = true;
+      pon(s);
+    }
+    if (pila.length || !hayEtiqueta) return null;
+    return lineas.join("\n");
+  }
+
+  function formatearPayload(texto) {
+    const original = texto === null || texto === undefined ? "" : String(texto);
+    const crudo = { tipo: "texto", texto: original };
+    const t = original.trim();
+    if (!t) return crudo;
+    try {
+      if (t[0] === "{" || t[0] === "[") {
+        JSON.parse(t);                           // solo valida; lanza si está roto o truncado
+        return { tipo: "json", texto: sangrarJSON(t) };
+      }
+      if (t[0] === "<") {
+        const x = sangrarXML(t);
+        if (x !== null) return { tipo: "xml", texto: x };
+      }
+    } catch (e) { /* no era lo que parecía: se muestra tal cual */ }
+    return crudo;
+  }
+
+  /** Recorre `t` con la expresión global `re`: lo que casa va por `pinta`
+      (que decide la clase) y lo que queda en medio se escapa sin pintar. */
+  function pintarCon(t, re, pinta) {
+    let out = "", ultimo = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(t)) !== null) {
+      out += esc(t.slice(ultimo, m.index)) + pinta(m);
+      ultimo = m.index + m[0].length;
+      if (m[0].length === 0) re.lastIndex++;
+    }
+    return out + esc(t.slice(ultimo));
+  }
+  const span = (clase, txt) => `<span class="me-sx-${clase}">${esc(txt)}</span>`;
+
+  const RE_JSON = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+  const RE_ATTR = /([^\s=\/>]+)(\s*=\s*)("[^"]*"|'[^']*')/g;
+
+  function pintarEtiqueta(s) {
+    const m = /^(<\/?)([^\s\/>]+)([\s\S]*?)(\/?>)$/.exec(s);
+    if (!m) return esc(s);
+    return esc(m[1]) + span("tag", m[2])
+      + pintarCon(m[3], RE_ATTR, a => span("attr", a[1]) + esc(a[2]) + span("cadena", a[3]))
+      + esc(m[4]);
+  }
+
+  function htmlPayload(r) {
+    const tipo = r && r.tipo, t = r && r.texto !== undefined && r.texto !== null ? String(r.texto) : "";
+    if (tipo === "json") {
+      return pintarCon(t, RE_JSON, m =>
+        m[1] !== undefined ? (m[2] ? span("clave", m[1]) + esc(m[2]) : span("cadena", m[1]))
+          : span(/^[tfn]/.test(m[0]) ? "lit" : "num", m[0]));
+    }
+    if (tipo === "xml") {
+      const toks = tokensXML(t);
+      if (!toks) return esc(t);
+      return toks.map(({ k, s }) =>
+        k === "txt" ? esc(s)
+          : k === "com" ? span("com", s)
+            : k === "cdata" ? span("cadena", s)
+              : k === "pi" || k === "decl" ? span("attr", s)
+                : pintarEtiqueta(s)).join("");
+    }
+    return esc(t);
+  }
+
+  /* =====================================================================
      9 · API pública
   ===================================================================== */
   const api = {
@@ -1123,7 +1313,7 @@
     limpiarLog() { cajasLog().forEach(c => { c.innerHTML = ""; }); api.instrucciones(); },
 
     toast, ocupado, libre, conSpinner, autoSpinner, enterEjecuta, abrirDoc,
-    copiarTexto,
+    copiarTexto, formatearPayload, htmlPayload,
     tabla, registrarTabla, ajustarTabla, ajustarTablas, opcionesTabla, idiomaTabla: IDIOMA_DT,
     mostrarSiHayDatos, prepararTabla,
     parseLineas, leerLibro, filasDeHoja, detectarColumna, normalizar,

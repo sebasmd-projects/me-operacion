@@ -28,6 +28,18 @@
     --me-off: #9A9A94;
     --me-info: #2C5AA0;
 
+    /* --- Sintaxis de cargas JSON/XML (MEUI.htmlPayload).
+           Pensados para el fondo claro #FAFAF7 de los visores: todos pasan
+           4.5:1 en texto pequeño. Donde ya había un tono del semáforo se
+           reutiliza; solo número, atributo y comentario son nuevos. --- */
+    --me-sx-clave: var(--me-info);
+    --me-sx-cadena: var(--me-ok);
+    --me-sx-num: #9A5200;
+    --me-sx-lit: var(--me-err);
+    --me-sx-tag: var(--me-info);
+    --me-sx-attr: #7B3FA0;
+    --me-sx-com: #66665F;
+
     /* --- Medidas del shell --- */
     --me-side-w: 244px;
     --me-side-mini: 62px;
@@ -1232,6 +1244,17 @@ tr.me-fila-oculta td:first-child {
 .modal-header .btn-copy:hover {
     background: rgba(255, 255, 255, .35);
 }
+
+/* =====================================================================
+   11.2 · Sintaxis pintada de cargas JSON/XML (MEUI.htmlPayload)
+===================================================================== */
+.me-sx-clave { color: var(--me-sx-clave); }
+.me-sx-cadena { color: var(--me-sx-cadena); }
+.me-sx-num { color: var(--me-sx-num); }
+.me-sx-lit { color: var(--me-sx-lit); font-weight: 600; }
+.me-sx-tag { color: var(--me-sx-tag); }
+.me-sx-attr { color: var(--me-sx-attr); }
+.me-sx-com { color: var(--me-sx-com); font-style: italic; }
 
 /* =====================================================================
    12 · Menú de sesión

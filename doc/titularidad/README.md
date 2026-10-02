@@ -288,6 +288,15 @@ página como `ceil(id / tamaño)`, que solo vale con orden ascendente y un
 servidor que conceda el tamaño pedido; con `DESC` y páginas de 100, medido con
 un servidor simulado que respeta el orden, no encuentra el registro casi nunca.
 
+La petición y la respuesta salen en **dos bloques** (`#mdReqTxt`, `#mdResTxt`),
+cada uno con el conmutador **Formateado | Crudo** y un botón de copiar (que
+copia lo que el bloque muestra en ese momento). «Formateado» sangra con 2
+espacios y pinta la sintaxis; «Crudo» es el original exacto. El formateo es
+`MEUI.formatearPayload` (JSON, XML/SOAP; cualquier otra cosa o un JSON/XML
+roto o truncado se muestra tal cual). Los JSON no se re-serializan: se
+validan con `JSON.parse` y se sangra el texto original, así que enteros
+largos, `1.0` o claves repetidas llegan intactos.
+
 ### Selección y consultas (de 1 a n)
 
 La **casilla de la cabecera** marca solo **la página que se ve** (queda «a
