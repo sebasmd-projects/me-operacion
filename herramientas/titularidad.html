@@ -113,6 +113,55 @@
         .btn-texto:hover { color: var(--me-negro); }
         .btn-texto:disabled { color: var(--me-off); text-decoration: none; cursor: default; }
 
+        .g-favorito {
+            display: flex;
+            gap: .6rem;
+            align-items: flex-start;
+            background: var(--me-fondo-suave, #f6f6f4);
+            border: 1px solid var(--me-linea, #e2e2dd);
+            border-radius: 8px;
+            padding: .6rem .7rem;
+        }
+
+        .g-favorito-num {
+            flex: 0 0 1.4rem;
+            height: 1.4rem;
+            border-radius: 50%;
+            background: var(--me-negro, #1a1a1a);
+            color: #fff;
+            font-size: .78rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .g-favorito-txt { font-size: .8rem; line-height: 1.45; }
+        .g-favorito-nota { font-size: .72rem; color: var(--me-suave); margin-top: .35rem; }
+
+        /* Parece un botón pero es un <a href="javascript:…">: tiene que ser un
+           enlace de verdad para que arrastrarlo a la barra de favoritos cree el
+           favorito. Un <button> no se puede arrastrar así. */
+        .g-favorito-arrastrar {
+            display: inline-block;
+            padding: .3rem .7rem;
+            border-radius: 6px;
+            background: var(--me-negro, #1a1a1a);
+            color: #fff;
+            font-size: .78rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: grab;
+        }
+
+        .g-favorito-arrastrar:hover { color: #fff; opacity: .88; }
+
+        .g-avanzado > summary {
+            font-size: .78rem;
+            color: var(--me-suave);
+            cursor: pointer;
+        }
+
         .ambos-bloque { flex: 0 0 100%; }
         .ambos-porque { font-size: .72rem; color: var(--me-suave); margin: .1rem 0 0 1.5rem; }
 
@@ -198,33 +247,85 @@
 
             <!-- 1 · Sesiones -->
             <section data-me-paso="1" data-me-titulo="Conexión" data-me-abierto="sin-sesion">
-                <div class="me-lbl mb-1">Genesis <span class="text-muted">(obligatoria)</span></div>
+                <div class="me-lbl mb-1">Genesis <span class="text-muted">(opcional)</span></div>
                 <div class="row g-2">
-                    <div class="col-6">
-                        <label class="me-lbl" for="gUser">Usuario</label>
-                        <input class="form-control form-control-sm me-mono" id="gUser" autocomplete="username">
-                    </div>
-                    <div class="col-6">
-                        <label class="me-lbl" for="gPass">Contraseña</label>
-                        <input class="form-control form-control-sm me-mono" id="gPass" type="password"
-                            autocomplete="current-password">
-                    </div>
+
+                    <!-- Paso 1: instalar el favorito. Una sola vez en la vida. -->
                     <div class="col-12">
-                        <button class="btn btn-sm btn-me-ink w-100" id="btnLoginGenesis" type="button">Iniciar sesión en
-                            Genesis</button>
+                        <div class="g-favorito">
+                            <div class="g-favorito-num">1</div>
+                            <div class="g-favorito-txt">
+                                <b>Una sola vez:</b> arrastra este botón a la barra de favoritos de Edge.
+                                <div class="mt-2">
+                                    <a class="g-favorito-arrastrar" id="bmGenesis" href="#" draggable="true"
+                                        title="Arrástrame a la barra de favoritos">
+                                        <i class="bi bi-key"></i> Token de Genesis
+                                    </a>
+                                    <button class="btn-texto ms-2" id="btnCopiarBm" type="button">
+                                        o copia su código
+                                    </button>
+                                </div>
+                                <div class="g-favorito-nota">
+                                    Si no ves la barra de favoritos: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>.
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Paso 2: usarlo. Esto sí, cada hora. -->
                     <div class="col-12">
-                        <label class="me-lbl" for="gToken">…o pega el token de una sesión de Genesis abierta</label>
+                        <div class="g-favorito">
+                            <div class="g-favorito-num">2</div>
+                            <div class="g-favorito-txt">
+                                En tu pestaña de <b>Genesis</b>, púlsalo: copia el token solo. Vuelve aquí y pega
+                                (<kbd>Ctrl</kbd>+<kbd>V</kbd>).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="me-lbl" for="gToken">Token de Genesis</label>
                         <textarea id="gToken" class="form-control form-control-sm me-mono" rows="2"
-                            placeholder="eyJhbGciOi…"></textarea>
-                        <button class="btn btn-sm btn-me-line w-100 mt-1" id="btnTokenGenesis" type="button">Usar este
+                            placeholder="Pega aquí (Ctrl+V)"></textarea>
+                        <button class="btn btn-sm btn-me-ink w-100 mt-1" id="btnTokenGenesis" type="button">Usar este
                             token</button>
                     </div>
+
                     <div class="col-12 sesion-ayuda">
-                        Genesis inicia sesión por el navegador (flujo de código), y eso no se puede completar desde
-                        una página local. Si el usuario y la contraseña no funcionan, el realm no permite ese
-                        camino: abre Genesis, copia el token de una petición (DevTools → Red → cabecera
-                        <code>Authorization</code>) y pégalo aquí.
+                        El token dura <b>una hora</b>. Mientras tu sesión de Genesis siga abierta, el favorito saca
+                        uno nuevo <b>sin pedirte contraseña ni aprobación en el móvil</b>.
+                    </div>
+
+                    <!-- Usuario y contraseña: solo sirve para cuentas locales del realm,
+                         que no es el caso de la gente que entra con la cuenta corporativa.
+                         Se deja porque para esas cuentas sí funciona, pero plegado y con
+                         la verdad escrita, para que nadie pierda el rato probándolo. -->
+                    <div class="col-12">
+                        <details class="g-avanzado">
+                            <summary>Usuario y contraseña (casi nunca aplica)</summary>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="me-lbl" for="gUser">Usuario</label>
+                                    <input class="form-control form-control-sm me-mono" id="gUser"
+                                        autocomplete="username">
+                                </div>
+                                <div class="col-6">
+                                    <label class="me-lbl" for="gPass">Contraseña</label>
+                                    <input class="form-control form-control-sm me-mono" id="gPass" type="password"
+                                        autocomplete="current-password">
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-sm btn-me-line w-100" id="btnLoginGenesis"
+                                        type="button">Iniciar sesión en Genesis</button>
+                                </div>
+                                <div class="col-12 sesion-ayuda">
+                                    Esto solo funciona si tu cuenta existe <i>dentro</i> de Keycloak con contraseña
+                                    propia. Si entras a Genesis con la cuenta corporativa y aprobación en el móvil,
+                                    <b>no la tienes</b>: Keycloak delega en el Azure AD de la compañía y ahí no hay
+                                    contraseña que verificar. Usa el favorito de arriba.
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -483,6 +584,7 @@
     <!-- 2 · Accesos: CM, Genesis, HLR y operaciones de línea -->
     <script src="../assets/me-api.js"></script>
     <script src="../assets/genesis-api.js"></script>
+    <script src="../assets/genesis-bookmarklet.js"></script>
     <script src="../assets/hlr-consulta.js"></script>
     <script src="../assets/cm-lineas.js"></script>
 

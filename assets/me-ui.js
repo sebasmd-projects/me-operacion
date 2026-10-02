@@ -1057,15 +1057,25 @@
 
   /** Copia al portapapeles, con respaldo para contexto HTTP interno
       (páginas file:// o intranets sin HTTPS, donde navigator.clipboard falla). */
+  /** Copia al portapapeles. Resuelve si pudo y RECHAZA si no.
+      El camino bueno es la API de portapapeles, pero `file://` cuenta como
+      contexto seguro y aun así el navegador puede denegar el permiso: antes,
+      ese rechazo salía sin más y el respaldo no se llegaba a intentar. Ahora
+      se intenta igual, que es justo donde se abren estas herramientas. */
   function copiarTexto(txt) {
-    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(txt);
-    return new Promise((res, rej) => {
+    const aLaVieja = () => new Promise((res, rej) => {
       const ta = document.createElement("textarea");
       ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
       document.body.appendChild(ta); ta.focus(); ta.select();
-      try { document.execCommand("copy"); res(); } catch (err) { rej(err); }
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
       document.body.removeChild(ta);
+      ok ? res() : rej(new Error("El navegador no permitió copiar."));
     });
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(txt).catch(aLaVieja);
+    }
+    return aLaVieja();
   }
 
   /* Botón "copiar" reutilizable en cualquier herramienta: basta con

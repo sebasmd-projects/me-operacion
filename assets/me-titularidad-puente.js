@@ -73,6 +73,42 @@
     el("btnTokenGenesis").addEventListener("click", usarToken);
     MEUI.enterEjecuta(el("gPass"), el("btnLoginGenesis"));
 
+    /* Pegar y listo: si lo que cae en el campo ya es un token válido, no hace
+       falta pulsar nada más. El operador viene de copiar en otra pestaña; que
+       encima tenga que acertarle a un botón es un paso de más. Si el token no
+       vale, NO se grita: se deja el botón para que lo intente y lea el error. */
+    el("gToken").addEventListener("paste", () => setTimeout(() => {
+        if ((el("gToken").value || "").trim().length > 40) usarToken();
+    }, 0));
+
+    /* El favorito. El <a> tiene que llevar la URL `javascript:` de verdad para
+       que arrastrarlo a la barra cree el favorito; por eso se pone aquí y no en
+       el HTML, donde habría que escapar la mitad del código. */
+    (function montarFavorito() {
+        const a = el("bmGenesis"), copiar = el("btnCopiarBm");
+        if (!a || !window.GENESIS_BOOKMARKLET) return;
+        const uri = GENESIS_BOOKMARKLET.uri();
+        a.href = uri;
+        /* Pulsarlo AQUÍ no sirve de nada (esta página no es Genesis) y encima
+           navegaría fuera. Se intercepta y se explica. */
+        a.addEventListener("click", ev => {
+            ev.preventDefault();
+            MEUI.toast("Arrástralo a la barra de favoritos; luego púlsalo en la pestaña de Genesis.", "warn");
+        });
+        /* copiarTexto resuelve si pudo y RECHAZA si no (no devuelve un
+           booleano): de ahí el try/catch y no un `if`. */
+        if (copiar) copiar.addEventListener("click", async () => {
+            try {
+                await MEUI.copiarTexto(uri);
+                MEUI.toast("Código copiado. Crea un favorito y pégalo en el campo de la dirección.", "ok");
+            } catch (e) {
+                MEUI.log("✖ No se pudo copiar el favorito: " + e.message
+                    + " · el código está en assets/genesis-bookmarklet.js", "err");
+                MEUI.toast("No se pudo copiar. Mira el registro.", "err");
+            }
+        });
+    })();
+
     /* --- 2 · Sesión del CM (misma mecánica que las demás herramientas) - */
     async function entrarCm(silencioso) {
         const auth = MEAPI.auth;

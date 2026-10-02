@@ -115,3 +115,76 @@ iniciar sale al 55 % de opacidad, para que no parezca un error ni una tarea
 pendiente, y recupera su aspecto normal en cuanto se inicia, porque entonces su
 estado sí importa. Las otras herramientas no declaran `sesionesOpcionales` y se
 comportan exactamente como antes.
+
+---
+
+## 5 · Cómo entra el analista, en la práctica
+
+Decisión tomada: **nada que pedirle al equipo de Genesis y nada que el
+operador tenga que instalar o configurar.** De ahí sale el favorito
+(*bookmarklet*).
+
+### Una sola vez
+
+Arrastrar el botón «Token de Genesis» del paso 1 de la herramienta a la barra
+de favoritos de Edge (`Ctrl`+`Shift`+`B` si no se ve). Si arrastrar no va,
+el enlace «o copia su código» pone la URL en el portapapeles para pegarla en
+la dirección de un favorito nuevo.
+
+### Cada hora
+
+1. En la pestaña de Genesis que ya tiene abierta, pulsar el favorito.
+2. Vuelve a la herramienta y pega (`Ctrl`+`V`). No hay que pulsar nada más:
+   al pegar un token válido la sesión se abre sola.
+
+### Qué hace el favorito por dentro
+
+Dos caminos, el barato primero:
+
+1. **Mira lo que la app ya tiene guardado** (`sessionStorage` y
+   `localStorage`, también dentro de valores JSON). Si encuentra un access
+   token de este realm sin vencer, lo muestra y no abre ninguna ventana.
+   Descarta el `id_token` (`typ: ID`), el refresh (`typ: Refresh`), los
+   vencidos y los de otros realms: son JWT igual de válidos y **no sirven**
+   como `Authorization`.
+2. **Si no hay nada, pide uno nuevo** con `prompt=none` en una ventana
+   emergente. Como la cookie SSO de Keycloak ya está, responde con un `code`
+   nuevo **sin contraseña y sin aprobación en el móvil** (es la entrada 93 del
+   HAR). Se verifica el `state`, se cambia el `code` por el token y se copia.
+   Si no hubiera sesión, Keycloak contesta `error=login_required` y el aviso
+   dice qué hacer, en vez de abrir una pantalla de login dentro de una
+   ventanita.
+
+### Por qué un favorito y no un botón de la herramienta
+
+Porque el token vive en el origen `genesisme.grupo-exito.com` y las
+herramientas se abren con `file://`. Un botón puede abrir una ventana a
+Genesis, pero **no puede leer nada de ella**: son orígenes distintos. El
+favorito se ejecuta *dentro* de esa página, y ahí sí.
+
+Tampoco sirve un iframe oculto: la app manda `X-Frame-Options: DENY`. Una
+ventana emergente no está sujeta a eso, y es lo que se usa.
+
+### Lo que falta por confirmar
+
+Esto está probado contra un navegador simulado y contra Chromium real, con
+24 + 14 comprobaciones, **pero no contra el servidor de Genesis**, que desde
+aquí no se alcanza. Hacen falta dos cosas de una pasada de verdad:
+
+1. **Cuál de los dos caminos entra.** Si la app guarda el token en
+   `sessionStorage`, gana el primero y no se abre ninguna ventana. Si lo
+   mantiene solo en memoria, se usa el segundo.
+2. **La carrera del segundo camino.** La ventana aterriza en la app de
+   Genesis; si la app arranca antes de que leamos el fragmento, consume ella
+   el `code` (son de un solo uso). Se sondea cada 25 ms para ganar esa
+   carrera, y perderla no rompe nada: basta repetir. Si resultara que se
+   pierde a menudo, la solución limpia es pedirle al equipo de Genesis un
+   `redirect_uri` que no monte la aplicación.
+
+### Mantenimiento
+
+El código vive en `assets/genesis-bookmarklet.js` como una **función normal**,
+legible y editable. La URL `javascript:` se genera de ella con `toString()`,
+así que no hay una segunda copia que se quede atrás. Las cuatro reglas al
+editarla están en la cabecera del archivo (solo comentarios de bloque, sin
+plantillas multilínea, sin `/*` dentro de cadenas, solo ASCII).
