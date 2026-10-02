@@ -115,10 +115,50 @@ param(
     # Tope de espera para hablar con la carpeta de red. Fuera de la VPN,
     # SMB puede bloquear 20-60 s CADA acceso a la ruta; no hay que quedarse
     # esperando eso para algo que al final se genera local igual.
+    [ValidateRange(1, 3600)]
     [int]$TimeoutRed = 8
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Los errores detienen el empaquetado, pero permiten leer/copiar el detalle.
+# La seleccion y copia con el raton las administra la consola de Windows.
+trap {
+    Write-Host ""
+    Write-Host ("ERROR: {0}" -f $_.Exception.Message) -ForegroundColor Red
+    if ($_.InvocationInfo.PositionMessage) {
+        Write-Host $_.InvocationInfo.PositionMessage -ForegroundColor DarkGray
+    }
+    Write-Host ""
+    Write-Host "Para copiar: selecciona el error y usa Ctrl+C."
+    Write-Host "El clic derecho depende de la configuracion de tu consola."
+
+    $modoAnterior = $null
+    try {
+        $modoAnterior = [Console]::TreatControlCAsInput
+        [Console]::TreatControlCAsInput = $true
+        Write-Host "Presiona cualquier tecla para cerrar" -NoNewline
+        do {
+            $tecla = [Console]::ReadKey($true)
+            $esCopia = (
+                ($tecla.Modifiers -band [ConsoleModifiers]::Control) -ne 0 -and
+                $tecla.Key -eq [ConsoleKey]::C
+            )
+        } while ($esCopia)
+        Write-Host ""
+    } catch {
+        # Hosts sin ReadKey (por ejemplo ISE): alternativa con Enter.
+        Write-Host ""
+        [void](Read-Host 'Presiona Enter para cerrar')
+    } finally {
+        if ($null -ne $modoAnterior) {
+            [Console]::TreatControlCAsInput = $modoAnterior
+        }
+    }
+    # Propaga el error tras la pausa; no continua con la publicacion.
+    break
+}
+
 
 # $PSScriptRoot es scripts\ (donde vive este archivo, junto a lanzador.ps1
 # y actualizar.ps1); la raiz del proyecto (index.html, assets\, etc.) es
@@ -204,34 +244,48 @@ if ($versionNueva -le $versionActual) {
 # Devuelve 'si', 'no' o 'sinacceso' -los tres casos son distintos y el que
 # llama decide: "no existe" no es lo mismo que "no pude preguntar"-.
 function Probar-Ruta($ruta, $tipo, $timeoutSec) {
-    $ps = [PowerShell]::Create()
-    [void]$ps.AddScript('param($r, $t) Test-Path -LiteralPath $r -PathType $t').AddArgument($ruta).AddArgument($tipo)
-    $h = $ps.BeginInvoke()
-    if (-not $h.AsyncWaitHandle.WaitOne($timeoutSec * 1000)) {
-        [void]$ps.BeginStop($null, $null)
-        return 'sinacceso'
-    }
+    $ps = $null
+    $h = $null
+    $agotado = $false
     try {
-        $res = $ps.EndInvoke($h)
-        if ($ps.Streams.Error.Count -gt 0) { return 'sinacceso' }
-        if (-not $res -or $res.Count -lt 1) { return 'sinacceso' }
-        # Se desenvuelve el PSObject a proposito, igual que Leer-JsonUtf8:
-        # el runspace devuelve el booleano envuelto y no hay que depender de
-        # que la conversion implicita lo destape bien.
-        if ([bool]$res[0].psobject.BaseObject) { return 'si' }
+        $ps = [PowerShell]::Create()
+        [void]$ps.AddScript('param($r, $t) Test-Path -LiteralPath $r -PathType $t -ErrorAction Stop').AddArgument($ruta).AddArgument($tipo)
+        $h = $ps.BeginInvoke()
+        if (-not $h.AsyncWaitHandle.WaitOne($timeoutSec * 1000)) {
+            $agotado = $true
+            Write-Host ("  Tiempo agotado ({0} s) consultando: {1}" -f $timeoutSec, $ruta) -ForegroundColor Yellow
+            try { [void]$ps.BeginStop($null, $null) } catch { }
+            return 'sinacceso'
+        }
+
+        # Un resultado false ES una respuesta valida: la ruta no existe.
+        # Se comprueba la cantidad, nunca la veracidad de toda la coleccion.
+        $res = @($ps.EndInvoke($h))
+        if ($ps.Streams.Error.Count -gt 0) {
+            Write-Host ("  Error al consultar '{0}': {1}" -f $ruta, $ps.Streams.Error[0]) -ForegroundColor Yellow
+            return 'sinacceso'
+        }
+        if ($res.Count -ne 1 -or $null -eq $res[0]) {
+            Write-Host ("  Respuesta inesperada al consultar: {0}" -f $ruta) -ForegroundColor Yellow
+            return 'sinacceso'
+        }
+        $existe = [System.Management.Automation.LanguagePrimitives]::ConvertTo($res[0], [bool])
+        if ($existe) { return 'si' }
         return 'no'
     } catch {
+        Write-Host ("  Error al consultar '{0}': {1}" -f $ruta, $_.Exception.Message) -ForegroundColor Yellow
         return 'sinacceso'
     } finally {
-        $ps.Dispose()
+        # Dispose puede bloquear si SMB sigue esperando tras el timeout.
+        if ($null -ne $ps -and -not $agotado) { $ps.Dispose() }
     }
 }
 
 # ---------- 1b. Carpeta de red ----------
-# Se revisa ANTES de tocar nada (scripts\VERSION, release\): si la version
-# ya esta publicada, se detiene aqui. Sin acceso (sin VPN) no se detiene:
-# el paquete se genera igual en release\ y se avisa que hay que copiarlo.
+# Se revisa antes de generar: si no se puede consultar o el ZIP ya existe
+# sin -Forzar, se deshabilita la publicacion y se genera la copia local.
 $publicar = -not $SinPublicar
+$motivoNoPublicado = ''
 if ($publicar) {
     Write-Host ""
     Write-Host "  Comprobando la carpeta de releases..." -ForegroundColor Gray
@@ -239,23 +293,32 @@ if ($publicar) {
     if ($acceso -ne 'si') {
         Write-Host ("  ATENCION  No se pudo acceder a {0}" -f $Destino) -ForegroundColor Yellow
         if ($acceso -eq 'sinacceso') {
-            Write-Host ("            No contesto en {0} s: sin VPN, sin red o el NAS caido." -f $TimeoutRed) -ForegroundColor Yellow
+            Write-Host ("            Consulta fallida o tiempo agotado (limite {0} s); revisa el detalle anterior." -f $TimeoutRed) -ForegroundColor Yellow
         } else {
             Write-Host "            La ruta no existe (ruta mal escrita?)." -ForegroundColor Yellow
         }
         Write-Host "            El paquete se genera igual en release\ y al final se dice que copiar." -ForegroundColor Yellow
         Write-Host "            Para saltarse esta comprobacion desde el principio: -SinPublicar" -ForegroundColor DarkGray
         $publicar = $false
+        $motivoNoPublicado = "No se pudo acceder a la carpeta de red: $Destino"
     } else {
-        # La carpeta SI contesta: aqui el guardia de "version ya publicada"
-        # tiene que valerse. Si justo esta consulta falla, se para en vez de
-        # arriesgarse a pisar una release publicada.
-        $yaEsta = Probar-Ruta (Join-Path $Destino ("me-operacion-{0}.zip" -f $versionNueva)) 'Leaf' $TimeoutRed
+        # Si la consulta falla, solo se genera localmente; no se publica
+        # sin saber si el ZIP ya existe.
+        # version.json puede existir de una release anterior. Aqui se
+        # comprueba el ZIP de la NUEVA version para evitar reemplazarlo.
+        $zipAComprobar = Join-Path $Destino ("me-operacion-{0}.zip" -f $versionNueva)
+        Write-Host ("  Comprobando ZIP de la nueva version: {0}" -f $zipAComprobar) -ForegroundColor Gray
+        $yaEsta = Probar-Ruta $zipAComprobar 'Leaf' $TimeoutRed
         if ($yaEsta -eq 'sinacceso') {
-            throw ("La carpeta de red contesto pero no se pudo comprobar si la version {0} ya esta publicada. No se publica a ciegas: vuelve a intentarlo, o usa -SinPublicar para generar solo en release\." -f $versionNueva)
+            $publicar = $false
+            $motivoNoPublicado = "No se pudo comprobar si el ZIP de la version $versionNueva ya esta publicado."
+        } elseif ($yaEsta -eq 'si' -and -not $Forzar) {
+            $publicar = $false
+            $motivoNoPublicado = "El ZIP de la version $versionNueva ya existe en red. No se reemplaza sin -Forzar."
         }
-        if ($yaEsta -eq 'si' -and -not $Forzar) {
-            throw ("La version {0} ya esta publicada en la carpeta de red. No se reutiliza un numero: sube la version (o usa -Forzar si de verdad hay que reemplazarla)." -f $versionNueva)
+        if (-not $publicar) {
+            Write-Host ("  ATENCION  {0}" -f $motivoNoPublicado) -ForegroundColor Yellow
+            Write-Host "  Se generara la release local; no se publicara en red." -ForegroundColor Yellow
         }
     }
 }
@@ -394,17 +457,25 @@ Write-Host ("  OK  version.json generado (sha256 {0}...)" -f $hashZip.Substring(
 # version.json: un analista que abra dame click.bat en medio de la
 # publicacion nunca ve una version cuyo .zip no esta completo.
 if ($publicar) {
-    $zipDestino  = Join-Path $Destino $nombreZip
-    $jsonDestino = Join-Path $Destino 'version.json'
-    Write-Host "  Publicando en la carpeta de red..." -ForegroundColor Gray
-    Copy-Item -LiteralPath $rutaZip -Destination $zipDestino -Force
-    $hashCopia = (Get-FileHash -LiteralPath $zipDestino -Algorithm SHA256).Hash
-    if ($hashCopia -ne $hashZip) {
-        Remove-Item -LiteralPath $zipDestino -Force -ErrorAction SilentlyContinue
-        throw "El .zip copiado a la carpeta de red no coincide con el generado (copia incompleta). No se publico version.json: vuelve a intentarlo."
+    try {
+        $zipDestino  = Join-Path $Destino $nombreZip
+        $jsonDestino = Join-Path $Destino 'version.json'
+        Write-Host "  Publicando en la carpeta de red..." -ForegroundColor Gray
+        Copy-Item -LiteralPath $rutaZip -Destination $zipDestino -Force
+        $hashCopia = (Get-FileHash -LiteralPath $zipDestino -Algorithm SHA256).Hash
+        if ($hashCopia -ne $hashZip) {
+            Remove-Item -LiteralPath $zipDestino -Force -ErrorAction SilentlyContinue
+            throw "El .zip copiado a la carpeta de red no coincide con el generado (copia incompleta). No se publico version.json: vuelve a intentarlo."
+        }
+        [IO.File]::Copy($rutaJson, $jsonDestino, $true)
+        Write-Host ("  OK  Publicado en {0}" -f $Destino) -ForegroundColor Green
+    } catch {
+        $publicar = $false
+        $motivoNoPublicado = "Fallo la publicacion en red: {0}" -f $_.Exception.Message
+        Write-Host ""
+        Write-Host ("  ATENCION  {0}" -f $motivoNoPublicado) -ForegroundColor Yellow
+        Write-Host "  La release local ya fue generada y se conserva completa." -ForegroundColor Yellow
     }
-    [IO.File]::Copy($rutaJson, $jsonDestino, $true)
-    Write-Host ("  OK  Publicado en {0}" -f $Destino) -ForegroundColor Green
 }
 
 # ---------- 8. Instrucciones ----------
@@ -414,7 +485,8 @@ if ($publicar) {
 } elseif ($SinPublicar) {
     Write-Host "  Listo. Generado solo en release\ (-SinPublicar)." -ForegroundColor Yellow
 } else {
-    Write-Host ("  Listo. La version {0} quedo generada en release\, SIN publicar:" -f $versionNueva) -ForegroundColor Yellow
+    Write-Host ("  Motivo: {0}" -f $motivoNoPublicado) -ForegroundColor Yellow
+    Write-Host ("  Listo. La version {0} quedo generada en release\, SIN publicacion confirmada:" -f $versionNueva) -ForegroundColor Yellow
     Write-Host ("    - {0}" -f $rutaZip)
     Write-Host ("    - {0}" -f $rutaJson)
     Write-Host ""
@@ -433,3 +505,9 @@ Write-Host ""
 Write-Host "  version.json SIEMPRE se reemplaza (mismo nombre); el .zip queda" -ForegroundColor DarkGray
 Write-Host "  con nombre nuevo cada vez, no hace falta borrar los anteriores." -ForegroundColor DarkGray
 Write-Host ""
+
+# Una falla de red es recuperable: los archivos locales ya estan listos.
+# Se mantiene el aviso visible usando la misma pausa del trap general.
+if (-not $SinPublicar -and -not $publicar) {
+    throw ("La release {0} se genero localmente, pero no se confirmo la publicacion en red. Motivo: {1}{2}ZIP: {3}{2}JSON: {4}" -f $versionNueva, $motivoNoPublicado, [Environment]::NewLine, $rutaZip, $rutaJson)
+}
