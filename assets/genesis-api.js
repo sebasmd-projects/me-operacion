@@ -52,6 +52,7 @@
         clientId: "genesismovilexito",
 
         paginaTam: 500,      // lo que se PIDE; manda lo que el servidor conceda
+        rangoLargoDias: 93,  // más allá se avisa (no se prohíbe): cada día es al menos una consulta
         margenRenovacion: 30
     };
 
@@ -253,7 +254,105 @@
     }
 
     /* =====================================================================
-       3 · CARGA COMPLETA
+       3 · RANGO DE FECHAS
+       ---------------------------------------------------------------------
+       El servidor acepta, dentro de la cabecera `pagination`, un filtro de
+       UN SOLO DÍA (confirmado con una captura real):
+
+           "filter": "FechaHoraTransaccion", "filterValue": "12/03/2026"
+
+       con el día en dd/MM/yyyy (día/mes/año; "12/03/2026" es el 12 de marzo).
+       Con él, `count` baja a lo que tiene ese día (200 en la captura, frente
+       a 208.249 sin filtro).
+
+       NO hay ningún filtro de rango confirmado. Las capturas traen `valor` y
+       `valor2` siempre en null, y sospechamos que podrían ser desde/hasta,
+       pero NO ESTÁ PROBADO, así que no se usan: se mandan en null. Si alguien
+       consigue una captura de Genesis filtrando por un rango, `valor` y
+       `valor2` se podrían usar para colapsar el bucle de días en una sola
+       consulta (N días = N series de peticiones hoy, 1 entonces). Hasta que
+       exista esa captura, el recorrido día por día es lo único que sabemos
+       que funciona, y por eso es lo que se implementa.
+    ===================================================================== */
+    const dos = n => (n < 10 ? "0" : "") + n;
+
+    /** dd/MM/yyyy, el formato que el servidor espera en `filterValue`. */
+    function fechaGenesis(p) { return `${dos(p.d)}/${dos(p.m)}/${p.y}`; }
+
+    /** Convierte la entrada a {y, m, d}. Se aceptan DOS formas y se documentan
+        porque la diferencia importa:
+          · "YYYY-MM-DD" (recomendada): es el valor de un <input type="date">
+            y no hay ambigüedad de zona horaria.
+          · Date: se toman sus componentes LOCALES (el día que ve el analista
+            en su reloj, America/Bogota). OJO: `new Date("2026-03-12")` el JS
+            lo interpreta como medianoche UTC, que en Bogotá es el 11 de marzo
+            a las 19:00, y saldría el día anterior. Por eso las cadenas no se
+            pasan por `new Date`: se leen a mano. */
+    function partesDeFecha(v, nombre) {
+        let y, m, d;
+        if (v instanceof Date) {
+            if (isNaN(v.getTime())) throw new Error(`La fecha «${nombre}» no es válida.`);
+            y = v.getFullYear(); m = v.getMonth() + 1; d = v.getDate();
+        } else {
+            const x = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v == null ? "" : v).trim());
+            if (!x) throw new Error(`La fecha «${nombre}» debe ser un Date o una cadena YYYY-MM-DD.`);
+            y = Number(x[1]); m = Number(x[2]); d = Number(x[3]);
+        }
+        // Ida y vuelta por UTC: rechaza días que no existen (2026-02-30) en
+        // vez de dejar que se desborden al mes siguiente sin avisar.
+        const t = new Date(Date.UTC(y, m - 1, d));
+        if (t.getUTCFullYear() !== y || t.getUTCMonth() !== m - 1 || t.getUTCDate() !== d) {
+            throw new Error(`La fecha «${nombre}» no existe en el calendario.`);
+        }
+        return { y, m, d };
+    }
+
+    /**
+     * Lista los días de un rango, ambos extremos incluidos.
+     * @returns {{desde:string, hasta:string, dias:Array, largo:boolean}}
+     *   cada día: {y, m, d, iso:"YYYY-MM-DD", fecha:"dd/MM/yyyy"}.
+     * Exige los DOS extremos: con uno solo habría que adivinar si el otro es
+     * «hoy» o «el mismo día», y adivinar aquí significa traer datos que nadie
+     * pidió (o no traer los que sí). Un solo día se pide con desde == hasta.
+     */
+    function rangoDias(desde, hasta) {
+        if (desde == null || hasta == null) {
+            throw new Error("Un rango necesita «desde» y «hasta». Para un solo día, usa el mismo valor en los dos.");
+        }
+        const a = partesDeFecha(desde, "desde"), b = partesDeFecha(hasta, "hasta");
+        const ta = Date.UTC(a.y, a.m - 1, a.d), tb = Date.UTC(b.y, b.m - 1, b.d);
+        if (tb < ta) throw new Error("El rango está al revés: «hasta» es anterior a «desde».");
+        const dias = [];
+        // Se avanza en UTC de a 24 h exactas: en hora local, un cambio de
+        // horario (que Colombia no tiene, pero la máquina sí podría) duplicaría
+        // o saltaría un día.
+        for (let t = ta; t <= tb; t += 86400000) {
+            const f = new Date(t);
+            const p = { y: f.getUTCFullYear(), m: f.getUTCMonth() + 1, d: f.getUTCDate() };
+            p.iso = `${p.y}-${dos(p.m)}-${dos(p.d)}`;
+            p.fecha = fechaGenesis(p);
+            dias.push(p);
+        }
+        return {
+            desde: dias[0].iso, hasta: dias[dias.length - 1].iso, dias,
+            largo: dias.length > CONFIG.rangoLargoDias
+        };
+    }
+
+    /** Lo que se suma a la cabecera `pagination` para acotar a un día.
+        `valor` y `valor2` van en null a propósito: ver el comentario de la
+        sección. Se mandan explícitos porque así viaja la petición capturada. */
+    function filtroDeDia(dia) {
+        return {
+            filter: "FechaHoraTransaccion",
+            filterValue: dia.fecha,
+            valor: null,
+            valor2: null
+        };
+    }
+
+    /* =====================================================================
+       4 · CARGA COMPLETA
        ---------------------------------------------------------------------
        Dos decisiones que importan con 200.000+ registros:
 
@@ -268,6 +367,13 @@
          cientos de megas solo para tenerlos guardados sin mirarlos. La
          herramienta los vuelve a pedir, de a una página, cuando alguien abre
          el detalle de una fila.
+
+       Con rango, cada día es una serie completa e independiente de páginas
+       (con su propia primera página, su propio `count` y su propio
+       `pageSize` concedido). La deduplicación por `id` es UNA sola para toda
+       la carga y NO se reinicia por día: un registro cerca de medianoche
+       puede caer en dos consultas contiguas (zona horaria del servidor,
+       reintentos), y contarlo dos veces ensuciaría la tabla.
     ===================================================================== */
     const LIGERO = ["id", "fechaHoraTransaccion", "tipoOperacion", "linea",
         "canal", "documento", "resultado", "usuario", "descripcionResultado"];
@@ -279,17 +385,45 @@
     }
 
     /**
-     * Trae TODAS las páginas de FechaExpedicion.
+     * Trae TODAS las páginas de FechaExpedicion, o las de un rango de días.
      * @param {object} opciones
+     *   - desde, hasta: acotan la carga a un rango de fechas, AMBOS
+     *     extremos incluidos. Cada uno es una cadena "YYYY-MM-DD" (la forma
+     *     recomendada) o un Date (se usa su día LOCAL). Se piden los dos o
+     *     ninguno. Sin rango, se trae todo, como siempre. Con rango se hace
+     *     UNA SERIE DE PETICIONES POR DÍA (el filtro confirmado es de un
+     *     solo día): un mes son 31 series, no una.
      *   - alLote(nuevos) con los registros NUEVOS de cada página, para que
      *     quien llama los pinte mientras siguen llegando. Si se pasa, este
      *     módulo NO se los queda: con 200.000 registros, guardarlos aquí y
      *     además en la tabla es duplicar cientos de megas para nada.
-     *   - alProgresar({leidos, total, pagina, paginas}) por cada página
-     *   - cancelado() -> true para cortar entre páginas
+     *   - alProgresar(p) por cada página, con
+     *       {leidos, total, pagina, paginas}           (siempre; no cambian)
+     *       {dia, dias, fecha, leidosDia, totalDia, fraccion}  (añadidos)
+     *     `pagina`/`paginas` son las del día en curso. `leidos` y `total` son
+     *     de TODA la carga; con rango, `total` suma los `count` de los días
+     *     ya consultados, así que CRECE a medida que se avanza (no se puede
+     *     saber lo que tiene un día sin preguntarle): no lo uses solo para un
+     *     porcentaje, para eso está `fraccion` (0 a 1, por días y páginas).
+     *     Sin rango, `dia`, `dias` y `fecha` son null y `fraccion` es
+     *     leidos/total.
+     *   - cancelado() -> true para cortar entre páginas y entre días
      *   - tam: tamaño de página a pedir (el servidor puede conceder menos)
-     * @returns {{registros: Array, total: number, completo: boolean}}
+     *   - filtro: campos extra para la cabecera `pagination`; si hay rango,
+     *     `filter` y `filterValue` los pone el rango y mandan sobre estos.
+     * @returns {{registros: Array, total: number, completo: boolean,
+     *            leidos: number, cancelado: boolean, rango: object|null,
+     *            diasTotal: number|null, diasRecorridos: number|null,
+     *            consultas: number, detalleDias: Array}}
      *   `registros` viene vacío si se usó `alLote` (los tiene quien llamó).
+     *   `completo` es false si se canceló. Con rango: `diasRecorridos` son
+     *   los días leídos hasta el final (un día cortado a medias NO cuenta),
+     *   `diasTotal` los del rango, `rango` = {desde, hasta, largo} y
+     *   `detalleDias` = [{fecha, total, leidos, completo}] de los días que
+     *   se llegaron a consultar. `total` suma solo los días consultados: si
+     *   se canceló, los que faltaban no están en la cuenta. `consultas` es
+     *   cuántas peticiones HTTP se hicieron. Sin rango, `rango`, `diasTotal`
+     *   y `diasRecorridos` son null.
      */
     async function cargarTodo(opciones) {
         const o = opciones || {};
@@ -298,27 +432,32 @@
         const cancelado = typeof o.cancelado === "function" ? o.cancelado : () => false;
         const alLote = typeof o.alLote === "function" ? o.alLote : null;
 
-        const primera = await pedirPagina(1, tamPedido, o.filtro);
-        const total = Number(primera.paginacion && primera.paginacion.count) || primera.items.length;
-
-        /* Cuánto concedió DE VERDAD el servidor. Si se pide 500 y entrega 100,
-           avanzar de 500 en 500 se saltaría cuatro de cada cinco registros, y
-           la carga quedaría incompleta sin que nada lo avisara. */
-        const eco = Number(primera.paginacion && primera.paginacion.pageSize) || 0;
-        const tam = primera.items.length
-            ? Math.min(eco || primera.items.length, primera.items.length)
-            : tamPedido;
-        if (tam !== tamPedido) {
-            log(`Genesis concede páginas de ${tam} (se pidieron ${tamPedido}); se ajusta el recorrido.`, "info");
+        /* Se valida el rango ANTES de la primera petición: un «hasta» antes
+           que «desde» o un día inexistente debe fallar sin haber gastado ni
+           una consulta. */
+        const rango = (o.desde != null || o.hasta != null) ? rangoDias(o.desde, o.hasta) : null;
+        const dias = rango ? rango.dias : [null];
+        if (rango) {
+            const n = dias.length;
+            if (rango.largo) {
+                log(`⚠ Rango de ${n} días (${rango.desde} a ${rango.hasta}): son al menos ${n} consultas `
+                    + `al servidor, una serie por día, más páginas si algún día trae mucho. `
+                    + `Va a tardar; se puede cancelar.`, "warn");
+            } else {
+                log(`Rango ${rango.desde} a ${rango.hasta}: ${n} día${n === 1 ? "" : "s"}, `
+                    + `una serie de consultas por día.`, "info");
+            }
         }
 
         /* El deduplicado necesita recordar qué ids ya se vieron, pero NO los
            registros: un Set de números cuesta una fracción de lo que cuesta
            guardar 200.000 objetos que ya tiene la tabla. Solo se retienen
-           cuando nadie los está recogiendo con `alLote`. */
+           cuando nadie los está recogiendo con `alLote`. El Set es uno solo
+           para toda la carga, así que también vale ENTRE días. */
         const vistos = new Set();
         const retenidos = alLote ? null : [];
         let leidos = 0;
+        let consultas = 0;
 
         const agregar = items => {
             const nuevos = [];
@@ -333,21 +472,102 @@
             return nuevos.length;
         };
 
-        agregar(primera.items);
-
-        const paginas = Math.max(1, Math.ceil(total / tam));
-        alProgresar({ leidos, total, pagina: 1, paginas });
+        const pedir = async (n, tam, filtro) => {
+            consultas++;
+            return pedirPagina(n, tam, filtro);
+        };
 
         let completo = true;
-        for (let n = 2; n <= paginas; n++) {
-            if (cancelado()) { completo = false; break; }
-            const p = await pedirPagina(n, tam, o.filtro);
-            if (!p.items.length) break;          // el servidor se quedó sin datos antes de la cuenta
-            agregar(p.items);
-            alProgresar({ leidos, total, pagina: n, paginas });
+        let totalPrevio = 0;          // suma de los `count` de los días ya cerrados
+        let tamAvisado = null;        // para no repetir el aviso de página concedida en cada día
+        let diasRecorridos = 0;
+        const detalleDias = [];
+
+        for (let i = 0; i < dias.length; i++) {
+            const dia = dias[i];
+            /* Entre días se mira `cancelado` ANTES de empezar el siguiente:
+               si no, cancelar en el último segundo de un día dispararía igual
+               la primera petición del día que viene. */
+            if (dia && cancelado()) { completo = false; break; }
+
+            const filtro = dia ? Object.assign({}, o.filtro, filtroDeDia(dia)) : o.filtro;
+
+            const primera = await pedir(1, tamPedido, filtro);
+            const totalDia = Number(primera.paginacion && primera.paginacion.count) || primera.items.length;
+
+            /* Cuánto concedió DE VERDAD el servidor. Si se pide 500 y entrega 100,
+               avanzar de 500 en 500 se saltaría cuatro de cada cinco registros, y
+               la carga quedaría incompleta sin que nada lo avisara. Se calcula en
+               cada día, porque cada día arranca con su propia primera página y
+               nada garantiza que el servidor conceda lo mismo siempre. */
+            const eco = Number(primera.paginacion && primera.paginacion.pageSize) || 0;
+            const tam = primera.items.length
+                ? Math.min(eco || primera.items.length, primera.items.length)
+                : tamPedido;
+            if (tam !== tamPedido && tam !== tamAvisado) {
+                tamAvisado = tam;
+                log(`Genesis concede páginas de ${tam} (se pidieron ${tamPedido}); se ajusta el recorrido.`, "info");
+            }
+
+            const leidosAntesDia = leidos;
+            const paginas = Math.max(1, Math.ceil(totalDia / tam));
+
+            const avisar = pagina => {
+                const total = totalPrevio + totalDia;
+                alProgresar({
+                    leidos, total, pagina, paginas,
+                    dia: dia ? i + 1 : null,
+                    dias: dia ? dias.length : null,
+                    fecha: dia ? dia.fecha : null,
+                    leidosDia: leidos - leidosAntesDia,
+                    totalDia,
+                    // Avance real de 0 a 1. Con rango el `total` va creciendo y
+                    // leidos/total daría ~100% en cada día; esto cuenta los días
+                    // cerrados más la fracción de páginas del actual.
+                    fraccion: dia
+                        ? Math.min(1, (i + pagina / paginas) / dias.length)
+                        : (total ? Math.min(1, leidos / total) : 0)
+                });
+            };
+
+            agregar(primera.items);
+            avisar(1);
+
+            let diaCompleto = true;
+            for (let n = 2; n <= paginas; n++) {
+                if (cancelado()) { diaCompleto = false; completo = false; break; }
+                const p = await pedir(n, tam, filtro);
+                if (!p.items.length) break;          // el servidor se quedó sin datos antes de la cuenta
+                agregar(p.items);
+                avisar(n);
+            }
+
+            totalPrevio += totalDia;
+            if (dia) {
+                detalleDias.push({
+                    fecha: dia.fecha, total: totalDia,
+                    leidos: leidos - leidosAntesDia, completo: diaCompleto
+                });
+                if (diaCompleto) {
+                    diasRecorridos++;
+                    log(`Día ${i + 1}/${dias.length} · ${dia.fecha}: ${totalDia.toLocaleString("es-CO")} registros.`, "info");
+                }
+            }
+            if (!diaCompleto) break;
         }
 
-        return { registros: retenidos || [], total, completo, leidos };
+        if (rango && !completo) {
+            log(`Rango cortado: ${diasRecorridos} de ${dias.length} días leídos por completo.`, "warn");
+        }
+
+        return {
+            registros: retenidos || [], total: totalPrevio, completo, leidos,
+            cancelado: !completo,
+            rango: rango ? { desde: rango.desde, hasta: rango.hasta, largo: rango.largo } : null,
+            diasTotal: rango ? dias.length : null,
+            diasRecorridos: rango ? diasRecorridos : null,
+            consultas, detalleDias
+        };
     }
 
     /** Vuelve a pedir la página donde cae un id, para ver su SOAP crudo.
@@ -369,6 +589,7 @@
 
     global.GENESIS = {
         CONFIG, auth, cargarTodo, detalleDe, pedirPagina,
-        configurar, vencimientoJwt, usuarioJwt
+        configurar, vencimientoJwt, usuarioJwt,
+        rangoDias, fechaGenesis      // para avisar «son N consultas» ANTES de cargar
     };
 })(window);
