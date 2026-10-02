@@ -1,9 +1,25 @@
 /* =====================================================================
    hlr-consulta.js · ¿En qué HLR está la línea? (Claro / Tigo / Ambos)
    ---------------------------------------------------------------------
-   Motor compartido: por cada MSISDN consulta EN PARALELO el QDN de Claro
-   (OAuth2) y el HLR de Tigo (X-Api-Key), y concluye en cuál de las dos
+   Motor compartido: por cada MSISDN consulta el HLR de Tigo (X-Api-Key) y,
+   si hace falta, el QDN de Claro (OAuth2), y concluye en cuál de las dos
    redes está la línea — o en ninguna.
+
+   CONSULTA EN CASCADA (por defecto). Medido en producción: Tigo responde
+   casi al instante y Claro puede tardar hasta 10 s. Con mil líneas,
+   esperar a Claro en todas era el cuello de botella, y casi siempre su
+   respuesta no cambiaba nada. Por eso:
+     1. se consulta Tigo primero;
+     2. si Tigo la encuentra con perfil (estado ACTIVA = RETCODE 0), NO se
+        consulta Claro: su resultado queda en `NO_CONSULTADO`;
+     3. en cualquier otro caso (SIN_PERFIL, RESIDUO_TIGO, ERROR,
+        ERROR_RETCODE, TIMEOUT) sí se consulta Claro.
+   `opciones.ambos = true` fuerza el comportamiento anterior (las dos redes
+   en paralelo, siempre).
+   Costo conocido de la cascada: una línea que NO está en Tigo ahora tarda
+   Tigo + Claro en serie (antes, el máximo de los dos), y una línea que esté
+   en las dos redes se concluye `TIGO`, no `AMBOS`, porque nunca se le
+   preguntó a Claro. Quien necesite detectar el doble alta debe usar `ambos`.
 
    ATENCIÓN · ESTO ES UNA TERCERA COPIA DE LAS MISMAS REGLAS.
    Las otras dos son `logica-hlr-cruzado.js` («¿En qué HLR está?») y
@@ -47,7 +63,14 @@
     const cfgCruce = {
         claro: Object.assign({}, AMBIENTE_CLARO, { timeoutMs: 30000, reintentos: 2 }),
         tigo: Object.assign({}, AMBIENTE_TIGO, { timeoutMs: 30000, reintentos: 2 }),
-        concurrencia: 5 // cada línea dispara 2 peticiones (Claro + Tigo) en paralelo
+        // Líneas en vuelo a la vez. Con `ambos`, cada línea dispara 2 peticiones
+        // simultáneas (pico = 2 × concurrencia). En cascada cada línea tiene UNA
+        // sola petición en vuelo en cada momento (Tigo, y luego Claro solo si
+        // hizo falta): el pico baja a ~1 × concurrencia. El mismo 5 por defecto
+        // significa entonces menos presión sobre los gateways, no más; el pool
+        // no se tocó a propósito — si se quiere más velocidad se sube este
+        // número, no se rediseña el pool.
+        concurrencia: 5
     };
 
     const gestorClaro = {
@@ -273,26 +296,54 @@
         RESIDUO_TIGO: "Residuo en Tigo (escalar)", CLARO_RESIDUO: "Claro + residuo en Tigo",
         AMBOS: "Ambos — revisar", NINGUNO: "Ninguno", NO_CONCLUYENTE: "No concluyente"
     };
-    const ETIQUETA_CLARO = { ACTIVA: "Activa", INACTIVA: "Inactiva", ERROR: "Error", TIMEOUT: "Timeout" };
+    // NO_CONSULTADO: la cascada se saltó Claro porque Tigo ya la encontró. Es un
+    // estado propio y NO "Inactiva": decir "no está en Claro" sería afirmar algo
+    // que nadie preguntó.
+    const ETIQUETA_CLARO = { ACTIVA: "Activa", INACTIVA: "Inactiva", ERROR: "Error", TIMEOUT: "Timeout", NO_CONSULTADO: "No consultado" };
     const ETIQUETA_TIGO = {
         ACTIVA: "Activa", SIN_PERFIL: "Sin perfil", RESIDUO_TIGO: "Residuo en Tigo",
         ERROR: "Error", ERROR_RETCODE: "Error (RETCODE)", TIMEOUT: "Timeout"
     };
 
+    /** Resultado de Claro cuando la cascada no lo consultó. `concluirUbicacion`
+        lo trata bien sin cambios: no es error (errClaro=false) ni activa
+        (enClaro=false), así que con Tigo ACTIVA cae en "TIGO". */
+    function claroNoConsultado() {
+        return {
+            fuente: "claro", estado: "NO_CONSULTADO", imsi: null, raw: null,
+            mensaje: "No se consultó: Tigo ya encontró la línea con perfil."
+        };
+    }
+
     /* ---------------------------------------------------------------------
-       Consulta de UNA línea: las dos redes a la vez, y la conclusión.
+       Consulta de UNA línea, y la conclusión.
+       Por defecto en cascada (Tigo primero; Claro solo si Tigo no la
+       encontró con perfil). `opciones.ambos` fuerza las dos en paralelo.
+       Solo ACTIVA (RETCODE 0) corta la cascada: RESIDUO_TIGO (1033) es
+       presencia en Tigo pero no un perfil utilizable, y la conclusión
+       CLARO_RESIDUO depende de saber si Claro la tiene — hay que preguntar.
+       Un fallo de Tigo tampoco corta: una ausencia no confirmada no se da
+       por buena.
     --------------------------------------------------------------------- */
-    async function consultarLinea(msisdn, cfg) {
+    async function consultarLinea(msisdn, cfg, opciones) {
         const c = cfg || CFG;
-        const [claro, tigo] = await Promise.all([
-            consultarClaro(msisdn, c.claro),
-            consultarTigo(msisdn, c.tigo)
-        ]);
+        const o = opciones || {};
+        let claro, tigo;
+        if (o.ambos) {
+            [claro, tigo] = await Promise.all([
+                consultarClaro(msisdn, c.claro),
+                consultarTigo(msisdn, c.tigo)
+            ]);
+        } else {
+            tigo = await consultarTigo(msisdn, c.tigo);
+            claro = tigo.estado === "ACTIVA" ? claroNoConsultado() : await consultarClaro(msisdn, c.claro);
+        }
+        const ubicacion = concluirUbicacion(claro, tigo);
         return {
             msisdn,
             claro, tigo,
-            ubicacion: concluirUbicacion(claro, tigo),
-            etiquetaUbicacion: ETIQUETA_UBICACION[concluirUbicacion(claro, tigo)] || "—",
+            ubicacion,
+            etiquetaUbicacion: ETIQUETA_UBICACION[ubicacion] || "—",
             etiquetaClaro: ETIQUETA_CLARO[claro.estado] || claro.estado || "—",
             etiquetaTigo: ETIQUETA_TIGO[tigo.estado] || tigo.estado || "—",
             imsi: (claro && claro.imsi) || (tigo && tigo.imsi) || null
@@ -300,7 +351,11 @@
     }
 
     /** Pool de concurrencia: Claro no tiene servicio de lote, así que
-        «en batch» es esto — tandas controladas, no mil peticiones a la vez. */
+        «en batch» es esto — tandas controladas, no mil peticiones a la vez.
+        `opciones.ambos` se pasa a cada línea (fuerza Claro + Tigo en paralelo).
+        Concurrencia efectiva: `limite` es de LÍNEAS en vuelo, no de peticiones.
+        En cascada hay ~1 petición por línea (2 solo en serie, cuando Tigo no
+        la encontró); con `ambos` hay 2 a la vez. */
     async function consultarVarias(msisdns, opciones) {
         const o = opciones || {};
         const cfg = o.cfg || CFG;
@@ -317,7 +372,7 @@
                 if (cancelado()) return;
                 const msisdn = lista[i++];
                 let r;
-                try { r = await consultarLinea(msisdn, cfg); }
+                try { r = await consultarLinea(msisdn, cfg, { ambos: !!o.ambos }); }
                 catch (e) {
                     r = {
                         msisdn, claro: { estado: "ERROR", mensaje: e.message },

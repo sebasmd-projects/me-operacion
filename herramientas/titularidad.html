@@ -1,4 +1,4 @@
-<!-- titularidad.html · v1.0.0
+<!-- titularidad.html · v1.1.0
      ---------------------------------------------------------------------
      Solo marcado. La lógica vive en:
 
@@ -70,6 +70,52 @@
 
         #progresoWrap { display: none; }
 
+        /* Mismo lenguaje que «Estado de líneas» y «Cierre masivo de casos»:
+           la fila oculta se queda a la vista, atenuada y tachada, mientras se
+           pide verla con «Ver ocultas». */
+        tr.fila-oculta { opacity: .45; }
+
+        tr.fila-oculta td {
+            text-decoration: line-through;
+            text-decoration-color: rgba(0, 0, 0, .25);
+        }
+
+        /* Qué se cargó (paso 2): la verdad sobre el tope, a la vista y no solo en el registro */
+        .carga-nota { font-size: .74rem; color: var(--me-suave); }
+        .carga-nota.tope { color: var(--me-warn); font-weight: 600; }
+
+        /* Rango de fechas del paso 2 */
+        .rango-aviso { font-size: .74rem; color: var(--me-suave); margin-top: .35rem; }
+        .rango-aviso.largo { color: var(--me-warn); font-weight: 600; }
+        .rango-aviso.error { color: var(--me-err); font-weight: 600; }
+
+        .todo-aviso {
+            font-size: .74rem;
+            color: var(--me-suave);
+            border-left: 2px solid var(--me-warn);
+            padding-left: .5rem;
+            margin: .35rem 0 .5rem;
+        }
+
+        /* Acciones de selección: texto, no botones; son atajos de la casilla
+           de la cabecera, no operaciones. */
+        .btn-texto {
+            border: 0;
+            background: none;
+            padding: 0 .15rem;
+            font-size: .8rem;
+            font-weight: 600;
+            color: var(--me-info);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .btn-texto:hover { color: var(--me-negro); }
+        .btn-texto:disabled { color: var(--me-off); text-decoration: none; cursor: default; }
+
+        .ambos-bloque { flex: 0 0 100%; }
+        .ambos-porque { font-size: .72rem; color: var(--me-suave); margin: .1rem 0 0 1.5rem; }
+
         .sesion-ayuda {
             font-size: .72rem;
             color: var(--me-suave);
@@ -135,9 +181,13 @@
             <div class="n" id="kpiBloqueos">0</div>
             <div class="lbl">Bloqueos</div>
         </div>
-        <div class="me-kpi warn" style="cursor:default">
+        <!-- Solo cuenta «No concluyente» (las dos redes fallaron: hay que volver a
+             consultar). «Ambos — revisar» ya no está aquí: en cascada no puede
+             aparecer; se encuentra con el filtro de operador. Ver actualizarKpis(). -->
+        <div class="me-kpi warn" style="cursor:default"
+            title="Líneas cuyo HLR/HSS no pudo concluir: las dos redes fallaron. Hay que volver a consultarlas.">
             <div class="n" id="kpiRevisar">0</div>
-            <div class="lbl">HLR a revisar</div>
+            <div class="lbl">HLR no concluyente</div>
         </div>
     </div>
 
@@ -202,9 +252,36 @@
 
             <!-- 2 · Carga -->
             <section data-me-paso="2" data-me-titulo="Datos de Genesis" data-me-abierto="con-sesion">
-                <div class="me-hint mb-2">Trae el log completo de comprobación de titularidad. Son más de doscientos
-                    mil registros: tarda, avisa del avance y se puede cancelar sin perder lo que ya llegó.</div>
+                <div class="me-hint mb-2">Por defecto trae los registros <strong>más nuevos</strong>: en segundos ya hay
+                    qué mirar. Para ver más atrás, elige un rango de fechas. Avisa del avance y se puede cancelar
+                    sin perder lo que ya llegó.</div>
                 <div class="row g-2">
+                    <div class="col-12 d-flex gap-2">
+                        <!-- El texto («Cargar los últimos 2.000») lo pone la lógica con el tope de GENESIS.CONFIG -->
+                        <button class="btn btn-me flex-grow-1" id="btnCargar" type="button">Cargar los más nuevos</button>
+                        <button class="btn btn-outline-danger d-none" id="btnCancelar" type="button">Cancelar</button>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="me-lbl mt-1">…o un rango de fechas <span class="text-muted">(sin tope)</span></div>
+                    </div>
+                    <!-- Las fechas arrancan con el mes en curso solo como SUGERENCIA visible: el botón de
+                         arriba NO las usa. Quien quiera el rango pulsa «Cargar rango». -->
+                    <div class="col-6">
+                        <label class="me-lbl" for="fDesde">Desde</label>
+                        <input type="date" id="fDesde" class="form-control form-control-sm me-mono">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="fHasta">Hasta</label>
+                        <input type="date" id="fHasta" class="form-control form-control-sm me-mono">
+                    </div>
+                    <div class="col-12">
+                        <div class="rango-aviso" id="rangoAviso" aria-live="polite"></div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-ink w-100" id="btnCargarRango" type="button">Cargar rango</button>
+                    </div>
+
                     <div class="col-6">
                         <label class="me-lbl" for="cfgPagina">Registros por página</label>
                         <input type="number" id="cfgPagina" class="form-control form-control-sm me-mono" value="500"
@@ -215,9 +292,26 @@
                         <input type="number" id="cfgConcurrencia" class="form-control form-control-sm me-mono"
                             value="5" min="1" max="15">
                     </div>
-                    <div class="col-12 d-flex gap-2">
-                        <button class="btn btn-me flex-grow-1" id="btnCargar" type="button">Cargar de Genesis</button>
-                        <button class="btn btn-outline-danger d-none" id="btnCancelar" type="button">Cancelar</button>
+                    <div class="col-12">
+                        <!-- Traer TODO sin rango existe, pero cerrado y con casilla de
+                             confirmación: son miles de peticiones y 5 a 10 minutos. No
+                             debe ser el camino fácil ni uno que se lance por accidente. -->
+                        <details id="detTodo">
+                            <summary class="me-hint" style="cursor:pointer">Traer todo el log, sin rango ni tope…</summary>
+                            <div class="todo-aviso">
+                                Son más de 200.000 registros: <strong>miles de peticiones</strong> a Genesis y
+                                entre <strong>5 y 10 minutos</strong> de espera (los más nuevos son unas pocas
+                                peticiones). Casi nunca hace falta: si buscas algo reciente, usa «los más nuevos»
+                                o un rango.
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="chkEntiendoTodo">
+                                <label class="form-check-label small" for="chkEntiendoTodo">Entiendo cuánto tarda y
+                                    quiero traerlo todo</label>
+                            </div>
+                            <button class="btn btn-sm btn-me-line w-100" id="btnCargarTodo" type="button"
+                                disabled>Traer todo sin rango</button>
+                        </details>
                     </div>
                 </div>
 
@@ -230,6 +324,9 @@
                         <div class="progress-bar bg-dark" id="progresoBar" style="width:0%"></div>
                     </div>
                 </div>
+
+                <!-- Qué hay cargado, dicho sin rodeos: una carga con tope NO es la carga completa. -->
+                <div class="carga-nota mt-2" id="cargaNota" aria-live="polite"></div>
             </section>
 
             <!-- 3 · Registro -->
@@ -250,13 +347,24 @@
                     placeholder="Buscar línea, documento, titular…">
                 <select class="form-select form-select-sm" id="fOperacion" style="width:auto"></select>
                 <select class="form-select form-select-sm" id="fResultado" style="width:auto"></select>
-                <select class="form-select form-select-sm" id="fUbicacion" style="width:auto"></select>
+                <!-- Operador: sus opciones son fijas y las llena la lógica una sola vez
+                     (no se reescriben en cada repintado). Filtra por la ubicación YA
+                     RESUELTA, no por las columnas Claro/Tigo: en cascada Claro puede
+                     decir «No consultado» y eso no es un operador. -->
+                <select class="form-select form-select-sm" id="fUbicacion" style="width:auto"
+                    title="Operador donde está la línea, según el HLR/HSS"></select>
                 <select class="form-select form-select-sm" id="fCanal" style="width:auto"></select>
                 <select class="form-select form-select-sm" id="fSel" style="width:auto">
                     <option value="">Marcadas: todas</option>
                     <option value="marcadas">Solo marcadas</option>
                     <option value="sin-marcar">Solo sin marcar</option>
                 </select>
+                <div class="form-check mb-0 ms-1"
+                    title="Las ocultas nunca se exportan ni se consultan, aunque estén a la vista">
+                    <input class="form-check-input" type="checkbox" id="chkVerOcultas">
+                    <label class="form-check-label small" for="chkVerOcultas">Ver ocultas (<span
+                            id="numOcultas">0</span>)</label>
+                </div>
                 <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros">Limpiar <i
                         class="bi bi-x-circle"></i></button>
 
@@ -271,8 +379,16 @@
             </div>
 
             <div class="me-filtros acciones-sel">
-                <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar lo filtrado</button>
-                <button class="btn btn-sm btn-me-line" id="btnDesmarcar" type="button">Desmarcar todo</button>
+                <!-- La casilla de la cabecera de la tabla marca solo la página que se ve.
+                     Estas dos acciones son para lo demás: todo lo filtrado, o el tope. -->
+                <button class="btn-texto" id="btnSelTodos" type="button" disabled>Seleccionar todos (0)</button>
+                <button class="btn-texto" id="btnSelPrimeros" type="button" disabled
+                    title="Marca las primeras filas, en el orden en que se ven, hasta el tope de consultas">Seleccionar primeros 2.000</button>
+                <button class="btn-texto" id="btnDesmarcar" type="button">Desmarcar todo</button>
+                <span class="text-muted">|</span>
+                <button class="btn btn-sm btn-me-line" id="btnOcultarSel" type="button">Ocultar marcadas</button>
+                <button class="btn btn-sm btn-me-line" id="btnOcultarNoSel" type="button">Ocultar no marcadas</button>
+                <button class="btn btn-sm btn-me-line" id="btnRestaurarOcultas" type="button">Mostrar todas</button>
                 <span id="resumenSeleccion">Nada marcado</span>
                 <div class="me-filtros-der">
                     <button class="btn btn-sm btn-me-ink" id="btnConsultarCm" type="button" disabled>
@@ -280,14 +396,27 @@
                     <button class="btn btn-sm btn-me" id="btnConsultarHlr" type="button" disabled>
                         <i class="bi bi-broadcast-pin"></i> Consultar HLR/HSS</button>
                 </div>
+                <div class="ambos-bloque">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkAmbos">
+                        <label class="form-check-label small fw-semibold" for="chkAmbos">Consultar en ambos
+                            HLR/HSS</label>
+                    </div>
+                    <div class="ambos-porque" id="ambosPorque">
+                        Por qué importa: normalmente se pregunta a Tigo y <strong>solo si no la encuentra</strong>
+                        se pregunta a Claro (cascada). Así una línea dada de alta en las <strong>dos</strong> redes
+                        sale como «Tigo» y no se detecta: a Claro nunca se le preguntó. «Ambos — revisar» solo puede
+                        aparecer con esta casilla marcada (cuesta dos consultas por línea).
+                    </div>
+                </div>
             </div>
 
             <div class="me-tabla-panel">
                 <table id="tablaTitularidad" class="table table-striped table-hover align-middle w-100"></table>
                 <div class="me-hint p-2" id="msgVacio">
-                    Inicia sesión en Genesis y presiona <strong>Cargar de Genesis</strong>. Después marca las líneas
-                    que te interesen y consulta su <strong>HLR/HSS</strong> (Claro / Tigo / ambos) y sus datos en el
-                    <strong>CM</strong>.
+                    Inicia sesión en Genesis y presiona <strong>Cargar los más nuevos</strong> (o elige un rango de fechas). Después marca
+                    las líneas que te interesen y consulta su <strong>HLR/HSS</strong> (Claro / Tigo) y sus datos en
+                    el <strong>CM</strong>.
                 </div>
             </div>
         </div>
@@ -326,7 +455,7 @@
     <script>
         MEUI.init({
             app: "titularidad",
-            version: "1.0.0",
+            version: "1.1.0",
             doc: "../doc/titularidad/README.md",
             titulo: "Titularidad · Bloqueos de SIM",
             descripcion: "Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS",
@@ -334,8 +463,9 @@
             instrucciones: [
                 "Para qué sirve: la mayoría de las llamadas por «me bloquearon la SIM» vienen del proceso de comprobación de titularidad. Genesis dice qué pasó, pero no en qué red está la línea; sin eso no se cierra la llamada.",
                 "1 · Conexión: Genesis es obligatoria. Si el usuario y la contraseña no funcionan, el realm solo permite el flujo del navegador: abre Genesis, copia el token de una petición y pégalo. El CM es opcional y solo hace falta para el titular y el estado de la línea.",
-                "2 · Datos de Genesis: trae el log completo (más de doscientos mil registros). Avisa del avance y se puede cancelar: lo que ya llegó se conserva.",
-                "3 · Marca de 1 a n líneas (o usa «Marcar lo filtrado») y presiona «Consultar HLR/HSS» para saber si están en Claro, en Tigo, en ambas o en ninguna.",
+                "2 · Datos de Genesis: por defecto «Cargar los más nuevos» trae los últimos registros (el tope está en el propio botón): son unas pocas peticiones y en segundos hay qué mirar. Para ver más atrás, elige «Desde» y «Hasta» y presiona «Cargar rango»: ahí no hay tope, y la herramienta avisa cuántas consultas cuesta (un mes completo es una). Avisa del avance y se puede cancelar: lo que ya llegó se conserva. Traer TODO el log (más de 200.000 registros, miles de peticiones, de 5 a 10 minutos) está aparte, en «Traer todo el log, sin rango ni tope…».",
+                "3 · Marca de 1 a n líneas y presiona «Consultar HLR/HSS» para saber si están en Claro, en Tigo o en ninguna. La casilla de la cabecera marca solo la página que ves; «Seleccionar todos (N)» marca todo lo filtrado y «Seleccionar primeros 2.000» respeta el tope de consultas. «Ocultar» saca filas de la vista (no se exportan ni se consultan); «Ver ocultas» las muestra.",
+                "Por defecto el HLR/HSS va en cascada: se pregunta a Tigo y solo si no la encuentra se pregunta a Claro. Eso no puede detectar una línea dada de alta en las dos redes: para eso marca «Consultar en ambos HLR/HSS».",
                 "4 · «Consultar CM» agrega titular, cuenta y estado de la línea de las mismas líneas marcadas.",
                 "Claro no tiene servicio de lote: su consulta es una por línea, así que se hace en tandas controladas (el campo «HLR en paralelo»). Mil líneas salen en tandas, no de golpe.",
                 "Una misma línea puede aparecer en varios registros: se consulta UNA vez y el resultado se copia a todas sus filas.",
