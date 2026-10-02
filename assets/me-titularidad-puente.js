@@ -137,7 +137,25 @@
     }
 
     /* --- 5 · Carga y acciones sobre lo marcado ------------------------- */
+    // Rango de fechas: el aviso de «son N días / N consultas» se rehace con
+    // cada cambio, ANTES de que nadie pulse el botón.
+    el("fDesde").addEventListener("input", () => actualizarAvisoRango());
+    el("fHasta").addEventListener("input", () => actualizarAvisoRango());
     el("btnCargar").addEventListener("click", () => cargarGenesis());
+
+    // Traer TODO sin rango: cerrado por defecto y con casilla. Son miles de
+    // peticiones y de 5 a 10 minutos; no debe ser el camino fácil ni algo que
+    // se lance con un clic suelto. La casilla se vuelve a desmarcar tras cada
+    // uso: cada carga completa se confirma de nuevo.
+    const armarTodo = () => { el("btnCargarTodo").disabled = !el("chkEntiendoTodo").checked; };
+    el("chkEntiendoTodo").addEventListener("change", armarTodo);
+    el("btnCargarTodo").addEventListener("click", () => {
+        const lanzada = cargarGenesis({ todo: true });
+        el("chkEntiendoTodo").checked = false;
+        Promise.resolve(lanzada).finally(armarTodo);   // `libre` lo habilita al terminar; sin casilla, debe quedar apagado
+        armarTodo();
+    });
+
     el("btnCancelar").addEventListener("click", () => {
         cancelarTrabajo();
         MEUI.log("Cancelando…", "warn");
@@ -147,8 +165,18 @@
     el("btnConsultarCm").addEventListener("click", () =>
         MEUI.conSpinner(el("btnConsultarCm"), "Consultando…", consultarCm));
 
-    el("btnMarcarVisibles").addEventListener("click", () => marcarVisibles(true));
-    el("btnDesmarcar").addEventListener("click", () => marcarVisibles(false));
+    // Selección. La casilla de la cabecera de la tabla (solo la página) la
+    // engancha la lógica, porque nace con la tabla.
+    el("btnSelTodos").addEventListener("click", () => seleccionarTodos());
+    el("btnSelPrimeros").addEventListener("click", () => seleccionarPrimeros(CONFIG.maxSeleccion));
+    el("btnDesmarcar").addEventListener("click", () => desmarcarTodo());
+
+    // Ocultar / Mostrar: mismos nombres y comportamiento que en «Estado de
+    // líneas» y «Cierre masivo de casos».
+    el("btnOcultarSel").addEventListener("click", () => ocultarMarcadas());
+    el("btnOcultarNoSel").addEventListener("click", () => ocultarNoMarcadas());
+    el("btnRestaurarOcultas").addEventListener("click", () => mostrarTodas());
+    el("chkVerOcultas").addEventListener("change", ev => fijarFiltro("verOcultas", ev.target.checked ? "1" : ""));
 
     /* --- 6 · Filtros --------------------------------------------------- */
     const liga = (id, campo) => {
@@ -168,9 +196,16 @@
     liga("fCanal", "canal");
     liga("fSel", "sel");
 
+    // Si llegó un valor nuevo mientras un filtro tenía el foco, sus opciones
+    // se dejaron para después (reescribir un <select> abierto lo cierra):
+    // este es ese «después».
+    ["fOperacion", "fResultado", "fCanal"].forEach(id =>
+        el(id).addEventListener("blur", () => refrescarOpcionesFiltros()));
+
     el("btnLimpiarFiltros").addEventListener("click", () => {
         ["fTexto", "fOperacion", "fResultado", "fUbicacion", "fCanal", "fSel"]
             .forEach(id => { if (el(id)) el(id).value = ""; });
+        el("chkVerOcultas").checked = false;
         limpiarFiltros();
     });
 

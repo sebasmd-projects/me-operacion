@@ -218,12 +218,24 @@
         return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
     }
 
+    /* `DESC` y no `ASC`, aunque ascendente sea más estable para paginar.
+       La razón es de riesgo, no de gusto: DESC es el ÚNICO valor que hemos
+       visto funcionar contra el servidor real —lo usan las dos capturas que
+       tenemos, la de producción y la de QA— y aquí no hay forma de probar
+       otra cosa sin romper una carga de verdad. Entre una elección elegante
+       sin probar y la que sabemos que responde, gana la probada.
+
+       Lo que ASC protegía —que un registro nuevo durante la descarga corra
+       las páginas y se dupliquen o se pierdan filas— lo cubre igual el
+       deduplicado por `id`, que es la garantía de verdad. Y con el filtro
+       por día el riesgo casi desaparece: un día cerrado ya no recibe
+       registros nuevos. */
     function paginaPedida(numero, tam, extra) {
         return Object.assign({
             pageNumber: numero,
             pageSize: tam,
             sort: "id",
-            sortOrder: "ASC"
+            sortOrder: "DESC"
         }, extra || {});
     }
 
