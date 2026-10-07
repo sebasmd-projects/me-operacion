@@ -288,7 +288,7 @@ Doble confirmación, bitácora, verificación posterior con QDN: igual que las d
 
 - **Ambiente productivo**: las consultas son de solo lectura, pero golpean PDN.
 - **Las operaciones de §11 escriben en producción y no se deshacen solas.** La doble confirmación y el listado previo de líneas son la única red de seguridad: no hay "deshacer".
-- **Cambio de IMSI/ICCID/KI y de MSISDN (§11.5) son las de mayor consecuencia de toda la herramienta**: cambian un identificador propio de la línea, y un dato nuevo incorrecto puede dejarla sin servicio. Pruébalas primero sobre una línea de bajo riesgo antes de confiar en ellas para un caso real.
+- **Cambio IMSI Claro|Tigo/ICCID/KI y de MSISDN (§11.5) son las de mayor consecuencia de toda la herramienta**: cambian un identificador propio de la línea, y un dato nuevo incorrecto puede dejarla sin servicio. Pruébalas primero sobre una línea de bajo riesgo antes de confiar en ellas para un caso real.
 - **`portation_status` no tiene documentación propia** (§11.5): el valor por defecto (`"0"`) sale del único ejemplo real disponible, no de una especificación confirmada.
 - **La traducción de bloqueos activos a `features` (§11.6) es best-effort**, igual que la interpretación de bloqueos de la consulta (§8): lo que no se puede traducir con confianza se avisa, no se adivina.
 - **Masivo**: en bloqueos y desbloqueos el alcance lo define el filtro puesto en ese momento; en Conciliación y Aprovisionar lo define lo **marcado con checkbox** (§11.8). Revisa siempre el listado de la confirmación, no el número.

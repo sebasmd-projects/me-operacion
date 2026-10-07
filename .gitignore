@@ -4,3 +4,9 @@
 har nuevas/
 
 # graphify-out/ SÍ se versiona (grafo de conocimiento del proyecto).
+
+# Grabaciones de reuniones: pesan y pueden traer datos de clientes.
+*.mp4
+
+# Archivos reales de facturación (NIT, líneas, nombres, códigos SAP): solo locales.
+Documentos Pre-Factura/

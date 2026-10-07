@@ -1,5 +1,5 @@
 /* =====================================================================
-   me-estado-lineas-puente.js · Enganche de «Estado de líneas»
+   me-estado-lineas-puente.js · Enganche de «Bloquear/Inactivar líneas»
    ---------------------------------------------------------------------
    Va al final del <body>, después de cm-lineas.js y
    logica-estado-lineas.js. Aquí vive la interfaz: tabla con casillas,

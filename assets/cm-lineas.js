@@ -1,7 +1,7 @@
 /* =====================================================================
    cm-lineas.js · Operaciones sobre líneas del CM, compartidas
    ---------------------------------------------------------------------
-   Lo usan «Estado de líneas» (bloquear / inactivar) y «Cambio de IMSI».
+   Lo usan «Bloquear/Inactivar líneas» (bloquear / inactivar) y «Cambio IMSI Claro|Tigo».
    Las dos resuelven la línea igual, escriben en el CM con una orden
    (`productOrder`) y la siguen hasta su estado final, así que esa parte
    vive aquí una sola vez. Todo va dentro de un IIFE y se publica como
@@ -12,7 +12,7 @@
    de las capturas `har nuevas/` (ver doc/estado-lineas y doc/cambio-imsi):
 
      Cambio de estado  POST /productOrder  type=ChangeSubscriptionState
-     Cambio de IMSI    POST /shoppingCart  → POST /productOrder (ChangeSim)
+     Cambio IMSI Claro|Tigo    POST /shoppingCart  → POST /productOrder (ChangeSim)
                        → DELETE /shoppingCart/{id}
 
    Además trae la tabla con casillas, filtros y ocultar/mostrar que usan
@@ -314,7 +314,7 @@
     }
 
     /* ---------------------------------------------------------------
-       Cambio de IMSI (ChangeSim)
+       Cambio IMSI Claro|Tigo (ChangeSim)
        Carrito con la oferta 10012 «SIM Category-EXITO» (producto 10010)
        → orden → seguimiento → borrar el carrito. La SIM nueva va en
        <g>_ICCID (su identificador en el inventario) y <g>_NEW_IMSI.

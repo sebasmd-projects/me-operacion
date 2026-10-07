@@ -852,7 +852,7 @@ function celdaPaso(paso, error) {
    Orden: casilla · Línea · Operación · Resultado · Fecha, que es lo primero
    que se mira en una llamada de «me bloquearon la SIM», y luego el resto. La
    última columna es el botón Ocultar/Mostrar de cada fila, igual que en
-   «Estado de líneas» y «Cierre masivo de casos».
+   «Bloquear/Inactivar líneas» y «Cierre masivo de casos».
 
    `plano: true` = comparar el texto tal cual al ordenar. Las fechas son ISO
    y ya ordenan igual que el tiempo; `localeCompare` sobre 208.000 filas

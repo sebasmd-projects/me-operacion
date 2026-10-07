@@ -1,6 +1,6 @@
-# Cambio de IMSI — Documentación técnica
+# Cambio IMSI Claro|Tigo — Documentación técnica
 
-> **Versión: v1.0.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.0.1** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Cambia la SIM (IMSI) de líneas en el CM, en masivo.** Se pega un renglón por cambio, `línea;imsi_nueva`, se **validan** todos, se marcan en una tabla con casillas —mismo manejo que «Cierre masivo de casos»— y a los marcados se les envía la orden de cambio de SIM con una **nota obligatoria**. Después se vuelve a consultar cada línea para confirmar que quedó con la SIM nueva.
@@ -22,7 +22,7 @@
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/cambio_imsi.html` | Marcado. Sin lógica. |
-| `assets/cm-lineas.js` | **Compartido con «Estado de líneas»**: resolver la línea, cuenta del CRM y su dirección, SIM en el inventario, orden `ChangeSim`, seguimiento y tabla con casillas. |
+| `assets/cm-lineas.js` | **Compartido con «Bloquear/Inactivar líneas»**: resolver la línea, cuenta del CRM y su dirección, SIM en el inventario, orden `ChangeSim`, seguimiento y tabla con casillas. |
 | `assets/logica-cambio-imsi.js` | Lectura de `línea;imsi`, validaciones, cambio y verificación, exportación. |
 | `assets/me-cambio-imsi-puente.js` | Sesión, tabla, filtros, nota obligatoria, doble confirmación y exportaciones. |
 
@@ -36,7 +36,7 @@ Las mismas del resto de la suite (Bootstrap, Bootstrap Icons, DataTables, SheetJ
 
 ## 4. Endpoints
 
-Tomados de la captura `har nuevas/Cambio de IMSI.har` (línea 3054164491 → IMSI 732157001066358).
+Tomados de la captura `har nuevas/Cambio IMSI Claro|Tigo.har` (línea 3054164491 → IMSI 732157001066358).
 
 | Método | Ruta | Para qué |
 | --- | --- | --- |
@@ -111,9 +111,9 @@ Un renglón por cambio: `línea;imsi_nueva`, separados por `;`, coma, tabulació
 
 ### Tabla
 
-La misma de «Estado de líneas» y del cierre de casos: casillas, marcar/desmarcar lo visible, filtros combinables (texto, estado de la línea, proceso, selección, ver ocultas) y ocultar/mostrar por fila y en lote. La columna **IMSI actual → nueva** muestra las dos con el estado de cada una en el inventario.
+La misma de «Bloquear/Inactivar líneas» y del cierre de casos: casillas, marcar/desmarcar lo visible, filtros combinables (texto, estado de la línea, proceso, selección, ver ocultas) y ocultar/mostrar por fila y en lote. La columna **IMSI actual → nueva** muestra las dos con el estado de cada una en el inventario.
 
-### Paso 3 · Cambio de IMSI
+### Paso 3 · Cambio IMSI Claro|Tigo
 
 **Nota obligatoria**: sin ella el botón no se habilita. **Doble confirmación**. Los cambios van **de uno en uno**, cada uno seguido hasta su estado final. Después de cada uno:
 
@@ -142,4 +142,5 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con usuario, IMSI anterior
 
 | Versión | Cambios |
 | --- | --- |
-| **1.0.0** | Primera versión. Cambio de IMSI en masivo desde `línea;imsi_nueva` con la orden `ChangeSim` de la interfaz del CM (carrito + orden, verificados contra la captura), validación previa (línea activa, IMSI nueva existente y disponible, sin repetidos), revalidación justo antes de enviar, nota obligatoria, verificación posterior, tabla con casillas y filtros como el cierre de casos, y bitácora con petición y respuesta. Lógica compartida con «Estado de líneas» en `cm-lineas.js`. |
+| **1.0.1** | La herramienta pasa a llamarse **«Cambio IMSI Claro\|Tigo»** (antes «Cambio de IMSI»). |
+| 1.0.0 | Primera versión. Cambio IMSI Claro\|Tigo en masivo desde `línea;imsi_nueva` con la orden `ChangeSim` de la interfaz del CM (carrito + orden, verificados contra la captura), validación previa (línea activa, IMSI nueva existente y disponible, sin repetidos), revalidación justo antes de enviar, nota obligatoria, verificación posterior, tabla con casillas y filtros como el cierre de casos, y bitácora con petición y respuesta. Lógica compartida con «Bloquear/Inactivar líneas» en `cm-lineas.js`. |

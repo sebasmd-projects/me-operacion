@@ -1,6 +1,6 @@
 # Aplicar PLU de paquete — Documentación técnica
 
-> **Versión: v1.5.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.6.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Aplica un **PLU de paquete** sobre una línea prepagada llamando a `RecargaPaquete` en **Tulio**, y después verifica **contra el CM** qué quedó: por cada paquete nuevo o con saldo sumado muestra el **total**, el **valor anterior** y **cuánto se sumó**.
@@ -18,7 +18,7 @@ Es el porte de la operación «Agregar PLU» de la consola local `consola_bundle
 - Dejar a la vista **cuánto se sumó**, que es el dato que se viene a comprobar.
 - No dejar que una **cuenta equivocada** llegue a una operación de escritura (ver §6).
 
-Trabaja en **secuencia**: una línea y varios PLU, uno detrás de otro, agregando y eliminando los bolsillos de cada uno (§7).
+Trabaja en **secuencia**: una línea y varios PLU, uno detrás de otro, agregando y (por defecto) eliminando los bolsillos de cada uno (§7).
 
 ---
 
@@ -27,7 +27,8 @@ Trabaja en **secuencia**: una línea y varios PLU, uno detrás de otro, agregand
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/aplicar_plu.html` | Marcado. Sin lógica. |
-| `assets/logica-plu.js` | Cuenta de la línea, paquetes, token y recarga en Tulio, comparación antes/después. |
+| `assets/tulio-plu.js` | **Compartido con Consumos** (`window.TulioPLU`): credenciales, token y `RecargaPaquete` de Tulio, usuarios autorizados (`USUARIOS`) y lectura de PLU pegados. |
+| `assets/logica-plu.js` | Cuenta de la línea, paquetes, comparación antes/después, eliminación y la secuencia. La recarga la delega en `tulio-plu.js`. |
 | `assets/me-plu-puente.js` | Sesión del CM, credenciales de Tulio, tabla, modal, doble confirmación y exportaciones. |
 
 Comparte con las demás herramientas: `me-ui.js` (marco, sesión, tablas, exportación) y `me-api.js` (Keycloak y GET autenticado al CM).
@@ -89,9 +90,9 @@ Si alguno difiere, se reporta la descripción de Tulio como falla. Un **401** re
 
 ## 5. Credenciales de Tulio
 
-Están en `logica-plu.js` (`TULIO_CRED`: `api_key`, `client_id`, `client_secret`, `scope`), igual que el `client_secret` del QDN en `logica-qdn.js`: la herramienta funciona sin pedirle nada al analista. Salieron del `tulio_credentials.json` que acompañaba al servidor de la consola y **cuando roten se cambian ahí**.
+Están en `tulio-plu.js` (`TULIO_CRED`, compartido con Consumos: `api_key`, `client_id`, `client_secret`, `scope`), igual que el `client_secret` del QDN en `logica-qdn.js`: la herramienta funciona sin pedirle nada al analista. Salieron del `tulio_credentials.json` que acompañaba al servidor de la consola y **cuando roten se cambian ahí**.
 
-> **Cuidado al repartir.** Con esas credenciales se puede pedir un token y recargar **cualquier** línea, y el archivo viaja a todas las máquinas que tengan la suite. La carpeta y el ZIP van en un lugar de acceso restringido. La guarda de `USUARIO_AGREGAR_PLU` evita recargas por accidente desde la interfaz, pero no impide que alguien con el archivo llame al servicio por fuera.
+> **Cuidado al repartir.** Con esas credenciales se puede pedir un token y recargar **cualquier** línea, y el archivo viaja a todas las máquinas que tengan la suite. La carpeta y el ZIP van en un lugar de acceso restringido. La guarda de `USUARIOS` (`tulio-plu.js`) evita recargas por accidente desde la interfaz, pero no impide que alguien con el archivo llame al servicio por fuera.
 
 ## 6. Elección de la cuenta de la línea (y el error 500 al eliminar)
 
@@ -165,6 +166,16 @@ Si el usuario no está autorizado, este paso se reemplaza por un aviso de **solo
 4. **Eliminar los bolsillos de ese PLU** con una orden `ChangeOffer` del CM (§9).
 5. **Verificar** que ya no estén.
 6. Si hay más PLU, **repetir** con el siguiente.
+
+**Opciones** (casillas encima de «Ejecutar secuencia»):
+
+| Casilla | Por defecto | Qué hace |
+| --- | --- | --- |
+| Eliminar después de cada PLU | Marcada | Pasos 4 y 5. Desmarcada, cada PLU termina en el paso 3: los bolsillos se agregan y quedan en la línea. |
+| Dejar la línea limpia antes de empezar | Desmarcada | Paso **«Limpieza inicial»** antes del primer PLU: elimina los bolsillos eliminables que ya tenga la línea. |
+| Dejar la línea limpia al terminar | Desmarcada | Paso **«Limpieza final»** después del último PLU. |
+
+Una limpieza sin nada eliminable no envía orden. Las limpiezas tienen su propia barra (Consultar · Eliminar · Verificar), van en el Resumen del Excel de evidencia y en la bitácora.
 
 **Un PLU a la vez, en el orden de la lista.** Dos PLU simultáneos sobre la misma línea mezclarían la evidencia y la eliminación de uno se llevaría los bolsillos del otro.
 
@@ -276,7 +287,7 @@ Si tras excluirlos no queda nada que borrar, no se envía la orden y se dice por
 
 - **Escribe en producción.** La recarga suma saldo real y no se deshace desde aquí.
 - **Credenciales de Tulio en el navegador.** Aunque no están en el código, quedan en el almacenamiento local de la máquina donde se peguen. `localStorage` no es un almacén seguro (mismo criterio que el resto de la suite). Quien tenga esas credenciales puede recargar cualquier línea.
-- **Guarda de interfaz, no control de acceso.** `USUARIO_AGREGAR_PLU` evita recargas por accidente, pero la API key de Tulio es la misma para todos: quien la tenga puede llamar al servicio por fuera de la herramienta.
+- **Guarda de interfaz, no control de acceso.** `USUARIOS` (`tulio-plu.js`) evita recargas por accidente, pero la API key de Tulio es la misma para todos: quien la tenga puede llamar al servicio por fuera de la herramienta.
 - **`host` y `objetoNegocio` sin confirmar** (`1.1.1.1`, `test`): vienen del ejemplo recibido y falta validarlos con el equipo de API.
 - **Timeout de la recarga: no se reintenta.** Si Tulio no responde, hay que verificar los paquetes de la línea antes de repetir, para no sumar dos veces.
 - **Un PLU a la vez por línea.** No hay ejecución masiva: la evidencia de dos recargas simultáneas sobre la misma línea se mezclaría.
@@ -291,7 +302,8 @@ Si tras excluirlos no queda nada que borrar, no se envía la orden y se dice por
 
 | Versión | Cambios |
 | --- | --- |
-| **1.5.0** | **Evidencia en Excel con el formato de la consola**: `evidencias_plu_AAAAMMDD_HHMM.xlsx` con hoja Resumen y una hoja por PLU (activados con el asignado antes, eliminados, no eliminables, activos por fase y request/response de Tulio y del CM). Para eso la eliminación ahora **guarda la petición y la respuesta** del carrito, de la orden y la orden final, incluso cuando fallan. Se mantiene el CSV. |
+| **1.6.0** | **Opciones de la secuencia**: «Eliminar después de cada PLU» viene **marcada** (agregar y eliminar, como hasta ahora); desmarcada, los PLU solo se agregan y los bolsillos quedan (el PLU termina en «Evidencia», barra de 3 etapas). Nuevas casillas **«Dejar la línea limpia antes de empezar»** y **«… al terminar»**: un paso «Limpieza inicial» / «Limpieza final» en la secuencia que elimina los bolsillos eliminables que tenga la línea (si no hay, no envía orden). La parte de Tulio (credenciales, token, recarga, usuarios autorizados) pasa a `assets/tulio-plu.js` para compartirla con «Bolsillos, paquetes y consumos». |
+| 1.5.0 | **Evidencia en Excel con el formato de la consola**: `evidencias_plu_AAAAMMDD_HHMM.xlsx` con hoja Resumen y una hoja por PLU (activados con el asignado antes, eliminados, no eliminables, activos por fase y request/response de Tulio y del CM). Para eso la eliminación ahora **guarda la petición y la respuesta** del carrito, de la orden y la orden final, incluso cuando fallan. Se mantiene el CSV. |
 | 1.4.0 | **Barra de avance por etapas** en el título de cada PLU de la secuencia (Consultar · Aplicar PLU · Evidencia · Eliminar · Verificar), que avanza con cada aviso —incluidos los intentos de espera al CM y los pasos internos de la eliminación— y marca en rojo, ámbar o gris dónde se detuvo; y otra en el título del panel con un tramo por PLU. Los **bolsillos de cada PLU pasan a ser plegables**, cerrados por defecto, con un resumen de cuánto sumó cada uno, y conservan su estado abierto entre repintados. |
 | 1.3.0 | **Resuelve el `ERCRT1002` del CM al crear el carrito** («Missing dependent product … product id:N», que dejaba la eliminación en 500 — caso real: línea 3332917510, producto 10185). El carrito solo llevaba los paquetes de `enabledOptionalBundles`, así que los productos del plan de los que estos dependen nunca entraban. Ahora se lee el id del propio mensaje del CM, se agrega ese producto como `NO_CHANGE` y se reintenta (hasta 10), con corte si el CM pide uno que ya va incluido o si sigue pidiendo más. Al fallar, el registro imprime el inventario de productos del plan para poder diagnosticarlo (§9). |
 | 1.2.0 | Corrige que el botón **Consultar se quedaba con el spinner** girando: `MEUI.autoSpinner` libera el botón cuando la herramienta le pone `disabled = false`, y el manejador no lo hacía — ahora lo hace en un `finally` y en cada salida temprana. Se agrega **eliminar paquetes sin aplicar PLU** (botón 🗑 en la fila y «Eliminar paquetes» en el detalle), que faltaba tras la consulta. El paso 3 suma un **cuadro de texto genérico** para pegar la lista de PLU en cualquier separador (espacio, tabulación, coma, `;`, `\|`), con costo y canal por defecto si solo va el PLU, encabezado opcional y **vista previa** de cómo quedó interpretada cada fila. |

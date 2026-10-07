@@ -240,6 +240,9 @@ function Leer-JsonUtf8($ruta, $timeoutSec) {
 }
 
 Write-Host '  Buscando actualizaciones...' -ForegroundColor Gray
+# Si hay version nueva, la pagina que se abre la muestra en un aviso (una
+# sola vez, al abrir): viaja en la URL como ?nv=<nueva>&va=<actual>.
+$avisoVersion = ''
 if ($sinUpdate) {
   Nota 'Omitido (/sinupdate).'
 } else {
@@ -260,6 +263,7 @@ if ($sinUpdate) {
       Ok ("Ya estas al dia (local {0}, publicada {1})." -f $verLocal, $verRemota)
     } else {
       Aviso ("Hay una version nueva: {0} -> {1}." -f $verLocal, $verRemota)
+      $avisoVersion = ('nv={0}&va={1}' -f $verRemota, $verLocal)
       if ($info.notas) { Nota ("Novedades: {0}" -f $info.notas) }
       Nota "Corre 'actualizar.bat' cuando quieras instalarla (no se aplica sola)."
     }
@@ -406,11 +410,13 @@ try {
 
   if ($abrirReporte -and $prf) {
     $rutaRep = [uri]::EscapeUriString('file:///' + ($htmlReporte -replace '\\', '/'))
-    $urls += ('{0}?prf={1}#cm_user={2}&cm_pass={3}' -f $rutaRep, [uri]::EscapeDataString($prf), $usrEnc, $passEnc)
+    $qVer = if ($avisoVersion) { '&' + $avisoVersion } else { '' }
+    $urls += ('{0}?prf={1}{4}#cm_user={2}&cm_pass={3}' -f $rutaRep, [uri]::EscapeDataString($prf), $usrEnc, $passEnc, $qVer)
   }
   if ($abrirCasos) {
     $rutaCas = [uri]::EscapeUriString('file:///' + ($htmlCasos -replace '\\', '/'))
-    $urls += ('{0}#cm_user={1}&cm_pass={2}' -f $rutaCas, $usrEnc, $passEnc)
+    $qVer = if ($avisoVersion) { '?' + $avisoVersion } else { '' }
+    $urls += ('{0}{3}#cm_user={1}&cm_pass={2}' -f $rutaCas, $usrEnc, $passEnc, $qVer)
   }
   if ($urls.Count -eq 0) { throw 'No quedo ninguna herramienta por abrir.' }
 

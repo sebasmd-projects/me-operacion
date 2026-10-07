@@ -747,6 +747,102 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         MEUI.libre(btn);
         btn.innerHTML = '<i class="bi bi-plus-circle"></i> Cargar paquete';
         preparar();
+
+        // PLU por Tulio: el botón solo existe si cargó tulio-plu.js; el panel
+        // dice si el usuario no está autorizado. Se resetea por línea.
+        if ($("#btnPluAbrir")) {
+            $("#btnPluAbrir").hidden = !global.TulioPLU;
+            if (global.TulioPLU) {
+                $("#pluPanel").classList.add("d-none");
+                $("#pluSalida").innerHTML = "";
+                $("#pluTexto").value = "";
+                pluArmado = false;
+            }
+        }
+    }
+
+    /* =====================================================================
+       10 · PLU POR TULIO (uno o varios)
+       Mismo servicio que «Aplicar PLU de paquete» (assets/tulio-plu.js):
+       RecargaPaquete, de uno en uno. Aquí solo AGREGA: para agregar y
+       eliminar en secuencia está «Aplicar PLU». Un timeout no se reintenta
+       (la recarga pudo aplicarse). Al terminar se refresca la pantalla
+       igual que tras una carga del CM.
+    ===================================================================== */
+    let pluArmado = false;
+    let pluCorriendo = false;
+    const TP = () => global.TulioPLU;
+
+    function pluLeer() {
+        return TP().leerPlus($("#pluTexto").value, $("#pluCanal").value.trim(), $("#pluCosto").value.trim() || "0");
+    }
+    function pluPintar() {
+        const { items, errores } = pluLeer();
+        const btn = $("#btnPluAplicar");
+        $("#pluResumen").innerHTML = errores.length
+            ? `<span class="text-danger">${errores.map(esc).join(" · ")}</span>`
+            : items.length
+                ? `${items.length} PLU: ${items.map(i => esc(i.plu)).join(", ")} · se aplican en este orden a <b class="me-mono">${esc(fila && fila.msisdn)}</b>.`
+                : "Escribe al menos un PLU.";
+        btn.disabled = pluCorriendo || !items.length || errores.length > 0;
+        if (!pluArmado && !btn.dataset.meOcupado) {
+            btn.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Aplicar ${items.length || ""} PLU`;
+        }
+    }
+    function pluDesarmar() { pluArmado = false; pluPintar(); }
+
+    function pluAbrir() {
+        $("#pluPanel").classList.remove("d-none");
+        const puede = TP().puede();
+        $("#pluCampos").hidden = !puede;
+        $("#pluBloqueado").hidden = puede;
+        if (!puede) $("#pluBloqueado").innerHTML = `<b>Solo consulta.</b> No se puede aplicar PLU: ${esc(TP().motivo())}.`;
+        else { $("#pluTexto").focus(); pluPintar(); }
+    }
+    function pluCerrar() { $("#pluPanel").classList.add("d-none"); pluDesarmar(); }
+
+    async function pluAplicar() {
+        const { items, errores } = pluLeer();
+        if (pluCorriendo || !items.length || errores.length || !TP().puede()) return;
+        const msisdn = String(fila && fila.msisdn || "");
+        if (!pluArmado) {
+            pluArmado = true;
+            $("#btnPluAplicar").innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Sí, aplicar ${items.length} PLU a ${esc(msisdn)} en PRODUCCIÓN`;
+            return;
+        }
+        pluArmado = false;
+        pluCorriendo = true;
+        const btn = $("#btnPluAplicar");
+        btn.disabled = true;
+        const salida = $("#pluSalida");
+        const filas = items.map(i => Object.assign({ estado: "En cola", detalle: "" }, i));
+        const pintar = () => {
+            salida.innerHTML = `<table class="table table-sm mb-0 small"><thead><tr><th>#</th><th>PLU</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>`
+                + filas.map((x, n) => `<tr><td>${n + 1}</td><td class="me-mono">${esc(x.plu)}</td>
+                    <td><span class="carga-tag${x.estado === "Aplicado" ? " ya" : x.estado === "Error" ? " precio" : ""}">${esc(x.estado)}</span></td>
+                    <td>${esc(x.detalle)}</td></tr>`).join("")
+                + "</tbody></table>";
+        };
+        pintar();
+        log(`▶ PLU por Tulio: ${items.length} sobre ${msisdn} · ejecuta ${TP().usuario()}`, "warn");
+        let ok = 0;
+        try {
+            for (const x of filas) {
+                x.estado = "Aplicando…"; pintar();
+                const r = await TP().aplicar(msisdn, x.plu, x.costo, x.canal, TP().usuario());
+                x.estado = r.ok ? "Aplicado" : "Error";
+                x.detalle = r.detalle || "";
+                if (r.ok) ok++;
+                log(`${r.ok ? "✔" : "✖"} PLU ${x.plu} · ${msisdn} · ${x.detalle}`, r.ok ? "ok" : "err");
+                pintar();
+            }
+        } finally {
+            pluCorriendo = false;
+            pluPintar();
+        }
+        MEUI.toast(`PLU: ${ok}/${filas.length} aplicado(s).`, ok === filas.length ? "ok" : ok ? "warn" : "err");
+        // El CM tarda en reflejar la recarga: se espera un poco antes de releer.
+        if (ok) { await new Promise(r => setTimeout(r, 2500)); await refrescarPantalla(); }
     }
 
     let cableado = false;
@@ -757,6 +853,13 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         cableado = true;
 
         $("#btnCargaAbrir").addEventListener("click", abrirPanel);
+
+        if (global.TulioPLU && $("#btnPluAbrir")) {
+            $("#btnPluAbrir").addEventListener("click", pluAbrir);
+            $("#btnPluCerrar").addEventListener("click", pluCerrar);
+            $("#btnPluAplicar").addEventListener("click", pluAplicar);
+            ["#pluTexto", "#pluCanal", "#pluCosto"].forEach(s => $(s).addEventListener("input", pluDesarmar));
+        }
 
         let t = null;
         $("#cargaBuscar").addEventListener("input", () => {

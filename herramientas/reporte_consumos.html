@@ -1,4 +1,4 @@
-<!-- reporte_consumos.html · v1.8.1
+<!-- reporte_consumos.html · v1.9.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -975,9 +975,45 @@
             <div id="mdCargaWrap" style="display:none" class="mb-4">
                 <div class="carga-cab">
                     <h6 class="fw-bold mb-0">Cargar paquete <small class="text-muted fw-normal">— agrega
-                            paquetes a esta línea en el CM</small></h6>
-                    <button class="btn btn-sm btn-me-line" type="button" id="btnCargaAbrir">
-                        <i class="bi bi-plus-circle"></i> Cargar paquete</button>
+                            paquetes a esta línea en el CM, o uno o varios PLU por Tulio</small></h6>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-me-line" type="button" id="btnPluAbrir" hidden
+                            title="Aplicar uno o varios PLU (Tulio RecargaPaquete)">
+                            <i class="bi bi-basket"></i> + PLU</button>
+                        <button class="btn btn-sm btn-me-line" type="button" id="btnCargaAbrir">
+                            <i class="bi bi-plus-circle"></i> Cargar paquete</button>
+                    </div>
+                </div>
+
+                <!-- PLU por Tulio (RecargaPaquete), como en «Aplicar PLU»: solo agrega -->
+                <div id="pluPanel" class="carga-panel d-none">
+                    <div id="pluBloqueado" class="carga-alerta warn mb-2" hidden></div>
+                    <div id="pluCampos">
+                        <label class="me-lbl" for="pluTexto">PLU a aplicar</label>
+                        <textarea id="pluTexto" class="form-control form-control-sm me-mono" rows="3"
+                            placeholder="10021&#10;10020 0 PPrepagadaTP&#10;10021, 10022"></textarea>
+                        <div class="me-hint">Uno por renglón o varios separados por coma o espacio. Opcional por
+                            renglón: <span class="me-mono">PLU costo canal</span>.</div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-4">
+                                <label class="me-lbl" for="pluCosto">Costo</label>
+                                <input id="pluCosto" class="form-control form-control-sm me-mono" value="0"
+                                    inputmode="numeric">
+                            </div>
+                            <div class="col-8">
+                                <label class="me-lbl" for="pluCanal">Canal de venta</label>
+                                <input id="pluCanal" class="form-control form-control-sm me-mono"
+                                    value="PPrepagadaTP" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="me-hint mt-1" id="pluResumen">Escribe al menos un PLU.</div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-warning fw-bold" type="button" id="btnPluAplicar"
+                                disabled><i class="bi bi-exclamation-triangle-fill"></i> Aplicar PLU</button>
+                            <button class="btn btn-sm btn-me-line" type="button" id="btnPluCerrar">Cerrar</button>
+                        </div>
+                    </div>
+                    <div id="pluSalida" class="mt-2"></div>
                 </div>
 
                 <div id="cargaPanel" class="carga-panel d-none">
@@ -1172,7 +1208,7 @@
     <script>
         MEUI.init({
             app: "consumos",
-            version: "1.8.1",
+            version: "1.9.0",
             doc: "../doc/reporte-consumos/README.md",
             titulo: "Consumos y Paquetes · CM",
             descripcion: "Datos de la línea, paquetes activos e histórico de consumo (CDR) por rango de fechas",
@@ -1202,6 +1238,8 @@
     <script src="../assets/logica-consumos.js"></script>
 
     <!-- 3b · Carga de paquetes (única parte que ESCRIBE en el CM) -->
+    <!-- Tulio (PLU), compartido con «Aplicar PLU» -->
+    <script src="../assets/tulio-plu.js"></script>
     <script src="../assets/logica-paquetes-carga.js"></script>
 
     <!-- 4 · Enganche entre la lógica y el shell -->

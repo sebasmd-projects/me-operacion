@@ -1,4 +1,4 @@
-<!-- aplicar_plu.html · v1.5.0
+<!-- aplicar_plu.html · v1.6.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -598,8 +598,8 @@
                 <div id="pluBloqueado" class="alert alert-warning py-2 mb-2" hidden></div>
                 <div id="pluCampos">
                     <div class="me-hint mb-2">Una línea y los PLU que se le van a aplicar <strong>uno detrás de
-                            otro</strong>. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y los
-                        elimina; luego sigue con el siguiente.</div>
+                            otro</strong>. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y (si
+                        está marcado abajo) los elimina; luego sigue con el siguiente.</div>
 
                     <label class="me-lbl" for="seqLinea">Línea</label>
                     <input class="form-control form-control-sm me-mono" id="seqLinea" inputmode="numeric"
@@ -642,6 +642,25 @@
                             </thead>
                             <tbody id="seqPreviaCuerpo"></tbody>
                         </table>
+                    </div>
+
+                    <div class="seq-opciones mt-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="seqEliminarCada" checked>
+                            <label class="form-check-label small" for="seqEliminarCada"><b>Eliminar después de cada
+                                    PLU</b> (agregar y eliminar). Desmarcado: los PLU se agregan y los bolsillos
+                                quedan en la línea.</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="seqLimpiarAntes">
+                            <label class="form-check-label small" for="seqLimpiarAntes"><b>Dejar la línea limpia
+                                    antes de empezar</b>: elimina los bolsillos que ya tenga.</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="seqLimpiarDespues">
+                            <label class="form-check-label small" for="seqLimpiarDespues"><b>Dejar la línea limpia al
+                                    terminar</b>: elimina los bolsillos que queden.</label>
+                        </div>
                     </div>
 
                     <div class="me-hint mt-2" id="seqResumen">0 PLU válidos.</div>
@@ -782,7 +801,7 @@
     <script>
         MEUI.init({
             app: "plu",
-            version: "1.5.0",
+            version: "1.6.0",
             doc: "../doc/aplicar-plu/README.md",
             titulo: "Aplicar PLU de paquete",
             descripcion: "Recarga de paquete en Tulio y verificación contra el CM",
@@ -804,6 +823,8 @@
     <script src="../assets/me-api.js"></script>
 
     <!-- 3 · Reglas de negocio de esta herramienta -->
+    <!-- Tulio (token y RecargaPaquete), compartido con Consumos -->
+    <script src="../assets/tulio-plu.js"></script>
     <script src="../assets/logica-plu.js"></script>
 
     <!-- 4 · Enganche entre la lógica y el shell -->

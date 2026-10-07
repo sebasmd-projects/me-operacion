@@ -498,9 +498,13 @@
         el("seqPlusTexto").classList.toggle("is-invalid",
             malos.some(x => x.origen === "texto"));
 
+        const op = opcionesSecuencia();
+        const plan = [op.limpiarAntes ? "limpia la línea" : "",
+            items.length ? `aplica ${items.length - malos.length} PLU ${op.eliminar ? "(agregar y eliminar cada uno)" : "(solo agregar)"}` : "",
+            op.limpiarDespues ? "limpia al terminar" : ""].filter(Boolean).join(" → ");
         el("seqResumen").textContent = `${items.length - malos.length} PLU válido(s)`
             + (malos.length ? ` · ${malos.length} con error (${malos[0].error})` : "")
-            + (items.length ? " · se aplican en este orden, de arriba abajo." : ".");
+            + (items.length ? ` · ${plan}.` : ".");
 
         // Vista previa: deja ver cómo se interpretó cada renglón antes de correr.
         const previa = el("seqPrevia");
@@ -513,6 +517,16 @@
         el("seqEjecutar").disabled = secuencia.corriendo || !lineaOk || !items.length || malos.length > 0;
         return { linea, items };
     }
+
+    function opcionesSecuencia() {
+        return {
+            eliminar: el("seqEliminarCada").checked,
+            limpiarAntes: el("seqLimpiarAntes").checked,
+            limpiarDespues: el("seqLimpiarDespues").checked
+        };
+    }
+    ["seqEliminarCada", "seqLimpiarAntes", "seqLimpiarDespues"].forEach(id =>
+        el(id).addEventListener("change", () => { desarmarSecuencia(); validarSecuencia(); }));
 
     function desarmarSecuencia() {
         secuencia.armado = false;
@@ -646,9 +660,9 @@
             return `<div class="seq-item">
                 <div class="seq-item-cab">
                     <span class="seq-estado ${est}">${MEUI.esc(ETIQUETA_ESTADO[est] || est)}</span>
-                    <span class="seq-item-plu">${i + 1}. PLU ${MEUI.esc(r.plu)}</span>
+                    <span class="seq-item-plu">${i + 1}. ${r.limpieza ? MEUI.esc(r.titulo) : "PLU " + MEUI.esc(r.plu)}</span>
                     ${barraEtapasHTML(r)}
-                    <span class="me-hint">costo ${MEUI.esc(r.costo)} · canal ${MEUI.esc(r.canal)}</span>
+                    ${r.limpieza ? "" : `<span class="me-hint">costo ${MEUI.esc(r.costo)} · canal ${MEUI.esc(r.canal)}${r.sinEliminar ? " · sin eliminar" : ""}</span>`}
                     ${seg !== null ? `<span class="me-hint">${seg}s</span>` : ""}
                     <span class="seq-item-paso ms-auto">${MEUI.esc(r.paso || "")}</span>
                 </div>
@@ -670,24 +684,33 @@
         if (el("seqEjecutar").disabled) return;
         if (!auth.token) { MEUI.toast("Inicia sesión en el CM primero.", "warn"); return; }
 
+        const op = opcionesSecuencia();
         // Doble confirmación: el primer clic arma, el segundo ejecuta.
         if (!secuencia.armado) {
             secuencia.armado = true;
-            el("seqEjecutar").textContent = `Sí, aplicar ${items.length} PLU a ${linea} en PRODUCCIÓN`;
+            el("seqEjecutar").textContent = `Sí, ${op.limpiarAntes ? "limpiar, " : ""}aplicar ${items.length} PLU`
+                + `${op.eliminar ? " y eliminar" : ""}${op.limpiarDespues ? " y limpiar al final" : ""} en ${linea} (PRODUCCIÓN)`;
             return;
         }
         desarmarSecuencia();
 
         secuencia.corriendo = true; secuencia.detener = false;
         secuencia.linea = linea;
-        secuencia.items = items.map(x => ({ plu: x.plu, costo: x.costo, canal: x.canal, estado: "espera" }));
+        const limpieza = titulo => ({ limpieza: true, titulo, plu: "—", costo: "", canal: "", estado: "espera", etapas: ETAPAS_LIMPIEZA });
+        secuencia.items = [
+            ...(op.limpiarAntes ? [limpieza("Limpieza inicial")] : []),
+            ...items.map(x => ({ plu: x.plu, costo: x.costo, canal: x.canal, estado: "espera", sinEliminar: !op.eliminar,
+                etapas: op.eliminar ? ETAPAS_PLU : ETAPAS_PLU.slice(0, 3) })),
+            ...(op.limpiarDespues ? [limpieza("Limpieza final")] : [])
+        ];
         abiertos.clear();   // los índices son de la lista anterior
         el("seqEjecutar").disabled = true;
         el("seqDetener").hidden = false; el("seqDetener").disabled = false;
         el("seqDetener").textContent = "Detener al terminar el PLU actual";
         pintarSecuencia();
 
-        MEUI.log(`▶ Secuencia: ${secuencia.items.length} PLU sobre ${linea} · ejecuta ${usuarioOperador()}`, "warn");
+        MEUI.log(`▶ Secuencia sobre ${linea}: ${op.limpiarAntes ? "limpieza inicial → " : ""}${items.length} PLU `
+            + `${op.eliminar ? "(agregar y eliminar)" : "(solo agregar)"}${op.limpiarDespues ? " → limpieza final" : ""} · ejecuta ${usuarioOperador()}`, "warn");
 
         // La línea se resuelve UNA vez: subscriberId y cuenta no cambian
         // entre PLU, y así la secuencia no repite la misma consulta.
@@ -704,10 +727,11 @@
         if (!filaDe(linea)) { filas.push(fila); render(); }
 
         for (const r of secuencia.items) {
-            if (secuencia.detener) { r.estado = "cancelado"; r.detalle = "Secuencia detenida antes de este PLU."; continue; }
-            const hecho = await correrPluSecuencia(fila, r, parcial => {
-                Object.assign(r, parcial); pintarSecuencia();
-            }, () => secuencia.detener);
+            if (secuencia.detener) { r.estado = "cancelado"; r.detalle = "Secuencia detenida antes de este paso."; continue; }
+            const alParcial = parcial => { Object.assign(r, parcial); pintarSecuencia(); };
+            const hecho = r.limpieza
+                ? await limpiarLinea(fila, r.titulo, alParcial)
+                : await correrPluSecuencia(fila, r, alParcial, () => secuencia.detener, { eliminar: op.eliminar });
             Object.assign(r, hecho);
 
             bitacora.push({
@@ -717,7 +741,7 @@
                 detalle: r.detalle, cambios: r.cambios, orden: r.orden ? r.orden.ordenId : "",
                 estadoOrden: r.orden ? r.orden.estado : ""
             });
-            MEUI.log(`${r.estado === "ok" ? "✔" : r.estado === "aviso" ? "⚠" : "✖"} PLU ${r.plu} · ${linea} · ${r.detalle}`,
+            MEUI.log(`${r.estado === "ok" ? "✔" : r.estado === "aviso" ? "⚠" : "✖"} ${r.limpieza ? r.titulo : "PLU " + r.plu} · ${linea} · ${r.detalle}`,
                 r.estado === "ok" ? "ok" : r.estado === "aviso" ? "warn" : "err");
 
             // La tabla y el detalle reflejan el último estado conocido.
@@ -740,7 +764,7 @@
 
         const ok = secuencia.items.filter(r => r.estado === "ok").length;
         const tipo = ok === secuencia.items.length ? "ok" : ok ? "warn" : "err";
-        MEUI.log(`Secuencia terminada: ${ok} de ${secuencia.items.length} PLU correctos.`, tipo);
+        MEUI.log(`Secuencia terminada: ${ok} de ${secuencia.items.length} paso(s) correctos.`, tipo);
         MEUI.toast(`Secuencia terminada: ${ok}/${secuencia.items.length} correctos.`, tipo);
     });
 

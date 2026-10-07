@@ -66,7 +66,7 @@
         { id: "consumos", titulo: "Bolsillos, Paquetes, Consumos", icono: "bi-bar-chart", url: "reporte_consumos.html" },
         { id: "tipificacion", titulo: "Exportar casos tipificación", icono: "bi-download", url: "export_tipificacion.html" },
         { id: "ajustes", titulo: "Ajustes y paquetes", icono: "bi-cash-coin", url: "export_ajustes.html" },
-        { id: "titularidad", titulo: "Titularidad · Bloqueos de SIM", icono: "bi-shield-check", url: "titularidad.html" },
+        { id: "titularidad", titulo: "Bloqueos SIM x Titularidad", icono: "bi-shield-check", url: "titularidad.html" },
       ]
     },
     {
@@ -74,8 +74,9 @@
         { id: "casos", titulo: "Cierre masivo de casos", icono: "bi-check2-square", url: "reporte_casos_masivos.html" },
         { id: "rechazo", titulo: "Generar archivo de rechazo", icono: "bi-file-earmark-pdf", url: "generar_rechazo.html" },
         { id: "plu", titulo: "Aplicar PLU de paquete", icono: "bi-basket", url: "aplicar_plu.html" },
-        { id: "estado-lineas", titulo: "Estado de líneas", icono: "bi-toggle-off", url: "estado_lineas.html" },
-        { id: "cambio-imsi", titulo: "Cambio de IMSI", icono: "bi-sim", url: "cambio_imsi.html" }
+        { id: "estado-lineas", titulo: "Bloquear/Inactivar líneas", icono: "bi-toggle-off", url: "estado_lineas.html" },
+        { id: "cambio-imsi", titulo: "Cambio IMSI Claro|Tigo", icono: "bi-sim", url: "cambio_imsi.html" },
+        { id: "prefactura", titulo: "Pre-factura", icono: "bi-receipt", url: "prefactura.html" }
       ]
     },
     {
@@ -208,6 +209,10 @@
     const h = new URLSearchParams(location.hash.slice(1));
     const dato = k => q.get(k) || h.get(k) || "";
     const prf = dato("prf"), u = dato("cm_user"), p = dato("cm_pass"), abierto = dato("abierto");
+    // Versión nueva publicada (la detecta dame click.bat): se avisa una sola
+    // vez, al abrir. Al navegar entre herramientas ya no está en la URL.
+    const nv = dato("nv"), va = dato("va");
+    if (/^\d+(\.\d+){0,2}$/.test(nv)) avisoVersion = { nueva: nv, actual: /^\d+(\.\d+){0,2}$/.test(va) ? va : "" };
 
     if (abierto) guardar("me.abierto", abierto);
     if (prf) cred.set("sime", { prf });
@@ -215,7 +220,7 @@
       const previo = cred.get("cm") || {};
       cred.set("cm", { usuario: u || previo.usuario || "", clave: p || previo.clave || "" });
     }
-    if (prf || u || p || abierto) {
+    if (prf || u || p || abierto || nv) {
       try { history.replaceState(null, "", location.pathname); } catch (e) { location.hash = ""; }
       return true;
     }
@@ -349,6 +354,49 @@
     // Pie → documentación de la propia herramienta
     const btnDoc = $("#meVerDoc");
     if (btnDoc) btnDoc.addEventListener("click", () => abrirDoc());
+  }
+
+  /* Aviso de versión nueva: modal simple con el número actual y el nuevo.
+     Solo lo dispara leerArranque (la URL que arma dame click.bat), así que
+     aparece al abrir la herramienta y no al cambiar de una a otra. */
+  let avisoVersion = null;
+  function mostrarAvisoVersion() {
+    if (!avisoVersion) return;
+    const v = avisoVersion;
+    avisoVersion = null;
+    const abrir = () => {
+      if (!global.bootstrap || !global.bootstrap.Modal) {
+        api.log(`Hay una versión nueva: ${v.actual || "?"} → ${v.nueva}. Corre «actualizar.bat» para instalarla.`, "warn");
+        return;
+      }
+      const m = document.createElement("div");
+      m.className = "modal fade";
+      m.id = "meModalVersion";
+      m.tabIndex = -1;
+      m.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Nueva versión ${esc(v.nueva)}</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <p class="mb-2 fs-5">Actual <b class="me-mono">${esc(v.actual || "?")}</b> → Nueva <b class="me-mono">${esc(v.nueva)}</b></p>
+              <p class="mb-0 small text-muted">Para instalarla, cierra las herramientas y ejecuta <b>actualizar.bat</b>.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-sm btn-me" data-bs-dismiss="modal">Entendido</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(m);
+      m.addEventListener("hidden.bs.modal", () => m.remove());
+      global.bootstrap.Modal.getOrCreateInstance(m).show();
+      api.log(`Hay una versión nueva: ${v.actual || "?"} → ${v.nueva}.`, "warn");
+    };
+    // Bootstrap puede cargarse después de me-ui.js: se espera a la página.
+    if (document.readyState === "complete") abrir();
+    else global.addEventListener("load", abrir, { once: true });
   }
 
   /* =====================================================================
@@ -1374,6 +1422,7 @@
       }
       document.addEventListener("me:sesion-cambio", aplicarAperturaPasos);
       setTimeout(ajustarTablas, 250);
+      mostrarAvisoVersion();
       return api;
     }
   };

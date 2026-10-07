@@ -1,5 +1,5 @@
 /* =====================================================================
-   logica-cambio-imsi.js · Cambio de IMSI (SIM) en el CM, en masivo
+   logica-cambio-imsi.js · Cambio IMSI Claro|Tigo (SIM) en el CM, en masivo
    ---------------------------------------------------------------------
    Entrada: un renglón por cambio, `linea;imsi_nuevo`.
    Por renglón se valida ANTES de dejarlo marcar:

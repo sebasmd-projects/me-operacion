@@ -36,19 +36,9 @@
 const CONFIG = {
     get apiBase() { return MEAPI.CONFIG.apiBase; },
 
-    // Tulio: mismo host que ya usa Prepagadas para SIME.
-    tulioBase: "https://tulio.grupo-exito.com",
-    rutaToken: "/identity/connect/token",
-    rutaRecarga: "/apimew/api/v1/MFYGS4TFMNQQ/Recarga/RecargaPaquete",
-
-    // Valores del ejemplo recibido. `host` y `objetoNegocio` van tal cual
-    // vinieron: no están confirmados con el equipo de API (ver README).
-    hostRecarga: "1.1.1.1",
-    objetoNegocio: "test",
-    idAplicacion: "API_MOVIL_EXITO",
-
-    canalPorDefecto: "PPrepagadaTP",
-    costoPorDefecto: "0",
+    // Tulio (endpoints, credenciales, token): assets/tulio-plu.js.
+    get canalPorDefecto() { return TulioPLU.CONFIG.canalPorDefecto; },
+    get costoPorDefecto() { return TulioPLU.CONFIG.costoPorDefecto; },
 
     timeoutMs: 60000,
     maxLineas: 50,
@@ -63,29 +53,10 @@ const CONFIG = {
     intentosEstable: 15
 };
 
-/* Credenciales de Tulio (las que traía `tulio_credentials.json` junto al
-   servidor de la consola). Van aquí, igual que el client_secret del QDN en
-   logica-qdn.js: la herramienta tiene que funcionar sin pedirle nada al
-   analista.
 
-   OJO al repartir: con estas credenciales se puede pedir un token y
-   recargar cualquier línea, y este archivo viaja a todas las máquinas con
-   la suite. La carpeta y el ZIP van en un lugar de acceso restringido, y
-   cuando roten se cambian aquí (ver el apartado de riesgos del README). */
-const TULIO_CRED = {
-    api_key: "3PKRxw0LZTFXQ+9RUM3B5f0z8Slcn7VFbboJaXuekSGyd+e9ZzBsXtBShyECqSZYt3DUM4rEiF5Pmte31gMNeg==",
-    client_id: "3ef5559a-99d8-43c8-b2af-d9c66abd01bb",
-    client_secret: "AY5W76jSIfhhhc+rmwlO9bTrfZa2Nqz8l033U/F38t8=",
-    scope: "UAIUGTFEYFUAPOIYO"
-};
-const credencialesTulio = () => TULIO_CRED;
-
-/* Quién puede aplicar PLU. Se compara contra el usuario de la sesión del
-   CM (el login de Keycloak): hace falta sesión vigente. Es una guarda de
-   interfaz para que nadie recargue por accidente, no un control de acceso
-   del servicio —la API key de Tulio es la misma para todos—. Para
-   habilitar a alguien más se agrega aquí. */
-const USUARIO_AGREGAR_PLU = ["jpelaezg"];
+/* Quién puede aplicar PLU: la lista vive en tulio-plu.js (USUARIOS), la
+   misma para «Aplicar PLU» y para la carga de PLU en Consumos. */
+const USUARIO_AGREGAR_PLU = TulioPLU.USUARIOS;
 
 const auth = MEAPI.auth;
 const getJson = MEAPI.getJson;
@@ -95,27 +66,11 @@ const escHtml = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
 /** Usuario de la sesión del CM (el que queda en la nota y en la bitácora). */
-function usuarioOperador() {
-    const st = MEUI.sesion.estado("cm");
-    return (st && st.usuario) ? st.usuario : "sin sesión identificada";
-}
-
+const usuarioOperador = () => TulioPLU.usuario();
 /** Sesión del CM vigente Y usuario autorizado. */
-function puedeAgregarPlu() {
-    const st = MEUI.sesion.estado("cm");
-    if (!st || (st.estado !== "ok" && st.estado !== "warn")) return false;
-    const usuario = String(st.usuario || "").trim().toLowerCase();
-    return USUARIO_AGREGAR_PLU.some(u => u.toLowerCase() === usuario);
-}
-
+const puedeAgregarPlu = () => TulioPLU.puede();
 /** Por qué no se puede aplicar PLU (texto para la interfaz), o "". */
-function motivoSinPlu() {
-    const st = MEUI.sesion.estado("cm");
-    if (!st || (st.estado !== "ok" && st.estado !== "warn")) {
-        return "hace falta una sesión del CM vigente: es la que dice quién eres";
-    }
-    return `el usuario «${st.usuario || "—"}» no está autorizado para aplicar PLU`;
-}
+const motivoSinPlu = () => TulioPLU.motivo();
 const listoParaPlu = () => puedeAgregarPlu();
 
 /* =====================================================================
@@ -334,155 +289,12 @@ function fmtFechaHora(iso) {
 }
 
 /* =====================================================================
-   4 · TOKEN DE TULIO (client_credentials)
-   ---------------------------------------------------------------------
-   El cuerpo va como multipart/form-data, igual que lo mandaba el servidor
-   Python. Con FormData el navegador pone el boundary solo: por eso NO se
-   fija Content-Type a mano (si se fija, el boundary falta y Tulio
-   responde 400).
+   4 · TOKEN Y RECARGA EN TULIO → assets/tulio-plu.js (compartido)
 ===================================================================== */
-const gestorTulio = {
-    token: null, exp: 0, renovando: null,
-
-    async solicitar() {
-        const cred = credencialesTulio();
-        const cuerpo = new FormData();
-        cuerpo.append("client_id", cred.client_id);
-        cuerpo.append("client_secret", cred.client_secret);
-        cuerpo.append("grant_type", "client_credentials");
-        cuerpo.append("scope", cred.scope);
-
-        const r = await fetch(CONFIG.tulioBase + CONFIG.rutaToken, { method: "POST", body: cuerpo });
-        const texto = await r.text();
-        let datos = null;
-        try { datos = texto ? JSON.parse(texto) : null; } catch (e) { /* no era JSON */ }
-        if (!r.ok) {
-            throw new Error(`Tulio ${r.status} pidiendo el token: ${String(texto).slice(0, 200)}`);
-        }
-        const token = datos && typeof datos.access_token === "string" ? datos.access_token : "";
-        if (!token) throw new Error("Tulio no devolvió access_token.");
-
-        this.token = token;
-        const vida = Number(datos.expires_in || 300);
-        this.exp = Date.now() + Math.max(30, vida - 60) * 1000;
-        MEUI.log(`✔ Token de Tulio obtenido (vence en ${vida}s).`, "ok");
-        return token;
-    },
-
-    async obtener(forzar) {
-        if (!forzar && this.token && Date.now() < this.exp) return this.token;
-        if (this.renovando) return this.renovando;
-        this.renovando = this.solicitar().finally(() => { this.renovando = null; });
-        return this.renovando;
-    },
-
-    reset() { this.token = null; this.exp = 0; }
-};
-
-/* =====================================================================
-   5 · APLICAR EL PLU (RecargaPaquete)
-===================================================================== */
-const idTransaccion = () => (crypto.randomUUID ? crypto.randomUUID()
-    : "ME-" + Date.now() + "-" + Math.random().toString(16).slice(2));
-
-function payloadRecarga(msisdn, plu, costo, canal, usuario) {
-    const sello = new Date().toISOString().replace("Z", "-05:00");
-    return {
-        cabeceraEntrada: {
-            uuid: idTransaccion(),
-            idAplicacion: CONFIG.idAplicacion,
-            fechaTransaccion: sello,
-            host: CONFIG.hostRecarga,
-            usuario,
-            objetoNegocio: CONFIG.objetoNegocio,
-            operacion: "RecargaPaquete"
-        },
-        DatosEntradaRecargaPaquete: {
-            idTransaccion: idTransaccion(),
-            canalVenta: canal,
-            lineaTelefonica: msisdn,
-            pluPaquete: plu,
-            costoPaquete: Number(costo),
-            fechaSolicitud: sello
-        }
-    };
-}
-
-async function recargaUnaVez(payload, token) {
-    const controlador = new AbortController();
-    const temporizador = setTimeout(() => controlador.abort(), CONFIG.timeoutMs);
-    const t0 = performance.now();
-    try {
-        const r = await fetch(CONFIG.tulioBase + CONFIG.rutaRecarga, {
-            method: "POST", signal: controlador.signal,
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + token,
-                "X-Api-Key": credencialesTulio().api_key
-            },
-            body: JSON.stringify(payload)
-        });
-        const texto = await r.text();
-        let cuerpo = null;
-        try { cuerpo = texto ? JSON.parse(texto) : null; } catch (e) { /* no era JSON */ }
-        return { ok: r.ok, status: r.status, cuerpo, texto, ms: Math.round(performance.now() - t0) };
-    } finally {
-        clearTimeout(temporizador);
-    }
-}
-
-/**
- * Aplica el PLU. El éxito NO es el HTTP 200: Tulio marca el resultado en
- * `cabeceraSalida.estado.estado` y en `datosSalida.estado`, y los dos
- * tienen que venir en "000" (mismo criterio que el servidor Python).
- */
-async function aplicarPlu(msisdn, plu, costo, canal) {
-    const usuario = usuarioOperador();
-    const payload = payloadRecarga(msisdn, plu, costo, canal, usuario);
-    const evidencia = { request: { url: CONFIG.tulioBase + CONFIG.rutaRecarga, body: payload } };
-
-    for (let intento = 1; intento <= 2; intento++) {
-        let token;
-        try {
-            token = await gestorTulio.obtener(intento === 2);
-        } catch (e) {
-            return { ok: false, detalle: "No se pudo autenticar en Tulio: " + e.message, evidencia };
-        }
-
-        let resp;
-        try {
-            resp = await recargaUnaVez(payload, token);
-        } catch (e) {
-            const esTimeout = e && e.name === "AbortError";
-            return {
-                ok: false, evidencia,
-                // Un timeout NO se reintenta: la recarga pudo haberse
-                // aplicado y repetirla la sumaría dos veces.
-                detalle: esTimeout
-                    ? "Tiempo de espera agotado. NO se reintenta: verifica los paquetes antes de repetir."
-                    : "Error de comunicación con Tulio: " + (e.message || e)
-            };
-        }
-
-        // 401: el token venció → se renueva UNA vez y se repite.
-        if (resp.status === 401 && intento === 1) { gestorTulio.reset(); continue; }
-
-        evidencia.response = resp.cuerpo || { httpStatus: resp.status, texto: (resp.texto || "").slice(0, 500) };
-        const estado = resp.cuerpo?.cabeceraSalida?.estado || {};
-        const estadoDatos = resp.cuerpo?.datosSalida?.estado;
-        const exito = resp.ok && String(estado.estado) === "000" && String(estadoDatos) === "000";
-
-        return {
-            ok: exito, httpStatus: resp.status, ms: resp.ms, evidencia,
-            codigo: estado.estado != null ? String(estado.estado) : String(resp.status),
-            detalle: exito
-                ? String(estado.descripcion || "Transacción Exitosa")
-                : "Tulio no confirmó la recarga: " + String(estado.descripcion || (resp.texto || "").slice(0, 200) || "error desconocido")
-        };
-    }
-    return { ok: false, detalle: "No se pudo aplicar el PLU.", evidencia };
-}
+const gestorTulio = TulioPLU.gestor;
+const idTransaccion = TulioPLU.idTransaccion;
+/** Aplica el PLU en Tulio como el usuario de la sesión. */
+const aplicarPlu = (msisdn, plu, costo, canal) => TulioPLU.aplicar(msisdn, plu, costo, canal, usuarioOperador());
 
 /* =====================================================================
    6 · ESPERAR A QUE EL CM REFLEJE EL CAMBIO
@@ -998,11 +810,16 @@ async function eliminarPaquetes(fila, esperados, alPaso) {
    línea mezclarían la evidencia y la eliminación de uno se llevaría los
    paquetes del otro.
 ===================================================================== */
-/** Un PLU completo sobre una línea. Devuelve el renglón de la secuencia. */
-async function correrPluSecuencia(fila, item, alPaso, cancelado) {
+/** Un PLU completo sobre una línea. Devuelve el renglón de la secuencia.
+    opciones.eliminar (por defecto true): después de cargarlo, eliminar los
+    bolsillos. En false, el PLU termina en «Evidencia» y los bolsillos
+    quedan en la línea. */
+async function correrPluSecuencia(fila, item, alPaso, cancelado, opciones) {
+    const eliminar = !opciones || opciones.eliminar !== false;
     const r = {
         msisdn: fila.msisdn, plu: item.plu, costo: item.costo, canal: item.canal,
         estado: "corriendo", paso: "", cambios: [], omitidos: [], restantes: [],
+        etapas: eliminar ? ETAPAS_PLU : ETAPAS_PLU.slice(0, 3), sinEliminar: !eliminar,
         inicio: Date.now()
     };
     /* Cada aviso dice en qué ETAPA va (índice de ETAPAS_PLU) y, opcional,
@@ -1048,6 +865,13 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
             r.estado = "aviso";
             r.detalle = "Tulio confirmó la recarga pero el CM no muestra bolsillos nuevos ni saldo sumado. "
                 + "No se eliminó nada: revisa la línea antes de repetir este PLU.";
+            return r;
+        }
+
+        if (!eliminar) {
+            r.estado = "ok";
+            r.final = despues;
+            r.detalle = `${r.cambios.length} bolsillo(s) agregado(s). No se eliminan: «eliminar después de cada PLU» está desmarcado.`;
             return r;
         }
 
@@ -1107,10 +931,74 @@ async function correrPluSecuencia(fila, item, alPaso, cancelado) {
     }
 }
 
+/** Deja la línea SIN bolsillos eliminables (antes de empezar o al terminar
+    la secuencia). Usa la misma orden ChangeOffer que la eliminación de cada
+    PLU, sobre lo que la línea tenga en ese momento. */
+async function limpiarLinea(fila, titulo, alPaso) {
+    const r = {
+        msisdn: fila.msisdn, plu: "—", costo: "", canal: "", limpieza: true, titulo,
+        estado: "corriendo", paso: "", cambios: [], omitidos: [], restantes: [],
+        etapas: ETAPAS_LIMPIEZA, inicio: Date.now(), etapa: 0, fraccion: 0
+    };
+    const aviso = (p, etapa, fraccion) => {
+        r.paso = p;
+        if (etapa != null && etapa !== r.etapa) { r.etapa = etapa; r.fraccion = 0; }
+        if (fraccion != null) r.fraccion = Math.max(r.fraccion || 0, Math.min(1, fraccion));
+        if (alPaso) alPaso(r);
+    };
+    try {
+        aviso("Consultando los bolsillos de la línea", 0);
+        const actual = await consultarLinea(fila.msisdn);
+        if (actual.estado === "ERROR" || actual.estado === "NO_EXISTE") {
+            throw new Error("no se pudo consultar la línea: " + (actual.detalle || "sin detalle"));
+        }
+        r.antes = actual;
+        const eliminables = (actual.paquetes || []).filter(esEliminable);
+        if (!eliminables.length) {
+            r.estado = "ok"; r.final = actual;
+            r.detalle = "La línea no tenía bolsillos eliminables: no se envió ninguna orden.";
+            return r;
+        }
+        aviso(`Eliminando ${eliminables.length} bolsillo(s)`, 1);
+        let subpasos = 0;
+        const borrado = await eliminarPaquetes(actual,
+            [...new Set((actual.paquetes || []).map(b => b.bundleId))],
+            p => aviso(p, 1, Math.min(0.95, ++subpasos / 8)));
+        r.orden = borrado;
+        r.omitidos = borrado.omitidos || [];
+        if (!borrado.ok) throw new Error(borrado.detalle || "la eliminación no se confirmó");
+
+        aviso("Verificando que ya no estén", 2);
+        await espera(CONFIG.esperaCmMs);
+        const verif = await esperarEstable(fila.msisdn, huellaPaquetes(actual),
+            (i, n) => aviso(`Verificando (${i}/${n})`, 2, i / n));
+        const final = verif.fila || actual;
+        r.final = final;
+        r.restantes = (final.paquetes || []).filter(esEliminable).map(b => b.bundleId);
+        if (r.restantes.length) {
+            r.estado = "error";
+            r.detalle = `${borrado.detalle}. Siguen activos: ${r.restantes.join(", ")}.`;
+            return r;
+        }
+        r.estado = "ok";
+        r.detalle = `${eliminables.length} bolsillo(s) eliminado(s)` + (borrado.ordenId ? ` · orden ${borrado.ordenId}` : "");
+        return r;
+    } catch (e) {
+        r.estado = "error";
+        r.detalle = e.message || String(e);
+        return r;
+    } finally {
+        r.fin = Date.now();
+        r.paso = "";
+    }
+}
+
 /* =====================================================================
    10b · PINTADO DE LA SECUENCIA: barra por etapas y bolsillos plegables
 ===================================================================== */
 const ETAPAS_PLU = ["Consultar", "Aplicar PLU", "Evidencia", "Eliminar", "Verificar"];
+const ETAPAS_LIMPIEZA = ["Consultar", "Eliminar", "Verificar"];
+const etapasDe = r => r.etapas || ETAPAS_PLU;
 
 /**
  * Barra del título de un PLU, un tramo por etapa. Se llena según el aviso
@@ -1122,7 +1010,8 @@ const ETAPAS_PLU = ["Consultar", "Aplicar PLU", "Evidencia", "Eliminar", "Verifi
 function barraEtapasHTML(r) {
     const est = r.estado || "espera";
     const actual = r.etapa == null ? -1 : r.etapa;
-    const tramos = ETAPAS_PLU.map((nombre, i) => {
+    const ETAPAS = etapasDe(r);
+    const tramos = ETAPAS.map((nombre, i) => {
         let clase = "", ancho = 0;
         if (est === "ok") { clase = "hecho"; ancho = 100; }
         else if (est === "espera") { ancho = 0; }
@@ -1137,12 +1026,12 @@ function barraEtapasHTML(r) {
             <span class="etapa-fill" style="width:${ancho}%"></span></span>`;
     }).join("");
 
-    const n = est === "ok" ? ETAPAS_PLU.length : est === "espera" ? 0 : actual + 1;
+    const n = est === "ok" ? ETAPAS.length : est === "espera" ? 0 : actual + 1;
     const rotulo = est === "espera" ? "en cola"
         : est === "ok" ? "completo"
-            : `${Math.min(n, ETAPAS_PLU.length)}/${ETAPAS_PLU.length} · ${ETAPAS_PLU[Math.max(0, actual)]}`;
-    return `<span class="etapas" role="progressbar" aria-valuemin="0" aria-valuemax="${ETAPAS_PLU.length}"
-        aria-valuenow="${Math.min(n, ETAPAS_PLU.length)}" aria-label="Avance del PLU">${tramos}</span>
+            : `${Math.min(n, ETAPAS.length)}/${ETAPAS.length} · ${ETAPAS[Math.max(0, actual)]}`;
+    return `<span class="etapas" role="progressbar" aria-valuemin="0" aria-valuemax="${ETAPAS.length}"
+        aria-valuenow="${Math.min(n, ETAPAS.length)}" aria-label="Avance">${tramos}</span>
         <span class="etapas-rotulo">${escHtml(rotulo)}</span>`;
 }
 
@@ -1162,14 +1051,14 @@ function barraSecuenciaHTML(items) {
         else if (est === "cancelado") { clase = "parado"; ancho = 100; }
         else if (est === "corriendo") {
             clase = "curso";
-            ancho = Math.round((((r.etapa || 0) + (r.fraccion || 0)) / ETAPAS_PLU.length) * 100);
+            ancho = Math.round((((r.etapa || 0) + (r.fraccion || 0)) / etapasDe(r).length) * 100);
         }
-        return `<span class="etapa ${clase}" title="${escHtml(`PLU ${r.plu}`)}">
+        return `<span class="etapa ${clase}" title="${escHtml(r.titulo || `PLU ${r.plu}`)}">
             <span class="etapa-fill" style="width:${ancho}%"></span></span>`;
     }).join("");
     return `<span class="etapas etapas-seq" role="progressbar" aria-valuemin="0"
         aria-valuemax="${total}" aria-valuenow="${hechos}" aria-label="Avance de la secuencia">${tramos}</span>
-        <span class="etapas-rotulo">${hechos}/${total} PLU</span>`;
+        <span class="etapas-rotulo">${hechos}/${total} paso${total === 1 ? "" : "s"}</span>`;
 }
 
 /** Cantidad corta para el resumen plegado: en datos, directo en MB/GB. */
@@ -1297,7 +1186,7 @@ function textoOrden(r) {
     const f = r.orden?.evidencia?.finalOrder;
     return f ? `${f.id} · ${f.state || ""}` : "";
 }
-const pasoConFalla = r => r.estado === "error" ? (ETAPAS_PLU[r.etapa] || "") : "";
+const pasoConFalla = r => r.estado === "error" ? (etapasDe(r)[r.etapa] || "") : "";
 const duracionS = r => r.inicio ? Math.round(((r.fin || Date.now()) - r.inicio) / 1000) : "";
 const listaPaquetes = xs => xs.map(x => `${x.b.bundleId} ${x.b.nombre}`).join("; ");
 
@@ -1312,7 +1201,7 @@ function descargarEvidenciaXlsx(linea, items) {
         "Paquetes eliminados", "Detalle de eliminados", "No eliminables", "Orden de eliminación", "Paquetes remanentes"]];
     items.forEach((r, i) => {
         const d = datosEvidencia(r);
-        resumen.push([i + 1, linea, r.plu, Number(r.costo), r.canal, ETIQUETA_XLS[r.estado] || r.estado || "",
+        resumen.push([i + 1, linea, r.limpieza ? r.titulo : r.plu, r.limpieza ? "" : Number(r.costo), r.canal, ETIQUETA_XLS[r.estado] || r.estado || "",
             pasoConFalla(r), r.detalle || "", fechaXls(r.inicio), fechaXls(r.fin), duracionS(r),
             r.antes?.subscriberId || "", textoTulio(r),
             r.cambios ? d.activados.length : "", listaPaquetes(d.activados),
@@ -1331,7 +1220,7 @@ function descargarEvidenciaXlsx(linea, items) {
         fechaXls(x.b.inicio), fechaXls(x.b.fin)];
 
     items.forEach((r, i) => {
-        if (!r.antes) return;                    // no se llegó ni a consultar
+        if (!r.antes || r.limpieza) return;      // no se llegó a consultar, o es una limpieza (va en el Resumen)
         const d = datosEvidencia(r);
         const aoa = [
             ["Línea", linea], ["PLU", r.plu], ["Costo", Number(r.costo)], ["Canal", r.canal],
@@ -1394,7 +1283,7 @@ function filasSecuencia(msisdn, items) {
     const rows = [];
     items.forEach((r, i) => {
         const orden = r.orden || {};
-        const base = [i + 1, msisdn, r.plu, r.costo, r.canal, r.estado || "", r.detalle || "",
+        const base = [i + 1, msisdn, r.limpieza ? r.titulo : r.plu, r.costo, r.canal, r.estado || "", r.detalle || "",
             orden.ordenId || "", orden.estado || ""];
         if (!(r.cambios || []).length) { rows.push([...base, "", "", "", "", "", "", ""]); return; }
         const restantes = new Set(r.restantes || []);

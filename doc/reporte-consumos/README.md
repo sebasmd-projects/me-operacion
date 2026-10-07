@@ -1,6 +1,6 @@
 # Consumos y Paquetes (CM) — Documentación técnica
 
-> **Versión: v1.8.1** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.9.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para traer, por línea, **datos básicos de la línea**, sus **paquetes activos** (uso y balance), sus **movimientos** (compras, paquetes, recurrencias) y su **histórico de consumo** (llamadas, datos y SMS) desde el CM (Optiva), con filtros, paginación, gráficas y exportación.
@@ -29,7 +29,8 @@ Herramienta para traer, por línea, **datos básicos de la línea**, sus **paque
 |---|---|
 | `reporte_consumos.html` | Solo marcado: KPIs, pasos, tabla principal y modal de detalle (paquetes + histórico + gráficas). |
 | `assets/logica-consumos.js` | Reglas de negocio: consultas al CM, clasificación del histórico, tabla, filtros, gráficas y exportación. |
-| `assets/logica-paquetes-carga.js` | **Cargar paquete**: única parte que escribe en el CM (catálogo de la oferta, carrito, orden y verificación). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
+| `assets/logica-paquetes-carga.js` | **Cargar paquete** y **+ PLU**: lo que escribe (catálogo de la oferta, carrito, orden y verificación en el CM; PLU por Tulio). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
+| `assets/tulio-plu.js` | Recarga de PLU en Tulio y usuarios autorizados, **compartido con «Aplicar PLU»**. |
 | `assets/me-consumos-puente.js` | Enganche con el shell: sesión del CM, credenciales compartidas y exportación. |
 | `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las herramientas de esta suite. |
 
@@ -190,7 +191,11 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
   - **Un único filtro Todos / Datos / Voz / SMS**, ubicado justo encima de la tabla de detalle y los botones de exportación: recalcula tarjetas, gráficas, tabla **y** exportación **a la vez** y **sin volver a consultar el CM** (es un filtro sobre lo ya traído). Se puso ahí a propósito — lo que exportas es exactamente lo que ves en la tabla.
   - Tabla de detalle: fecha, tipo (con dirección MO/MT cuando aplica), **origen y destino en columnas separadas**, uso (duración `hh:mm:ss` o datos, según el tipo), bundle, monto e ID. Botón **👁 Detalle** por fila: despliega una ficha con los campos crudos relevantes del registro (cuenta, línea, fechas de evento/registro, regla de tarifa, cargo, balance tras el evento, plan y bundle), sin los códigos internos de facturación que no tienen catálogo.
 
-### Cargar paquete (v1.8.0) — lo único que escribe en el CM
+### + PLU (v1.9.0) — uno o varios PLU por Tulio
+
+Junto a «Cargar paquete», el botón **+ PLU** abre un panel para aplicar uno o varios PLU a la línea con `RecargaPaquete` de Tulio (el mismo servicio de «Aplicar PLU», en `assets/tulio-plu.js`). Se escriben uno por renglón o separados por coma o espacio, opcionalmente `PLU costo canal` (por defecto costo 0 y canal `PPrepagadaTP`). Doble confirmación; se aplican de uno en uno y un fallo no detiene los demás. **Solo agrega**: para agregar y eliminar está «Aplicar PLU». Habilitado para los usuarios de `USUARIOS` (`tulio-plu.js`) con sesión del CM; los demás ven el motivo. Al terminar se refresca la pantalla como tras una carga del CM.
+
+### Cargar paquete (v1.8.0) — orden del CM
 
 Vive dentro del detalle, **debajo de «Paquetes · Uso y Balance»**, porque ese es el sitio donde el analista acaba de ver lo que la línea tiene: agregar es el paso natural siguiente. Está plegada por defecto (la herramienta sigue abriéndose como consulta) y se despliega con el botón **Cargar paquete**. Desde la v1.8.1 la línea y su catálogo se **precargan al abrir el detalle**: mientras tanto el botón dice «Cargando catálogo…» y está deshabilitado; cuando termina pasa a **+ Cargar paquete** (o a «Reintentar catálogo» si falló).
 
@@ -272,7 +277,8 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 
 | Versión | Cambios |
 |---|---|
-| **1.8.1** | **Fix «Cargar paquete»**: el catálogo se pedía al hacer clic, pero el spinner quedaba en el botón que el panel oculta, así que parecía no pasar nada hasta darle «Cancelar». Ahora el catálogo se **precarga al abrir el detalle de la línea**: el botón muestra «Cargando catálogo…» deshabilitado y se habilita como «+ Cargar paquete» cuando está listo (o «Reintentar catálogo» si falló). Las respuestas de una línea que ya se cerró se descartan. |
+| **1.9.0** | **Agregar uno o varios PLU** desde el detalle de la línea: botón **«+ PLU»** junto a «Cargar paquete». Se escriben los PLU (uno por renglón o separados por coma/espacio; opcional `PLU costo canal`), se confirman dos veces y se aplican en Tulio de uno en uno (`RecargaPaquete`, el mismo servicio de «Aplicar PLU», compartido en `assets/tulio-plu.js`). Solo agrega; un fallo no detiene los demás. Habilitado solo para los usuarios de `USUARIOS` en `tulio-plu.js` con sesión del CM. Al terminar se refrescan paquetes, tabla, movimientos y consumo. |
+| 1.8.1 | **Fix «Cargar paquete»**: el catálogo se pedía al hacer clic, pero el spinner quedaba en el botón que el panel oculta, así que parecía no pasar nada hasta darle «Cancelar». Ahora el catálogo se **precarga al abrir el detalle de la línea**: el botón muestra «Cargando catálogo…» deshabilitado y se habilita como «+ Cargar paquete» cuando está listo (o «Reintentar catálogo» si falló). Las respuestas de una línea que ya se cerró se descartan. |
 | 1.8.0 | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. Al quedar aplicada se refrescan paquetes, tabla principal, movimientos y consumo con datos nuevos del CM. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
 | **1.7.0** | La identificación aparece en la cabecera del detalle con botón de copia rápida. La resolución del titular incorpora dos respaldos confirmados con el flujo de Postman: `individual.fullName` y el `id` de la cuenta como posible `individualID` cuando falta la relación `Individual`, conservando la búsqueda multinivel existente. |
 | 1.6 | **Corrige un recorte introducido en la 1.5** y agrega reintentos. (1) El paginador usaba el tamaño de la página para decidir si quedaban más registros; como el CM no devuelve páginas de tamaño constante, cualquier página más corta que la anterior se tomaba por la última y la consulta terminaba antes de tiempo —trayendo **menos** registros que antes de la 1.5—. Ahora la única condición de fin es que una página no aporte **nada nuevo**. (2) Cuando el CM responde 500 en una página, ya no se corta la paginación con un aviso: se **reintenta** la misma petición (2 veces, con espera creciente) y, si sigue fallando, se vuelve a pedir la misma ventana con **la mitad de registros** hasta un piso de 50 — el tamaño reducido se mantiene para las páginas siguientes. Solo si se agota todo eso se da por perdida, devolviendo igual lo ya traído. (3) Una falla total de los movimientos ya no se muestra como "0 movimientos": queda marcada como incompleta. |

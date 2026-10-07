@@ -20,15 +20,16 @@ GitHub ni permisos de administrador.
 | **Prepagadas · SIME ⇄ CM** | Verificación cruzada de líneas prepagadas y alta de suscripciones en SIME. | [reporte-prepagadas](reporte-prepagadas/README.md) |
 | **Cierre masivo de casos** | Búsqueda del ticket de cada caso y cierre por lotes en el CM, con simulación previa. | [cerrar-casos](cerrar-casos/README.md) |
 | **Exportar casos · Tipificación** | Descarga masiva de casos del CRM por rango de fechas y estados. | [reporte-tipificacion](reporte-tipificacion/README.md) |
-| **Titularidad · Bloqueos de SIM** | Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS, para resolver el bloqueo de SIM en la llamada. | [titularidad](titularidad/README.md) |
+| **Bloqueos SIM x Titularidad** | Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS, para resolver el bloqueo de SIM en la llamada. | [titularidad](titularidad/README.md) |
 | **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) · [análisis: recarga de paquetes](reporte-ajustes/recarga-de-paquetes-cm.md) |
 | **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueos, conciliación y, para usuarios autorizados, aprovisionar/desaprovisionar) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) · motores: [validador-qdn](validador-qdn/README.md) · [consulta-qdn-tigo](consulta-qdn-tigo/README.md) · [hlr-cruzado](hlr-cruzado/README.md) |
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |
 | **Bolsillos, Paquetes, Consumos · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. Además **carga paquetes** en el CM desde el detalle de la línea. | [reporte-consumos](reporte-consumos/README.md) |
 | **Aplicar PLU de paquete** | Aplica un PLU en Tulio sobre una línea, en secuencia (consultar → agregar → eliminar), y verifica en el CM cuánto se sumó a cada paquete; evidencia en Excel y CSV. Solo usuarios autorizados. | [aplicar-plu](aplicar-plu/README.md) |
-| **Estado de líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. Solo usuarios autorizados. | [estado-lineas](estado-lineas/README.md) |
-| **Cambio de IMSI** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. Solo usuarios autorizados. | [cambio-imsi](cambio-imsi/README.md) |
+| **Bloquear/Inactivar líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. Solo usuarios autorizados. | [estado-lineas](estado-lineas/README.md) |
+| **Cambio IMSI Claro\|Tigo** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. Solo usuarios autorizados. | [cambio-imsi](cambio-imsi/README.md) |
+| **Pre-factura** | Pre-factura mensual del Plan Corporativo: corte del 15, valores e impuestos por línea, resumen por empresa y un archivo por filial. Todo local, sin servicios. | [prefactura](prefactura/README.md) |
 | **Convertir audio a MP3** | Convierte localmente uno o varios audios OGG, M4A u otros formatos compatibles y genera archivos `mp3-*.mp3`. | [audio-mp3](audio-mp3/README.md) |
 
 Todas comparten una **base común** (marco visual, sesión, acceso al CM) y

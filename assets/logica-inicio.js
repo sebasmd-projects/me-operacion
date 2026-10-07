@@ -209,6 +209,8 @@ const PROYECTOS = [
                 archivos: [
                     { nombre: "reporte_consumos.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/reporte_consumos.html" },
                     { nombre: "logica-consumos.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-consumos.js" },
+                    { nombre: "logica-paquetes-carga.js", tipo: "JS · cargar paquete y PLU", icono: "bi-filetype-js", ruta: "assets/logica-paquetes-carga.js" },
+                    { nombre: "tulio-plu.js", tipo: "JS · Tulio RecargaPaquete (compartido)", icono: "bi-filetype-js", ruta: "assets/tulio-plu.js" },
                     { nombre: "me-consumos-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-consumos-puente.js" }
                 ]
             },
@@ -260,6 +262,7 @@ const PROYECTOS = [
                 descripcion: "Archivos de la herramienta. La recarga escribe en produccion y solo esta habilitada para los usuarios de USUARIO_AGREGAR_PLU con sesion del CM vigente.",
                 archivos: [
                     { nombre: "aplicar_plu.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/aplicar_plu.html" },
+                    { nombre: "tulio-plu.js", tipo: "JS · Tulio RecargaPaquete (compartido)", icono: "bi-filetype-js", ruta: "assets/tulio-plu.js" },
                     { nombre: "logica-plu.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-plu.js" },
                     { nombre: "me-plu-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-plu-puente.js" }
                 ]
@@ -276,7 +279,7 @@ const PROYECTOS = [
     {
         id: "titularidad",
         numero: 13,
-        nombre: "Titularidad · Bloqueos de SIM",
+        nombre: "Bloqueos SIM x Titularidad",
         descripcion: "El log de comprobación de titularidad de Genesis, cruzado con el CM y con el HLR/HSS. Carga los más de doscientos mil registros, y sobre las líneas que se marquen (de 1 a n) trae titular y estado del CM y en qué red está la línea: Claro, Tigo, ambas o ninguna. Existe para que el call resuelva el bloqueo de SIM en la llamada, sin escalarlo.",
         estado: "Consulta",
         abrir: "herramientas/titularidad.html",
@@ -304,14 +307,14 @@ const PROYECTOS = [
     {
         id: "estado-lineas",
         numero: 11,
-        nombre: "Estado de líneas",
+        nombre: "Bloquear/Inactivar líneas",
         descripcion: "Bloquea o inactiva líneas en el CM, en masivo: tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, y estado real de cada línea tras la orden. Al inactivar, la IMSI pasa a HELD y hay que liberarla en el BSS.",
         estado: "Operación",
         abrir: "herramientas/estado_lineas.html",
         entregables: [
             {
                 nombre: "Código", tipo: "codigo",
-                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Estado de líneas y Cambio de IMSI.",
+                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
                 archivos: [
                     { nombre: "estado_lineas.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/estado_lineas.html" },
                     { nombre: "logica-estado-lineas.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-estado-lineas.js" },
@@ -331,14 +334,14 @@ const PROYECTOS = [
     {
         id: "cambio-imsi",
         numero: 12,
-        nombre: "Cambio de IMSI",
+        nombre: "Cambio IMSI Claro|Tigo",
         descripcion: "Cambia la SIM (IMSI) de líneas en el CM, en masivo, desde renglones línea;imsi_nueva: valida que la línea esté activa y la IMSI nueva disponible, exige nota y confirma contra el CM que la línea quedó con la SIM nueva.",
         estado: "Operación",
         abrir: "herramientas/cambio_imsi.html",
         entregables: [
             {
                 nombre: "Código", tipo: "codigo",
-                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Estado de líneas y Cambio de IMSI.",
+                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
                 archivos: [
                     { nombre: "cambio_imsi.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/cambio_imsi.html" },
                     { nombre: "logica-cambio-imsi.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-cambio-imsi.js" },
@@ -351,6 +354,32 @@ const PROYECTOS = [
                 descripcion: "Orden ChangeSim (carrito + orden), validaciones de la IMSI nueva y verificación posterior.",
                 archivos: [
                     { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/cambio-imsi/README.md" }
+                ]
+            }
+        ]
+    },
+    {
+        id: "prefactura",
+        numero: 14,
+        nombre: "Pre-factura",
+        descripcion: "Pre-factura mensual del Plan Corporativo: aplica el corte (día 15) a las observaciones de la hoja Activas, calcula valor bruto, IVA, ICO, retefuente y neto de cada línea, resume por empresa y tipo, compara con el mes anterior y genera un archivo por filial (hojas Facturas y Liquidación). Todo local.",
+        estado: "Operación",
+        abrir: "herramientas/prefactura.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. No consulta ningún servicio: lee el Excel del Plan Corporativo en el navegador.",
+                archivos: [
+                    { nombre: "prefactura.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/prefactura.html" },
+                    { nombre: "logica-prefactura.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-prefactura.js" },
+                    { nombre: "me-prefactura-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-prefactura-puente.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "Paso a paso del proceso en Excel que reemplaza, reglas de corte, tarifas e impuestos, y archivos que genera.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/prefactura/README.md" }
                 ]
             }
         ]

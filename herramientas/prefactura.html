@@ -1,0 +1,357 @@
+<!-- prefactura.html · v1.0.0
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+
+       assets/me-ui.css / me-ui.js        marco visual, registro, tablas
+       assets/logica-prefactura.js        reglas del corte, tarifas,
+                                          impuestos y libros de Excel
+       assets/me-prefactura-puente.js     enganche con la interfaz
+
+     Pre-factura del Plan Corporativo. Todo es local: no llama a ningún
+     servicio. Ver doc/prefactura/README.md.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Pre-factura</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../assets/me-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
+        td.num,
+        th.num {
+            text-align: right;
+        }
+
+        .me-tabs {
+            border-bottom: 1px solid var(--me-borde);
+            gap: .2rem;
+        }
+
+        .me-tabs .nav-link {
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: .45rem .45rem 0 0;
+            color: var(--me-suave);
+            font-weight: 600;
+            font-size: .86rem;
+            padding: .4rem .9rem;
+        }
+
+        .me-tabs .nav-link.active {
+            background: #fff;
+            border-color: var(--me-borde);
+            color: var(--me-tinta);
+        }
+
+        .me-tabs .cuenta {
+            font-size: .72rem;
+            font-weight: 600;
+            margin-left: .25rem;
+            color: var(--me-suave);
+        }
+
+        .tag {
+            font-size: .7rem;
+            font-weight: 600;
+            border-radius: .35rem;
+            padding: .25em .5em;
+            white-space: nowrap;
+        }
+
+        .tag.ok {
+            background: #E2F2E8;
+            color: var(--me-ok);
+        }
+
+        .tag.warn {
+            background: #FBEED8;
+            color: var(--me-warn);
+        }
+
+        .tag.err {
+            background: #FBE2DF;
+            color: var(--me-err);
+        }
+
+        .tag.neutro {
+            background: #F0F0EC;
+            color: var(--me-suave);
+        }
+
+        .tarifas {
+            border: 1px solid var(--me-borde);
+            border-radius: .45rem;
+            background: #FBFAF6;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .tarifas table {
+            margin: 0;
+            font-size: .78rem;
+        }
+
+        .tarifas td {
+            padding: .15rem .3rem;
+            vertical-align: middle;
+        }
+
+        .tarifas input,
+        .tarifas select {
+            font-size: .78rem;
+            padding: .1rem .3rem;
+        }
+
+        .tarifas tr.falta td {
+            background: #FBE2DF;
+        }
+
+        .aviso-tarifa {
+            border-left: 4px solid var(--me-err);
+        }
+    </style>
+</head>
+
+<body class="me-body">
+
+    <!-- ============ RESUMEN ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi neutro" style="cursor:default">
+            <div class="n" id="kLineas">0</div>
+            <div class="lbl">Líneas facturadas</div>
+        </div>
+        <div class="me-kpi info" style="cursor:default">
+            <div class="n" id="kFiliales">0</div>
+            <div class="lbl">Filiales</div>
+        </div>
+        <div class="me-kpi warn" style="cursor:default">
+            <div class="n" id="kExcluidas">0</div>
+            <div class="lbl">Fuera del corte</div>
+        </div>
+        <div class="me-kpi err" style="cursor:default">
+            <div class="n" id="kRevisar">0</div>
+            <div class="lbl">Revisar</div>
+        </div>
+        <div class="me-kpi ok" style="cursor:default">
+            <div class="n" id="kSubtotal">$0</div>
+            <div class="lbl">Subtotal</div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Plan Corporativo y corte -->
+            <section data-me-paso="1" data-me-titulo="Plan Corporativo y corte" data-me-abierto="siempre">
+                <label class="me-lbl" for="inputArchivo">Archivo «Plan Corporativo» (.xlsx)</label>
+                <input type="file" id="inputArchivo" class="form-control form-control-sm" accept=".xlsx,.xls,.xlsm">
+                <div class="me-hint">Se lee la hoja <b>Activos</b>. El archivo no sale de este equipo.</div>
+
+                <label class="me-lbl mt-2" for="selHoja">Hoja</label>
+                <select id="selHoja" class="form-select form-select-sm" disabled></select>
+
+                <div class="row g-2 mt-1">
+                    <div class="col-7">
+                        <label class="me-lbl" for="inputMes">Mes que se factura</label>
+                        <input type="month" id="inputMes" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-5">
+                        <label class="me-lbl" for="inputDiaCorte">Día de corte</label>
+                        <input type="number" id="inputDiaCorte" class="form-control form-control-sm" min="1" max="31"
+                            value="15">
+                    </div>
+                </div>
+                <div class="me-hint" id="infoCorte">Entra lo que ocurre hasta el día de corte, inclusive.</div>
+
+                <button class="btn btn-sm btn-me mt-2 w-100" id="btnProcesar" type="button" disabled>Generar
+                    pre-factura</button>
+            </section>
+
+            <!-- 2 · Tarifas -->
+            <section data-me-paso="2" data-me-titulo="Tarifas por plan" data-me-abierto="nunca">
+                <div class="me-hint mb-1">Valor <b>con IVA</b> de cada plan («Hoja2» de Liquidación Corporativo 2).
+                    Bruto = valor / 1,19; IVA 19 %; Voz suma ICO 4 % del bruto; retefuente 2,5 % del bruto. Un plan
+                    con valor <b>0</b> se factura en cero (roaming); uno <b>vacío</b> bloquea la descarga. Se guarda en
+                    este equipo.</div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="chkIcoIncluido">
+                    <label class="form-check-label small" for="chkIcoIncluido">ICO de voz <b>incluido</b> en el valor
+                        (valor / 1,23, como en la grabación de marzo 2025)</label>
+                </div>
+                <div class="alert alert-danger py-2 small aviso-tarifa" id="avisoTarifas" hidden></div>
+                <div class="tarifas">
+                    <table class="table table-sm">
+                        <tbody id="tbTarifas"></tbody>
+                    </table>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnTarifaNueva" type="button"><i
+                            class="bi bi-plus"></i> Plan</button>
+                    <button class="btn btn-sm btn-me-line" id="btnTarifasBase" type="button">Restaurar</button>
+                </div>
+            </section>
+
+            <!-- 3 · Filiales y mes anterior -->
+            <section data-me-paso="3" data-me-titulo="Filiales y mes anterior" data-me-abierto="nunca">
+                <label class="me-lbl" for="inputAgrupaciones">Empresas que van en un mismo archivo</label>
+                <textarea id="inputAgrupaciones" class="form-control form-control-sm me-mono" rows="3"></textarea>
+                <div class="me-hint" id="infoAgrupaciones">Un renglón por regla: <span
+                        class="me-mono">patrón =&gt; filial</span>. El patrón se busca en el nombre de la empresa.
+                </div>
+
+                <label class="me-lbl mt-2" for="inputCargos">Cargos de roaming (opcional)</label>
+                <textarea id="inputCargos" class="form-control form-control-sm me-mono" rows="3"
+                    placeholder="3113489676;Voz Roaming;48588,6;Octubre&#10;3053614397;Datos Roaming;11552"></textarea>
+                <div class="me-hint" id="infoCargos">Un renglón por cargo: <span class="me-mono">línea;plan;valor
+                        bruto;mes</span>. Como en la liquidación, se escribe el <b>valor bruto</b> y de ahí salen IVA,
+                    ICO y retefuente.</div>
+
+                <label class="me-lbl mt-2" for="inputAnterior">Pre-factura del mes anterior (opcional)</label>
+                <input type="file" id="inputAnterior" class="form-control form-control-sm" accept=".xlsx,.xls">
+                <div class="me-hint" id="infoAnterior">El consolidado que generó esta herramienta el mes pasado: dice
+                    qué filiales cambiaron.</div>
+            </section>
+
+            <!-- 4 · Registro -->
+            <section data-me-paso="4" data-me-titulo="Registro" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: resultados ================= -->
+        <div class="me-trabajo-datos">
+            <ul class="nav me-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#paneFiliales" type="button"
+                        role="tab">Filiales<span class="cuenta" id="cFiliales"></span></button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#paneFactura" type="button"
+                        role="tab">Factura</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#paneLiquidacion" type="button"
+                        role="tab">Liquidación<span class="cuenta" id="cLiquidacion"></span></button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#paneExcluidas" type="button"
+                        role="tab">Fuera del corte<span class="cuenta" id="cExcluidas"></span></button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#paneRevisar" type="button"
+                        role="tab">Revisar<span class="cuenta" id="cRevisar"></span></button>
+                </li>
+                <li class="nav-item ms-auto d-flex align-items-center gap-1">
+                    <button id="btnConsolidado" class="btn btn-sm btn-me-line" type="button" disabled><i
+                            class="bi bi-file-earmark-excel"></i> Consolidado</button>
+                    <button id="btnZip" class="btn btn-sm btn-me-line" type="button" disabled
+                        title="Descargar los archivos de filial en un .zip"><i class="bi bi-file-earmark-zip"></i>
+                        ZIP</button>
+                    <button id="btnGuardarRed" class="btn btn-sm btn-me" type="button" disabled><i
+                            class="bi bi-hdd-network"></i> Guardar en la red</button>
+                </li>
+            </ul>
+            <div class="alert py-2 mt-2 mb-0 small" id="avisoDestino" hidden></div>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="paneFiliales" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblFiliales" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioFiliales">Carga el <strong>Plan Corporativo</strong> en
+                            el paso <strong>1</strong>, revisa el mes y presiona <strong>Generar pre-factura</strong>.
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="paneFactura" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblFactura" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioFactura">Resumen por empresa y tipo (la tabla dinámica
+                            «Factura»).</div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="paneLiquidacion" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblLiquidacion" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioLiquidacion">Una fila por línea y tipo (Voz / Datos), con
+                            sus impuestos.</div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="paneExcluidas" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblExcluidas" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioExcluidas">Líneas que no entran en este corte, con el
+                            motivo.</div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="paneRevisar" role="tabpanel">
+                    <div class="me-tabla-panel mt-2">
+                        <table id="tblRevisar" class="table table-sm table-striped table-hover w-100"
+                            style="display:none"></table>
+                        <div class="me-hint p-2" id="msgVacioRevisar">Lo que la herramienta no resuelve sola: líneas
+                            sin plan, observaciones sin regla, repetidas.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LIBRERÍAS ============ -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "prefactura",
+            version: "1.0.0",
+            doc: "../doc/prefactura/README.md",
+            titulo: "Pre-factura",
+            descripcion: "Pre-factura del Plan Corporativo: corte, liquidación e impuestos, y un archivo por filial",
+            sesiones: [],
+            instrucciones: [
+                "1 · Carga el «Plan Corporativo» (.xlsx). Se lee la hoja Activos. Revisa el mes y el día de corte (15).",
+                "Solo las cancelaciones sacan una línea del corte («Se cancela», «Cancelada», «se inactiva»…, hasta el día de corte). «Se activa el …» sin año no se tiene en cuenta. «Se bloquea» se sigue facturando.",
+                "2 · Tarifas: valor con impuestos de cada plan. Un plan sin tarifa sale en rojo y no se suma: complétalo antes de enviar.",
+                "3 · Opcional: los cargos de roaming del mes (valor bruto) y la pre-factura del mes anterior, para ver qué filiales cambiaron.",
+                "Revisa la pestaña «Revisar»: líneas sin plan (ver en el CM), observaciones que no encajan en ninguna regla y líneas repetidas.",
+                "«Guardar en la red» escribe un archivo por filial directo en «Plan Corporativo\\AAAA Facturación\\NN. Mes». La primera vez se elige la carpeta Plan Corporativo (la ruta queda copiada para pegarla). Si falla, avisa y ofrece el .zip para guardarlo donde quieras.",
+                "Descarga también el Consolidado: el mes siguiente sirve de «mes anterior»."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Reglas de esta herramienta -->
+    <script src="../assets/logica-prefactura.js"></script>
+
+    <!-- 3 · Enganche con la interfaz -->
+    <script src="../assets/me-prefactura-puente.js"></script>
+</body>
+
+</html>

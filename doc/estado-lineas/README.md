@@ -1,6 +1,6 @@
-# Estado de líneas — Documentación técnica
+# Bloquear/Inactivar líneas — Documentación técnica
 
-> **Versión: v1.0.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.0.1** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Bloquea o inactiva líneas en el CM, en masivo.** Se pegan las líneas, se consultan, se marcan en una tabla con casillas —con el mismo manejo de filtros y ocultar/mostrar que «Cierre masivo de casos»— y a las marcadas se les envía la orden de cambio de estado. Después de cada orden la línea se vuelve a consultar, así que la tabla muestra el estado que el CM tiene **de verdad**, no el que se pidió.
@@ -23,7 +23,7 @@
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/estado_lineas.html` | Marcado. Sin lógica. |
-| `assets/cm-lineas.js` | **Compartido con «Cambio de IMSI»**: resolver la línea, cuenta del CRM, SIM en el inventario, órdenes del CM, seguimiento y la tabla con casillas. Se publica como `window.CMLineas`. |
+| `assets/cm-lineas.js` | **Compartido con «Cambio IMSI Claro\|Tigo»**: resolver la línea, cuenta del CRM, SIM en el inventario, órdenes del CM, seguimiento y la tabla con casillas. Se publica como `window.CMLineas`. |
 | `assets/logica-estado-lineas.js` | Consulta por línea, cambio de estado, exportación. |
 | `assets/me-estado-lineas-puente.js` | Sesión, tabla, filtros, doble confirmación y exportaciones. |
 
@@ -99,7 +99,7 @@ Lo que no está confirmado se muestra con su código crudo (`Estado 7 (¿HELD?)`
 
 ### Inactivar deja la IMSI en HELD
 
-Al inactivar una línea, su IMSI pasa a **HELD** en el inventario y **no queda libre sola**. Para volver a usarla —por ejemplo en un «Cambio de IMSI»— hay que pasarla a disponible **a mano en el BSS**. La herramienta lo avisa al elegir «Inactivar», al terminar la tanda y en el detalle de cada línea inactivada (con el estado en que quedó su IMSI).
+Al inactivar una línea, su IMSI pasa a **HELD** en el inventario y **no queda libre sola**. Para volver a usarla —por ejemplo en un «Cambio IMSI Claro|Tigo»— hay que pasarla a disponible **a mano en el BSS**. La herramienta lo avisa al elegir «Inactivar», al terminar la tanda y en el detalle de cada línea inactivada (con el estado en que quedó su IMSI).
 
 Bloquear **no** cambia la IMSI: en la captura, la de 3332463394 siguió «En uso» después de bloquearla.
 
@@ -157,4 +157,5 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con cada orden enviada: us
 
 | Versión | Cambios |
 | --- | --- |
-| **1.0.0** | Primera versión. Bloquear e inactivar en masivo con la orden `ChangeSubscriptionState` de la interfaz del CM (verificada contra las capturas), tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, estado real tras cada orden, aviso de HELD al inactivar, bitácora con petición y respuesta. Lógica compartida con «Cambio de IMSI» en `cm-lineas.js`. |
+| **1.0.1** | La herramienta pasa a llamarse **«Bloquear/Inactivar líneas»** (antes «Estado de líneas») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
+| 1.0.0 | Primera versión. Bloquear e inactivar en masivo con la orden `ChangeSubscriptionState` de la interfaz del CM (verificada contra las capturas), tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, estado real tras cada orden, aviso de HELD al inactivar, bitácora con petición y respuesta. Lógica compartida con «Cambio IMSI Claro\|Tigo» en `cm-lineas.js`. |

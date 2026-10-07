@@ -1,5 +1,5 @@
 /* =====================================================================
-   me-cambio-imsi-puente.js · Enganche de «Cambio de IMSI»
+   me-cambio-imsi-puente.js · Enganche de «Cambio IMSI Claro|Tigo»
    ---------------------------------------------------------------------
    Va al final del <body>, después de cm-lineas.js y
    logica-cambio-imsi.js. Aquí vive la interfaz: tabla con casillas,
@@ -153,7 +153,7 @@
         armado = false;
         corriendo = true;
         el("btnEjecutar").disabled = true;
-        MEUI.log(`▶ Cambio de IMSI en ${objetivo.length} línea(s) · nota «${L.notaDe(nota)}» · ejecuta ${L.usuario()}`, "warn");
+        MEUI.log(`▶ Cambio IMSI Claro|Tigo en ${objetivo.length} línea(s) · nota «${L.notaDe(nota)}» · ejecuta ${L.usuario()}`, "warn");
 
         try {
             for (const [n, f] of objetivo.entries()) {
@@ -186,7 +186,7 @@
             tabla.redibujar(true);
         }
         const ok = objetivo.filter(f => f.proceso === PROCESO.CAMBIADA).length;
-        MEUI.toast(`Cambio de IMSI: ${ok}/${objetivo.length} confirmado(s).`, ok === objetivo.length ? "ok" : "warn");
+        MEUI.toast(`Cambio IMSI Claro|Tigo: ${ok}/${objetivo.length} confirmado(s).`, ok === objetivo.length ? "ok" : "warn");
     });
 
     /* --- Exportaciones -------------------------------------------------- */
