@@ -38,7 +38,7 @@
         textoDe: f => [f.msisdn, f.ban, f.subscriberId, f.imsi, f.orden, f.detalle, f.estadoTexto, f.proceso].join(" "),
         alCambiar: actualizar,
         columnas: [
-            { t: "Línea", txt: f => f.msisdn, render: f => `<span class="me-mono">${MEUI.esc(f.msisdn)}</span>` },
+            { t: "Línea", txt: f => f.msisdn, render: f => MEUI.copiable(f.msisdn, "línea") },
             { t: "Estado en el CM", txt: f => f.estadoTexto, render: f => f.estadoTexto ? L.badge(f.estadoTexto, CLASE_ESTADO[f.estadoTexto]) : "—" },
             { t: "Proceso", txt: f => f.proceso, render: f => L.badge(f.proceso, CLASE_PROCESO[f.proceso]) },
             {
@@ -46,7 +46,7 @@
                 render: f => `<span class="me-mono">${MEUI.esc(f.ban || "—")}</span>`
                     + (f.cuentas > 1 ? ` <span title="Tiene ${f.cuentas} suscripciones" style="color:var(--me-warn)">⚠</span>` : "")
             },
-            { t: "IMSI", txt: f => f.imsi, render: f => `<span class="me-mono">${MEUI.esc(f.imsi || "—")}</span>` },
+            { t: "IMSI", txt: f => f.imsi, render: f => MEUI.copiable(f.imsi, "IMSI") },
             {
                 t: "Estado IMSI", txt: f => f.simEstadoTexto,
                 render: f => f.simEstadoTexto ? L.badge(f.simEstadoTexto, CLASE_SIM[f.simEstadoTexto] || "warn") : "—"

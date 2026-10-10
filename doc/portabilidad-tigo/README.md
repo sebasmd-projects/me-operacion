@@ -1,6 +1,6 @@
 # Validador Portabilidad · Tigo — Documentación técnica
 
-> **Versión: v1.3** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.4** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Valida por **MSISDN** en qué punto del proceso de portabilidad quedó una línea en el **HLR de Tigo**. Consume el mismo servicio de autogestión que *Consulta QDN · Tigo*, pero traduce el `RETCODE` al lenguaje del proceso.
@@ -133,7 +133,8 @@ Sobre la interpretación de bloqueos y desvíos del perfil (heurística declarad
 
 | Versión | Cambios |
 |---|---|
-| **1.3** | Sesión del CM **opcional** (paso 2 nuevo): cada línea trae también su **Estado ME** (Activa/Desactivada/Disponible/Bloqueada/No está en el CM), consultado en paralelo con el HLR de Tigo — mismo servicio y criterio que `logica-consumos.js`. Es el dato que hacía falta para leer el `RETCODE 3001` sin salir de la herramienta (§2.1); cuando el cruce da la inconsistencia (`3001` + `Activa`), el modal de detalle la marca sola. Sin sesión del CM, la herramienta funciona exactamente igual que antes. |
+| **1.4** | IMSI copiable en la tabla. |
+| 1.3 | Sesión del CM **opcional** (paso 2 nuevo): cada línea trae también su **Estado ME** (Activa/Desactivada/Disponible/Bloqueada/No está en el CM), consultado en paralelo con el HLR de Tigo — mismo servicio y criterio que `logica-consumos.js`. Es el dato que hacía falta para leer el `RETCODE 3001` sin salir de la herramienta (§2.1); cuando el cruce da la inconsistencia (`3001` + `Activa`), el modal de detalle la marca sola. Sin sesión del CM, la herramienta funciona exactamente igual que antes. |
 | 1.2 | Reglas de negocio de Tigo actualizadas: `3001` = **Sin perfil** (no prueba pertenencia a ME; se cruza con Optiva) y `1033` = **Residuo en Tigo** (la línea sí se portó a ME, Tigo no la eliminó de su HLR/HSS; se escala a Tigo y luego pasa a `3001`). Reemplaza la lectura de la v1.1. |
 | 1.1 | Etiquetas de negocio corregidas (`3001` = pendiente y **es** de ME; `1033` = Port Out), validación de coherencia ISDN ⇄ línea, estado `Revisar respuesta`, KPIs y columna Observaciones. |
 | 1.0 | Reemplazo de `CheckPortabilidad.html`: JSON en vez de texto plano, concurrencia real, reintentos por timeout y detalle completo del perfil. |

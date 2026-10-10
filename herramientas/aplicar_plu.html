@@ -1,4 +1,4 @@
-<!-- aplicar_plu.html · v1.6.0
+<!-- aplicar_plu.html · v1.7.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -563,7 +563,7 @@
             <!-- 1 · Conexión -->
             <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
                 <div class="me-hint mb-2">La sesión del CM sirve para dos cosas: consultar la línea y sus paquetes,
-                    y <strong>decir quién eres</strong> — aplicar PLU solo está habilitado para usuarios autorizados.
+                    y <strong>decir quién eres</strong> (queda en la bitácora).
                 </div>
                 <div class="row g-2">
                     <div class="col-6">
@@ -720,6 +720,7 @@
                         <tr>
                             <th>Línea (MSISDN)</th>
                             <th>Estado</th>
+                            <th>IMSI</th>
                             <th>SubscriptionID</th>
                             <th>Cuenta (BAN)</th>
                             <th>Titular</th>
@@ -741,7 +742,9 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span></h5>
+                    <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span>
+                        <button type="button" class="btn-copy" data-copy-target="mdMsisdn" title="Copiar línea">⧉</button>
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                         aria-label="Cerrar"></button>
                 </div>
@@ -801,13 +804,13 @@
     <script>
         MEUI.init({
             app: "plu",
-            version: "1.6.0",
+            version: "1.7.0",
             doc: "../doc/aplicar-plu/README.md",
             titulo: "Aplicar PLU de paquete",
             descripcion: "Recarga de paquete en Tulio y verificación contra el CM",
             sesiones: ["cm"],
             instrucciones: [
-                "1 · Conexión: la sesión del CM consulta la línea Y dice quién eres. Aplicar PLU solo está habilitado para usuarios autorizados; sin autorización la herramienta queda de solo consulta.",
+                "1 · Conexión: la sesión del CM consulta la línea Y dice quién eres. Sin sesión no se puede aplicar PLU.",
                 "2 · Escribe las líneas (máximo 50) y presiona «Consultar paquetes»: trae la cuenta de cada línea y sus paquetes activos.",
                 "3 · Secuencia de PLU: una línea y los PLU que se le aplican uno detrás de otro. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y los ELIMINA; luego sigue con el siguiente. ESCRIBE EN PRODUCCIÓN, con doble confirmación.",
                 "Al escribir los PLU: Enter agrega otra fila, Tab pasa al campo siguiente seleccionando su contenido (para sobrescribirlo), y en el campo de PLU se puede pegar desde Excel.",

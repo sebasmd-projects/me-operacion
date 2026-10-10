@@ -1,6 +1,6 @@
 # Consumos y Paquetes (CM) — Documentación técnica
 
-> **Versión: v1.9.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.10.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para traer, por línea, **datos básicos de la línea**, sus **paquetes activos** (uso y balance), sus **movimientos** (compras, paquetes, recurrencias) y su **histórico de consumo** (llamadas, datos y SMS) desde el CM (Optiva), con filtros, paginación, gráficas y exportación.
@@ -30,7 +30,7 @@ Herramienta para traer, por línea, **datos básicos de la línea**, sus **paque
 | `reporte_consumos.html` | Solo marcado: KPIs, pasos, tabla principal y modal de detalle (paquetes + histórico + gráficas). |
 | `assets/logica-consumos.js` | Reglas de negocio: consultas al CM, clasificación del histórico, tabla, filtros, gráficas y exportación. |
 | `assets/logica-paquetes-carga.js` | **Cargar paquete** y **+ PLU**: lo que escribe (catálogo de la oferta, carrito, orden y verificación en el CM; PLU por Tulio). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
-| `assets/tulio-plu.js` | Recarga de PLU en Tulio y usuarios autorizados, **compartido con «Aplicar PLU»**. |
+| `assets/tulio-plu.js` | Recarga de PLU en Tulio, **compartido con «Aplicar PLU»**. |
 | `assets/me-consumos-puente.js` | Enganche con el shell: sesión del CM, credenciales compartidas y exportación. |
 | `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las herramientas de esta suite. |
 
@@ -193,7 +193,7 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
 
 ### + PLU (v1.9.0) — uno o varios PLU por Tulio
 
-Junto a «Cargar paquete», el botón **+ PLU** abre un panel para aplicar uno o varios PLU a la línea con `RecargaPaquete` de Tulio (el mismo servicio de «Aplicar PLU», en `assets/tulio-plu.js`). Se escriben uno por renglón o separados por coma o espacio, opcionalmente `PLU costo canal` (por defecto costo 0 y canal `PPrepagadaTP`). Doble confirmación; se aplican de uno en uno y un fallo no detiene los demás. **Solo agrega**: para agregar y eliminar está «Aplicar PLU». Habilitado para los usuarios de `USUARIOS` (`tulio-plu.js`) con sesión del CM; los demás ven el motivo. Al terminar se refresca la pantalla como tras una carga del CM.
+Junto a «Cargar paquete», el botón **+ PLU** abre un panel para aplicar uno o varios PLU a la línea con `RecargaPaquete` de Tulio (el mismo servicio de «Aplicar PLU», en `assets/tulio-plu.js`). Se escriben uno por renglón o separados por coma o espacio, opcionalmente `PLU costo canal` (por defecto costo 0 y canal `PPrepagadaTP`). Doble confirmación; se aplican de uno en uno y un fallo no detiene los demás. **Solo agrega**: para agregar y eliminar está «Aplicar PLU». Pide sesión del CM vigente; sin ella el panel dice por qué. Al terminar se refresca la pantalla como tras una carga del CM.
 
 ### Cargar paquete (v1.8.0) — orden del CM
 
@@ -277,7 +277,8 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 
 | Versión | Cambios |
 |---|---|
-| **1.9.0** | **Agregar uno o varios PLU** desde el detalle de la línea: botón **«+ PLU»** junto a «Cargar paquete». Se escriben los PLU (uno por renglón o separados por coma/espacio; opcional `PLU costo canal`), se confirman dos veces y se aplican en Tulio de uno en uno (`RecargaPaquete`, el mismo servicio de «Aplicar PLU», compartido en `assets/tulio-plu.js`). Solo agrega; un fallo no detiene los demás. Habilitado solo para los usuarios de `USUARIOS` en `tulio-plu.js` con sesión del CM. Al terminar se refrescan paquetes, tabla, movimientos y consumo. |
+| **1.10.0** | **IMSI** de la línea en la tabla (copiable), en la cabecera y los datos del detalle y en la exportación (`MEAPI.imsi`, también al cambiar de cuenta). «+ PLU» ya no tiene lista de usuarios: basta la sesión del CM vigente. Copiar en una fila no abre el detalle. |
+| 1.9.0 | **Agregar uno o varios PLU** desde el detalle de la línea: botón **«+ PLU»** junto a «Cargar paquete». Se escriben los PLU (uno por renglón o separados por coma/espacio; opcional `PLU costo canal`), se confirman dos veces y se aplican en Tulio de uno en uno (`RecargaPaquete`, el mismo servicio de «Aplicar PLU», compartido en `assets/tulio-plu.js`). Solo agrega; un fallo no detiene los demás. Habilitado solo para los usuarios de `USUARIOS` en `tulio-plu.js` con sesión del CM. Al terminar se refrescan paquetes, tabla, movimientos y consumo. |
 | 1.8.1 | **Fix «Cargar paquete»**: el catálogo se pedía al hacer clic, pero el spinner quedaba en el botón que el panel oculta, así que parecía no pasar nada hasta darle «Cancelar». Ahora el catálogo se **precarga al abrir el detalle de la línea**: el botón muestra «Cargando catálogo…» deshabilitado y se habilita como «+ Cargar paquete» cuando está listo (o «Reintentar catálogo» si falló). Las respuestas de una línea que ya se cerró se descartan. |
 | 1.8.0 | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. Al quedar aplicada se refrescan paquetes, tabla principal, movimientos y consumo con datos nuevos del CM. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
 | **1.7.0** | La identificación aparece en la cabecera del detalle con botón de copia rápida. La resolución del titular incorpora dos respaldos confirmados con el flujo de Postman: `individual.fullName` y el `id` de la cuenta como posible `individualID` cuando falta la relación `Individual`, conservando la búsqueda multinivel existente. |

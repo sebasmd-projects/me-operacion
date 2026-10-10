@@ -44,34 +44,21 @@
         scope: "UAIUGTFEYFUAPOIYO"
     };
 
-    /* Quién puede aplicar PLU. Se compara contra el usuario de la sesión del
-       CM (el login de Keycloak): hace falta sesión vigente. Es una guarda de
-       interfaz para que nadie recargue por accidente, no un control de acceso
-       del servicio —la API key de Tulio es la misma para todos—. Para
-       habilitar a alguien más se agrega aquí. */
-    const USUARIOS = ["jpelaezg"];
-
     /** Usuario de la sesión del CM (el que queda en la nota y en la bitácora). */
     function usuarioOperador() {
         const st = MEUI.sesion.estado("cm");
         return (st && st.usuario) ? st.usuario : "sin sesión identificada";
     }
 
-    /** Sesión del CM vigente Y usuario autorizado. */
+    /** Para aplicar PLU basta una sesión del CM vigente (no hay lista de
+        usuarios): es la que dice quién opera. */
     function puedeAgregarPlu() {
         const st = MEUI.sesion.estado("cm");
-        if (!st || (st.estado !== "ok" && st.estado !== "warn")) return false;
-        const usuario = String(st.usuario || "").trim().toLowerCase();
-        return USUARIOS.some(u => u.toLowerCase() === usuario);
+        return !!st && (st.estado === "ok" || st.estado === "warn");
     }
-
     /** Por qué no se puede aplicar PLU (texto para la interfaz), o "". */
     function motivoSinPlu() {
-        const st = MEUI.sesion.estado("cm");
-        if (!st || (st.estado !== "ok" && st.estado !== "warn")) {
-            return "hace falta una sesión del CM vigente: es la que dice quién eres";
-        }
-        return `el usuario «${st.usuario || "—"}» no está autorizado para aplicar PLU`;
+        return puedeAgregarPlu() ? "" : "hace falta una sesión del CM vigente: es la que dice quién eres";
     }
     /* =====================================================================
        4 · TOKEN DE TULIO (client_credentials)
@@ -245,7 +232,7 @@
     }
 
     global.TulioPLU = {
-        CONFIG: CFG, USUARIOS,
+        CONFIG: CFG,
         usuario: usuarioOperador, puede: puedeAgregarPlu, motivo: motivoSinPlu,
         gestor: gestorTulio, idTransaccion, payloadRecarga, aplicar: aplicarPlu, leerPlus
     };

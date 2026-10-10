@@ -749,7 +749,7 @@ ${total > TOPE_PRECIO ? `<div class="carga-alerta err"><i class="bi bi-slash-cir
         preparar();
 
         // PLU por Tulio: el botón solo existe si cargó tulio-plu.js; el panel
-        // dice si el usuario no está autorizado. Se resetea por línea.
+        // dice si falta la sesión del CM. Se resetea por línea.
         if ($("#btnPluAbrir")) {
             $("#btnPluAbrir").hidden = !global.TulioPLU;
             if (global.TulioPLU) {

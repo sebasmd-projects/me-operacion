@@ -54,10 +54,6 @@ const CONFIG = {
 };
 
 
-/* Quién puede aplicar PLU: la lista vive en tulio-plu.js (USUARIOS), la
-   misma para «Aplicar PLU» y para la carga de PLU en Consumos. */
-const USUARIO_AGREGAR_PLU = TulioPLU.USUARIOS;
-
 const auth = MEAPI.auth;
 const getJson = MEAPI.getJson;
 
@@ -67,7 +63,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 /** Usuario de la sesión del CM (el que queda en la nota y en la bitácora). */
 const usuarioOperador = () => TulioPLU.usuario();
-/** Sesión del CM vigente Y usuario autorizado. */
+/** Sesión del CM vigente (no hay lista de usuarios). */
 const puedeAgregarPlu = () => TulioPLU.puede();
 /** Por qué no se puede aplicar PLU (texto para la interfaz), o "". */
 const motivoSinPlu = () => TulioPLU.motivo();
@@ -215,7 +211,10 @@ async function consultarLinea(msisdn) {
             MEUI.log(`⚠ ${msisdn}: ${crm.aviso}`, "warn");
         }
 
-        fila.paquetes = await cmPaquetes(c.subscriberId);
+        // La consulta de suscriptores no trae el IMSI: sale de la SIM (cardPackage).
+        const [paquetes, imsi] = await Promise.all([cmPaquetes(c.subscriberId), MEAPI.imsi(c.iccid)]);
+        fila.paquetes = paquetes;
+        fila.imsi = imsi;
         return fila;
     } catch (e) {
         return { ...base, estado: "ERROR", detalle: e.message || String(e) };
@@ -1093,14 +1092,14 @@ function bolsillosPlegablesHTML(r, i, abierto) {
 /* =====================================================================
    11 · EXPORTACIÓN
 ===================================================================== */
-const CABECERA_EXPORT = ["MSISDN", "Estado", "SubscriptionID", "Cuenta (BAN)", "Cuenta CRM",
+const CABECERA_EXPORT = ["MSISDN", "Estado", "IMSI", "SubscriptionID", "Cuenta (BAN)", "Cuenta CRM",
     "Titular", "Paquetes activos", "Avisos"];
 
 function filasExport(filas) {
     return {
         head: CABECERA_EXPORT,
         rows: filas.map(f => [
-            f.msisdn, f.estado, f.subscriberId || "", f.ban || "", f.cuentaCrm || "",
+            f.msisdn, f.estado, f.imsi || "", f.subscriberId || "", f.ban || "", f.cuentaCrm || "",
             f.titular || "", (f.paquetes || []).length, (f.avisos || []).join(" · ")
         ])
     };

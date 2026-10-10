@@ -29,29 +29,20 @@
     const esc = s => MEUI.esc(s);
     const espera = ms => new Promise(r => setTimeout(r, ms));
 
-    /* Quiénes pueden ESCRIBIR (bloquear, inactivar, cambiar IMSI). Se
-       compara con el usuario de la sesión del CM, que tiene que estar
-       vigente. Es una guarda de interfaz para evitar operaciones por
-       accidente, no un control de acceso del CM. Los demás usuarios pueden
-       consultar. Para habilitar a alguien más se agrega aquí. */
-    const USUARIOS_AUTORIZADOS = ["jpelaezg"];
-
+    /* Para ESCRIBIR (bloquear, inactivar, cambiar IMSI) basta una sesión del
+       CM vigente: no hay lista de usuarios. La sesión dice quién opera (va en
+       la nota y en la bitácora). */
     function usuario() {
         const st = MEUI.sesion.estado("cm");
         return (st && st.usuario) ? st.usuario : "";
     }
+
     function puedeOperar() {
         const st = MEUI.sesion.estado("cm");
-        if (!st || (st.estado !== "ok" && st.estado !== "warn")) return false;
-        const u = String(st.usuario || "").trim().toLowerCase();
-        return USUARIOS_AUTORIZADOS.some(x => x.toLowerCase() === u);
+        return !!st && (st.estado === "ok" || st.estado === "warn");
     }
     function motivoSinPermiso() {
-        const st = MEUI.sesion.estado("cm");
-        if (!st || (st.estado !== "ok" && st.estado !== "warn")) {
-            return "hace falta una sesión del CM vigente: es la que dice quién eres";
-        }
-        return `el usuario «${st.usuario || "—"}» no está autorizado para esta operación`;
+        return puedeOperar() ? "" : "hace falta una sesión del CM vigente: es la que dice quién eres";
     }
     /** Nota que viaja en la orden: SIEMPRE con el usuario delante. */
     const notaDe = texto => {
@@ -96,7 +87,8 @@
             creado: Number(p.created || 0),
             simId: p.cardPackageID ? String(p.cardPackageID) : "",
             paidType: p.paidType != null ? String(p.paidType) : "0",
-            notificationPreference: p.notificationPreference != null ? String(p.notificationPreference) : "0"
+            notificationPreference: p.notificationPreference != null ? String(p.notificationPreference) : "0",
+            planId: sub.rating?.primaryPricePlanID != null ? String(sub.rating.primaryPricePlanID) : ""
         };
     }
 
@@ -148,11 +140,20 @@
         contacto = contacto || cuenta?.contact || [];
         const c = (contacto.find(x => x.contactType === "billingAddress") || contacto[0] || {})
             .contactMedium?.[0]?.characteristic || {};
+        const correo = (contacto.find(x => /mail/i.test(x.contactType || "")) || {})
+            .contactMedium?.[0]?.characteristic?.emailAddress || "";
+        const unir = partes => partes.filter(v => v != null && String(v).trim() !== "").join(" ");
         return {
-            address: [c.city, c.contactType, c.country, c.stateOrProvince, c.street1, c.street2]
-                .filter(v => v != null && String(v).trim() !== "").join(" "),
+            address: unir([c.city, c.contactType, c.country, c.stateOrProvince, c.street1, c.street2]),
+            // Con el código postal: así lo arma la interfaz del CM en la
+            // portabilidad («Bogota billingAddress Colombia T1234580 410-1 Main Street18 31»).
+            addressConZip: unir([c.city, c.contactType, c.country, c.postCode, c.stateOrProvince, c.street1, c.street2]),
             state: c.stateOrProvince || "",
-            city: c.city || ""
+            city: c.city || "",
+            zip: c.postCode || "",
+            street1: c.street1 || "",
+            street2: c.street2 || "",
+            email: correo
         };
     }
 
@@ -212,7 +213,10 @@
      * el CM la RECIBIÓ. La interfaz del CM consulta con el BAN entre
      * comillas (customerBan="…"); si así no aparece, se prueba sin ellas.
      */
-    async function esperarOrden(ban, ordenId, alProgresar, maxMs) {
+    /** opciones.aceptar: estados que se dan por buenos sin esperar al final
+     *  (la portabilidad queda en «Order Created» hasta que se complete). */
+    async function esperarOrden(ban, ordenId, alProgresar, maxMs, opciones) {
+        const aceptar = (opciones && opciones.aceptar) || [];
         const limite = Date.now() + (maxMs || 45000);
         let ultima = null;
         while (Date.now() < limite) {
@@ -239,6 +243,7 @@
                 if (estado === "Order Fulfilled" || estado === "Order Completed") {
                     return { estado, ok: true, motivo: "", orden };
                 }
+                if (aceptar.includes(estado)) return { estado, ok: true, pendiente: true, motivo: "", orden };
             }
             await espera(2000);
         }
@@ -432,7 +437,7 @@
         const idTabla = cfg.tabla.replace(/^#/, "");
         const valor = sel => (sel && $(sel) ? $(sel).value : "");
         const marcado = sel => !!(sel && $(sel) && $(sel).checked);
-        const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         const COLS = [{
             t: '<input type="checkbox" class="form-check-input chk-todas" title="Marcar o desmarcar lo visible">',
@@ -642,12 +647,137 @@
 
     const horaBogota = () => new Date().toLocaleString("es-CO", { timeZone: "America/Bogota", hour12: false });
 
+    /** Órdenes pendientes de la cuenta de ciertos tipos (la interfaz del CM
+     *  revisa ChangeMSISDN y portInExistingSubscription en «Order Created» y
+     *  «Order Initiated» antes de dejar pedir un cambio de número). */
+    async function ordenesPendientes(ban, tipos) {
+        const encontradas = [];
+        for (const type of tipos) {
+            for (const state of ["Order Created", "Order Initiated"]) {
+                const lista = await getJson(`${API()}/api/v1/productOrder`, { customerBan: String(ban), type, state }).catch(() => []);
+                (Array.isArray(lista) ? lista : []).forEach(o => encontradas.push({ id: String(o.id || ""), tipo: type, estado: o.state || state }));
+            }
+        }
+        return encontradas;
+    }
+
+    /** Cambio de número: orden PortInExistingSubscription, IGUAL a la de la
+     *  interfaz del CM (captura «cambio de numero.har», 2026-10-10). Carrito
+     *  → orden → seguimiento → se borra el carrito. La orden queda en
+     *  «Order Created»: es una portabilidad y se completa después. */
+    async function cambiarMsisdn(linea, nueva, nota, alPaso) {
+        const res = { ok: false, pendiente: false, ordenId: "", estado: "", detalle: "", evidencia: {} };
+        const aviso = t => { if (alPaso) alPaso(t); };
+
+        const crm = await cuentaCrm(linea.ban);
+        if (!crm.cuenta) { res.detalle = crm.aviso; return res; }
+        aviso("Leyendo la dirección de facturación…");
+        const dir = await direccionDe(crm.cuenta);
+
+        const g = grupo();
+        const texto = notaDe(nota);
+        const detalle = {
+            orderData: {
+                spidInfo: "410", numberToPort: linea.msisdn, contactNumberAlternate: nueva,
+                channelInfo: "AppCrm", orderTypeInfo: "EXITO-PORT_IN_CM", orderSubTypeInfo: "EXITO-PORT_IN_CM",
+                simPackage: linea.simId, billingTypeInfo: Number(linea.paidType || 0),
+                supplementaryList: [
+                    ["channelinfo", "AppCrm"], ["numbertoport", linea.msisdn], ["orderTypeInfo", "EXITO-PORT_IN_CM"],
+                    ["ordersubtypeInfo", "EXITO-PORT_IN_CM"], ["accNumber", linea.ban], ["remarks", "remarks"],
+                    ["targetBrand", "410"], ["agencyAuthName", "Exito"], ["langPref", "E"],
+                    ["ospStreet1", dir.street1], ["ospStreet2", dir.street2], ["ospCity", dir.city],
+                    ["ospState", dir.state], ["ospZip", dir.zip]
+                ].map(([id, value]) => ({ id, value }))
+            },
+            accountData: { ban: linea.ban },
+            offerData: { subscriberPlanId: String(linea.planId || "") }
+        };
+        const userData = [
+            ["SPID", "410"], ["PAIDTYPE", linea.paidType || "0"], ["LANGUAGE", "es"],
+            ["orderType", "PortInExistingSubscription"], ["type", "PortInExistingSubscription"],
+            ["notificationPreference", linea.notificationPreference || "0"], ["preferredLanguage", "es"],
+            ["dealerCode", ""], ["reasonForActivation", ""], ["MSISDN_PREFIX", ""], ["PAYMENT_METHOD", ""],
+            ["MONTHLY_SPEND_LIMIT", ""], ["ADDRESS", dir.addressConZip], ["QUERY_TYPE", "0"], ["ZIP", dir.zip],
+            ["state", dir.state], ["CITY", dir.city], ["GEOCODE", ""], ["CUSTOMER_EMAIL", dir.email],
+            ["reservationProfile", "Exito"],
+            [`${g}_ICCID`, linea.simId],
+            [`${g}_MSISDN`, nueva],
+            [`${g}_OLD_MSISDN`, linea.msisdn],
+            ["PORTIN", true],
+            ["ADDITIONAL_DETAIL", JSON.stringify(detalle)],
+            ["SUBSCRIPTION_ID", linea.subscriberId]
+        ].map(([name, value]) => ({ name, value }));
+
+        const carritoReq = {
+            userData,
+            cartItem: [{
+                action: "ADD", index: 0, itemGroupId: g,
+                productOffering: { id: "10012", quantity: 1, includedItems: [{ id: "10010", quantity: 1 }] },
+                note: [{ text: texto, author: usuario() }]
+            }],
+            relatedParty: [{
+                id: linea.ban, firstName: crm.cuenta.givenName || "", lastName: crm.cuenta.familyName || "",
+                role: "Customer"
+            }]
+        };
+        res.evidencia.carrito = { request: carritoReq };
+
+        let carritoId = null;
+        try {
+            aviso("Creando el carrito…");
+            const carrito = await post("/api/v1/shoppingCart", carritoReq);
+            res.evidencia.carrito.response = carrito;
+            carritoId = carrito?.id;
+            if (!carritoId || !carrito.cartItem) { res.detalle = "el CM no devolvió un carrito válido"; return res; }
+
+            const ordenReq = {
+                notificationContact: "", channel: [{ id: "DCRM" }],
+                relatedParty: carrito.relatedParty || carritoReq.relatedParty,
+                productOrderItem: JSON.parse(JSON.stringify(carrito.cartItem)),
+                note: carrito.cartItem[0].note || [],
+                contactMedium: carrito.contactMedium || [],
+                userData: (carrito.userData || userData).concat([
+                    { name: "AMOUNT_PAID", value: "0" }, { name: "AMOUNT", value: "0" }
+                ]),
+                type: "PortInExistingSubscription", atuBssTokenID: ""
+            };
+            res.evidencia.orden = { request: ordenReq };
+            aviso("Enviando la orden de cambio de número…");
+            const orden = await post("/api/v1/productOrder", ordenReq, { "Transaction-Id": transactionId() });
+            res.evidencia.orden.response = orden;
+            if (!orden?.id) { res.detalle = "el CM no confirmó la orden: revisa antes de repetir"; return res; }
+            res.ordenId = String(orden.id);
+
+            aviso(`Orden ${res.ordenId}: esperando su estado…`);
+            const fin = await esperarOrden(linea.ban, res.ordenId, e => aviso(`Orden ${res.ordenId}: ${e}…`), 20000,
+                { aceptar: ["Order Created", "Order Initiated"] });
+            res.evidencia.ordenFinal = fin.orden;
+            res.estado = fin.estado;
+            res.ok = fin.ok;
+            res.pendiente = !!fin.pendiente;
+            res.detalle = fin.ok
+                ? `Orden ${res.ordenId}: ${fin.estado}` + (fin.pendiente ? " (la portabilidad sigue su curso; el número cambia cuando se complete)" : "")
+                : `Orden ${res.ordenId}: ${fin.estado}. ${fin.motivo}`;
+            return res;
+        } catch (e) {
+            const paso = res.evidencia.orden ? "orden" : "carrito";
+            res.evidencia[paso].response = e.cuerpo || e.message;
+            res.detalle = textoError(e);
+            return res;
+        } finally {
+            if (carritoId) {
+                await MEAPI.api("/api/v1/shoppingCart/" + encodeURIComponent(carritoId), { method: "DELETE" })
+                    .catch(() => { });
+            }
+        }
+    }
+
     global.CMLineas = {
         engancharSesionCm, engancharLote, engancharRegistro, badge, horaBogota,
-        USUARIOS_AUTORIZADOS, usuario, puedeOperar, motivoSinPermiso, notaDe,
+        usuario, puedeOperar, motivoSinPermiso, notaDe,
         ESTADOS_LINEA, textoEstadoLinea, ESTADOS_SIM, textoEstadoSim, SIM_DISPONIBLE,
         resolverLinea, cuentaCrm, direccionDe, simDe,
-        transactionId, esperarOrden, textoError,
+        transactionId, esperarOrden, textoError, ordenesPendientes, cambiarMsisdn,
         DESTINOS_ESTADO, cambiarEstado, cambiarImsi,
         tablaSeleccionable, soloDigitos
     };

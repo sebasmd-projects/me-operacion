@@ -445,6 +445,7 @@ function cuentaBase(sub, linea) {
         finEstado: epochISO(st.endDate),
         expira: epochISO(st.expiryDate),
         planPrecioId: rt.primaryPricePlanID ?? null,
+        simId: p.cardPackageID ? String(p.cardPackageID) : "",
         _raw: sub
     };
 }
@@ -534,15 +535,16 @@ const cacheServicios = new Map();
 async function bssServiciosDeCuenta(cuenta) {
     if (!cuenta?.subscriberId) return { uso: null, cliente: null, ...resumirTx(null) };
     if (cacheServicios.has(cuenta.subscriberId)) return cacheServicios.get(cuenta.subscriberId);
-    const [bundles, txs, cliente] = await Promise.all([
+    const [bundles, txs, cliente, imsi] = await Promise.all([
         bssBundleBalance(cuenta.subscriberId),
         bssTransacciones(cuenta.subscriberId).catch(e => {
             log(`⚠ BSS ${cuenta.msisdn || cuenta.subscriberId}: suscriptor OK pero falló el historial de transacciones (${e.message})`);
             return null;
         }),
-        bssCliente(cuenta)
+        bssCliente(cuenta),
+        MEAPI.imsi(cuenta.simId)          // la consulta de suscriptores no trae el IMSI
     ]);
-    const serv = { uso: bundles, cliente, ...resumirTx(txs) };
+    const serv = { uso: bundles, cliente, imsi, ...resumirTx(txs) };
     cacheServicios.set(cuenta.subscriberId, serv);
     return serv;
 }
@@ -877,9 +879,11 @@ let dataTable = null, filas = [];
 // Alto del cuerpo de la tabla (scrollY). Al ser un recuadro con alto fijo,
 // su barra horizontal queda siempre visible en pantalla.
 const ALTO_TABLA = "58vh";
-const HEADERS = ["Línea (MSISDN)", "Cédula", "Estado SIME", "Pestaña", "ID suscriptor BSS", "Estado BSS", "Plan",
-    "F. compra SIME", "F. compra BSS", "Verificación", "Periodos", "Próxima ejecución", "Comentario", "Acción"];
-const COL_ACCION = HEADERS.length - 1;
+// En el MISMO orden que las columnas de la tabla (thead de reporte_prepagadas.html):
+// el menú «Columnas» oculta por índice.
+const HEADERS = ["Acción", "Línea (MSISDN)", "Cédula", "Estado SIME", "Pestaña", "ID suscriptor BSS", "IMSI", "Estado BSS", "Plan",
+    "F. compra SIME", "F. compra BSS", "Verificación", "Periodos", "Próxima ejecución", "Comentario"];
+const COL_ACCION = 0;
 let colVisibles = HEADERS.map(() => true);
 let mostrarOcultas = false;   // ver las líneas que el analista ya despachó
 
@@ -1018,6 +1022,7 @@ function render() {
       <td>${badgeEstado(r.estado)}</td>
       <td>${r.item ? `${r.pestana} · ${PESTANAS[r.pestana] || "?"}` : "—"}</td>
       <td class="mono">${r.bss?.subscriberId || "—"}</td>
+      <td class="mono">${MEUI.copiable(r.bss?.imsi, "IMSI")}</td>
       <td>${r.bss ? `${r.bss.estadoBssTexto}` : "—"}</td>
       <td>${r.item?.nombre || "—"}</td>
       <td class="mono" data-order="${r.item?.fechaCompra || ""}">${fmt(r.item?.fechaCompra)}</td>
@@ -2114,6 +2119,7 @@ function abrirDetalle(i) {
     mdLinea.textContent = r.msisdn;
     mdBan.textContent = r.bss?.subscriberId || r.bss?.ban || "—";
     mdCedula.textContent = cli?.cedula || "—";
+    mdImsi.textContent = r.bss?.imsi || "—";
     mdTitular.textContent = cli?.nombre ? `· ${cli.nombre}` : "";
     const it = r.item || {};
     mdUsuarioCreacion.textContent = it.usuarioCreacion || "—";
@@ -2406,12 +2412,12 @@ function filasParaExportar() {
 }
 
 function filasExport() {
-    const head = ["MSISDN", "Cédula", "Titular", "Estado SIME", "Pestaña", "Estado línea (OBP)", "ID suscriptor BSS", "Cuenta BSS", "Estado BSS", "Plan",
+    const head = ["MSISDN", "IMSI", "Cédula", "Titular", "Estado SIME", "Pestaña", "Estado línea (OBP)", "ID suscriptor BSS", "Cuenta BSS", "Estado BSS", "Plan",
         "Fecha compra SIME", "1.ª compra BSS", "Monto 1.ª compra", "Compras BSS", "Verificación",
         "Recurrencias SIME", "Periodos consumidos", "Periodos por consumir",
         "Ciclos vigentes", "Cobertura desde", "Cobertura hasta", "Próxima ejecución", "Comentario"];
     const rows = filasParaExportar().map(r => [
-        r.msisdn, r.bss?.cliente?.cedula || "", r.bss?.cliente?.nombre || "",
+        r.msisdn, r.bss?.imsi || "", r.bss?.cliente?.cedula || "", r.bss?.cliente?.nombre || "",
         r.estado, r.item ? r.pestana : "", r.bss?.estadoLinea || "", r.bss?.subscriberId || "", r.bss?.ban || "",
         r.bss ? r.bss.estadoBssTexto : "", r.item?.nombre || "",
         r.item?.fechaCompra || "", r.bss?.primeraCompra || "", r.bss?.montoPrimera ?? "", r.bss?.comprasBss ?? "",

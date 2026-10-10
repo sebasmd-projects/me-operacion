@@ -72,7 +72,7 @@
        Utilidades
     --------------------------------------------------------------- */
     const norm = s => String(s ?? "").toLowerCase().normalize("NFD")
-        .replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+        .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
     const compacto = s => norm(s).replace(/ /g, "");
     const VACIOS = new Set(["", "#n/a", "n/a", "na", "no aplica", "#value!", "#ref!", "0", "-", "ninguno"]);
     const vacio = v => VACIOS.has(String(v ?? "").trim().toLowerCase());

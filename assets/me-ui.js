@@ -76,6 +76,7 @@
         { id: "plu", titulo: "Aplicar PLU de paquete", icono: "bi-basket", url: "aplicar_plu.html" },
         { id: "estado-lineas", titulo: "Bloquear/Inactivar líneas", icono: "bi-toggle-off", url: "estado_lineas.html" },
         { id: "cambio-imsi", titulo: "Cambio IMSI Claro|Tigo", icono: "bi-sim", url: "cambio_imsi.html" },
+        { id: "cambio-msisdn", titulo: "Cambio MSISDN Claro|Tigo", icono: "bi-telephone-forward", url: "cambio_msisdn.html" },
         { id: "prefactura", titulo: "Pre-factura", icono: "bi-receipt", url: "prefactura.html" }
       ]
     },
@@ -685,13 +686,14 @@
       });
     };
 
-    const aplicar = mini => {
+    const aplicar = (mini, sinGuardar) => {
       trabajo.classList.toggle("pasos-mini", mini);
-      guardar("me.pasos", mini ? "mini" : "full");
+      if (!sinGuardar) guardar("me.pasos", mini ? "mini" : "full");
       pintar();
       // DataTables mide anchos: hay que recalcular al cambiar el ancho útil.
       setTimeout(api.ajustarTablas, 220);
     };
+    contraerPasos = () => { if (!trabajo.classList.contains("pasos-mini")) aplicar(true, true); };
 
     b.addEventListener("click", () => aplicar(!trabajo.classList.contains("pasos-mini")));
 
@@ -777,7 +779,47 @@
 
   function registrarTabla(dt) {
     if (tablas.indexOf(dt) < 0) tablas.push(dt);
+    vigilarDatos(dt);
     setTimeout(() => ajustarTabla(dt), 30);
+  }
+
+  /* Al llegar resultados (la tabla pasa de vacía a tener filas) se contraen
+     el menú y la columna de pasos para dejarle el ancho a los datos. No se
+     guarda: la próxima vez la herramienta abre completa para escribir, y si
+     el analista los vuelve a abrir no se cierran otra vez con cada filtro.
+     Las tablas dentro de un modal (detalle de una línea) no cuentan. */
+  function vigilarDatos(dt) {
+    let nodo;
+    try { nodo = dt.table().node(); } catch (e) { return; }
+    if (!nodo || nodo.dataset.meVigila || nodo.closest(".modal")) return;
+    nodo.dataset.meVigila = "1";
+    let antes = 0;
+    const ver = () => {
+      let n = 0;
+      try { n = dt.rows().count(); } catch (e) { return; }
+      if (antes === 0 && n > 0) enfocarDatos();
+      antes = n;
+    };
+    dt.on("draw", ver);
+    ver();
+  }
+
+  let contraerPasos = null;   // lo define montarTogglePasos
+  function enfocarDatos() {
+    const side = $("#meSide");
+    if (side && global.innerWidth >= 992 && !side.classList.contains("mini")) {
+      side.classList.add("mini");
+      pintarFlechaLateral();
+    }
+    if (contraerPasos) contraerPasos();
+    setTimeout(ajustarTablas, 230);
+  }
+
+  /** Valor con botón de copiar (usa el .btn-copy común). */
+  function copiable(valor, nombre) {
+    const v = String(valor ?? "").trim();
+    if (!v) return "—";
+    return `<span class="me-mono">${esc(v)}</span> <button type="button" class="btn-copy" data-copy-text="${esc(v)}" title="Copiar ${esc(nombre || "")}">⧉</button>`;
   }
 
   /* Ajusta al píxel el alto del cuerpo de la tabla para que el panel entero
@@ -1130,10 +1172,13 @@
          <button class="btn-copy" data-copy-target="idDelElemento">⧉</button>
      (copia el texto de #idDelElemento) o data-copy-text="texto literal"
      cuando no hay un elemento del que tomarlo. Delegado en document: no hace
-     falta cablear el clic modal por modal ni tabla por tabla. */
+     falta cablear el clic modal por modal ni tabla por tabla. Se escucha en
+     fase de CAPTURA y se corta la propagación: un botón de copiar dentro de
+     una fila no debe disparar el clic de la fila (que abre el detalle). */
   document.addEventListener("click", e => {
     const btn = e.target.closest(".btn-copy");
     if (!btn) return;
+    e.stopPropagation();
     let txt = btn.dataset.copyText;
     if (txt === undefined) {
       const destino = btn.dataset.copyTarget && document.getElementById(btn.dataset.copyTarget);
@@ -1145,7 +1190,7 @@
       btn.classList.add("copiado"); btn.innerHTML = "✓";
       setTimeout(() => { btn.classList.remove("copiado"); btn.innerHTML = prev; }, 1200);
     }).catch(() => toast("No se pudo copiar al portapapeles.", "err"));
-  });
+  }, true);
 
   /* =====================================================================
      8.1 · Cargas JSON / XML legibles (petición y respuesta de los sistemas)
@@ -1360,7 +1405,7 @@
 
     limpiarLog() { cajasLog().forEach(c => { c.innerHTML = ""; }); api.instrucciones(); },
 
-    toast, ocupado, libre, conSpinner, autoSpinner, enterEjecuta, abrirDoc,
+    toast, ocupado, libre, conSpinner, autoSpinner, enterEjecuta, abrirDoc, enfocarDatos, copiable,
     copiarTexto, formatearPayload, htmlPayload,
     tabla, registrarTabla, ajustarTabla, ajustarTablas, opcionesTabla, idiomaTabla: IDIOMA_DT,
     mostrarSiHayDatos, prepararTabla,

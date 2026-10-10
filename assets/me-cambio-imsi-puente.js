@@ -37,13 +37,13 @@
         textoDe: f => [f.msisdn, f.imsiNueva, f.imsiActual, f.ban, f.orden, f.detalle, f.proceso].join(" "),
         alCambiar: actualizar,
         columnas: [
-            { t: "Línea", txt: f => f.msisdn, render: f => `<span class="me-mono">${MEUI.esc(f.msisdn)}</span>` },
+            { t: "Línea", txt: f => f.msisdn, render: f => MEUI.copiable(f.msisdn, "línea") },
             { t: "Estado de la línea", txt: f => f.estadoTexto, render: f => f.estadoTexto ? L.badge(f.estadoTexto, CLASE_ESTADO[f.estadoTexto]) : "—" },
             { t: "Proceso", txt: f => f.proceso, render: f => L.badge(f.proceso, CLASE_PROCESO[f.proceso]) },
             {
                 t: "IMSI actual → nueva", txt: f => `${f.imsiActual} ${f.imsiNueva}`,
-                render: f => `<div class="me-mono small">${MEUI.esc(f.imsiActual || "—")} ${simBadge(f.simActualEstado)}</div>`
-                    + `<div class="me-mono small">→ <b>${MEUI.esc(f.imsiNueva)}</b> ${simBadge(f.simNuevaEstado)}</div>`
+                render: f => `<div class="small">${MEUI.copiable(f.imsiActual, "IMSI actual")} ${simBadge(f.simActualEstado)}</div>`
+                    + `<div class="small">→ <b>${MEUI.copiable(f.imsiNueva, "IMSI nueva")}</b> ${simBadge(f.simNuevaEstado)}</div>`
             },
             {
                 t: "Cuenta (BAN)", txt: f => f.ban,

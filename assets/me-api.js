@@ -208,8 +208,25 @@
         throw new Error("No se pudo autenticar para " + ruta);
     }
 
+    /** IMSI de una línea a partir del `cardPackageID` de su perfil
+        (subscribers → profile.cardPackageID → /cardPackage/{id} → imsi).
+        La consulta de suscriptores no trae el IMSI. Con caché por id: una
+        tabla de cientos de líneas no repite pedidos. Nunca lanza: si no se
+        puede leer devuelve "". */
+    const cacheImsi = new Map();
+    function imsi(cardPackageID) {
+        const id = String(cardPackageID || "").replace(/\D/g, "");
+        if (!id) return Promise.resolve("");
+        if (!cacheImsi.has(id)) {
+            cacheImsi.set(id, getJson(`/api/v1/cardPackage/${encodeURIComponent(id)}`)
+                .then(r => String(r?.cardPackage?.imsi || ""))
+                .catch(() => { cacheImsi.delete(id); return ""; }));
+        }
+        return cacheImsi.get(id);
+    }
+
     /** Ajustes por herramienta: MEAPI.configurar({ locale:"en" }) */
     function configurar(opciones) { Object.assign(CONFIG, opciones || {}); return CONFIG; }
 
-    global.MEAPI = { CONFIG, auth, getJson, api, cabeceras, configurar };
+    global.MEAPI = { CONFIG, auth, getJson, api, cabeceras, configurar, imsi };
 })(window);

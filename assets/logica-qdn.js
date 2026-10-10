@@ -949,7 +949,7 @@ function construirDataTable() {
             },
             { data: "msisdn", title: "MSISDN", render: (v, t, f) => `<span class="me-mono">${MEUI.esc(v)}</span>` },
             { data: null, title: "Estado", render: (f) => celdaEstado(f) },
-            { data: null, title: "IMSI", render: f => MEUI.esc((f.resumen && f.resumen.imsi) || "—") },
+            { data: null, title: "IMSI", render: f => MEUI.copiable(f.resumen && f.resumen.imsi !== "—" ? f.resumen.imsi : "", "IMSI") },
             { data: null, title: "IMEI", render: f => MEUI.esc((f.resumen && f.resumen.imei) || "—") },
             { data: null, title: "5G", render: f => MEUI.esc((f.resumen && f.resumen.cincoG) || "—") },
             { data: null, title: "Telefonía", render: f => MEUI.esc((f.resumen && f.resumen.telefonia) || "—") },

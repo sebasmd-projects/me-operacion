@@ -197,8 +197,9 @@
         dataTable = new DataTable("#tablaResultados", MEUI.opcionesTabla({
             data: [],
             columns: [
-                { data: "msisdn", title: "Línea (MSISDN)", render: v => `<span class="me-mono">${MEUI.esc(v)}</span>` },
+                { data: "msisdn", title: "Línea (MSISDN)", render: v => MEUI.copiable(v, "línea") },
                 { data: null, title: "Estado", render: celdaEstado },
+                { data: null, title: "IMSI", render: f => MEUI.copiable(f.imsi, "IMSI") },
                 { data: null, title: "SubscriptionID", render: f => `<span class="me-mono">${MEUI.esc(f.subscriberId || "—")}</span>` },
                 {
                     data: null, title: "Cuenta (BAN)",
@@ -227,7 +228,8 @@
             e.stopPropagation();
             eliminarDeLinea(this.dataset.msisdn, this);
         });
-        dataTable.on("click", "tbody tr", function () {
+        dataTable.on("click", "tbody tr", function (e) {
+            if (e.target.closest(".btn-copy")) return;      // copiar no abre el detalle
             const f = dataTable.row(this).data();
             if (f && f.msisdn) abrirDetalle(f.msisdn);
         });
@@ -267,12 +269,13 @@
         el("mdDatos").innerHTML = [
             ["Estado en el CM", f.estadoCmTexto || TEXTO_ESTADO[f.estado] || "—"],
             ["SubscriptionID", f.subscriberId || "—"],
+            ["IMSI", f.imsi || "", true],
             ["Cuenta (BAN)", f.ban || "—"],
             ["Cuenta en el CRM", f.cuentaCrm || "— no encontrada —"],
             ["Titular", f.titular || "—"],
             ["ICCID", f.iccid || "—"],
             ["Price Plan", f.planPrecioId ?? "—"]
-        ].map(([k, v]) => `<dt>${MEUI.esc(k)}</dt><dd>${MEUI.esc(v)}</dd>`).join("");
+        ].map(([k, v, copiar]) => `<dt>${MEUI.esc(k)}</dt><dd>${copiar ? MEUI.copiable(v, k) : MEUI.esc(v)}</dd>`).join("");
 
         const wrap = el("mdCuentasWrap");
         wrap.hidden = !(f.cuentas && f.cuentas.length > 1);

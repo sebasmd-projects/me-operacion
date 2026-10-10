@@ -1,11 +1,11 @@
 # Bloquear/Inactivar líneas — Documentación técnica
 
-> **Versión: v1.0.1** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.1.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Bloquea o inactiva líneas en el CM, en masivo.** Se pegan las líneas, se consultan, se marcan en una tabla con casillas —con el mismo manejo de filtros y ocultar/mostrar que «Cierre masivo de casos»— y a las marcadas se les envía la orden de cambio de estado. Después de cada orden la línea se vuelve a consultar, así que la tabla muestra el estado que el CM tiene **de verdad**, no el que se pidió.
 
-> **Escribe en producción.** Solo los usuarios autorizados pueden cambiar el estado; los demás pueden consultar.
+> **Escribe en producción.** Pide sesión del CM vigente; sin ella solo se puede consultar.
 
 ---
 
@@ -109,7 +109,7 @@ Bloquear **no** cambia la IMSI: en la captura, la de 3332463394 siguió «En uso
 
 ### Paso 1 · Conexión
 
-Sesión del CM, compartida con las demás herramientas. Además de consultar, dice **quién opera**: cambiar el estado solo está habilitado para los usuarios de `USUARIOS_AUTORIZADOS` en `cm-lineas.js` (hoy `jpelaezg`) con sesión vigente.
+Sesión del CM, compartida con las demás herramientas. Además de consultar, dice **quién opera** (va en la nota y en la bitácora). Con la sesión vigente se puede cambiar el estado; no hay lista de usuarios.
 
 ### Paso 2 · Líneas
 
@@ -146,7 +146,7 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con cada orden enviada: us
 
 - **Escribe en producción.** Bloquear e inactivar se hacen sobre la línea real.
 - **Inactivar retiene la IMSI (HELD)** y liberarla es manual en el BSS.
-- **Guarda de interfaz, no control de acceso**: `USUARIOS_AUTORIZADOS` evita operaciones por accidente, pero el CM acepta la orden de cualquier sesión válida.
+- **Sin lista de usuarios**: cualquiera con sesión del CM vigente puede bloquear o inactivar; la doble confirmación es la guarda contra operaciones por accidente.
 - **`REASON` sin catálogo**: solo se conocen los dos valores de las capturas.
 - **Activar no está incluido** hasta confirmarlo con una orden real.
 - **Una orden aceptada no es una orden aplicada**: se sigue hasta `Order Fulfilled`/`Order Failed` (45 s) y, además, se relee la línea.
@@ -157,5 +157,6 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con cada orden enviada: us
 
 | Versión | Cambios |
 | --- | --- |
-| **1.0.1** | La herramienta pasa a llamarse **«Bloquear/Inactivar líneas»** (antes «Estado de líneas») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
+| **1.1.0** | Sin lista de usuarios: bloquear e inactivar solo piden sesión del CM vigente. Línea e IMSI copiables en la tabla. |
+| 1.0.1 | La herramienta pasa a llamarse **«Bloquear/Inactivar líneas»** (antes «Estado de líneas») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
 | 1.0.0 | Primera versión. Bloquear e inactivar en masivo con la orden `ChangeSubscriptionState` de la interfaz del CM (verificada contra las capturas), tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, estado real tras cada orden, aviso de HELD al inactivar, bitácora con petición y respuesta. Lógica compartida con «Cambio IMSI Claro\|Tigo» en `cm-lineas.js`. |

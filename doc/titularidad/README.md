@@ -1,6 +1,6 @@
 # Bloqueos SIM x Titularidad — Documentación técnica
 
-> **Versión: v1.1.1** · Convención: `Major.Minor.Patch`.
+> **Versión: v1.2.0** · Convención: `Major.Minor.Patch`.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Junta en una sola tabla las tres cosas que hacen falta para resolver, en la
@@ -475,6 +475,7 @@ en el Edge del analista.
 
 | Versión | Cambios |
 |---|---|
-| **1.1.1** | La herramienta pasa a llamarse **«Bloqueos SIM x Titularidad»** (antes «Titularidad · Bloqueos de SIM») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
+| **1.2.0** | Columna **IMSI** (la del HLR/HSS, copiable) y línea copiable en la tabla. |
+| 1.1.1 | La herramienta pasa a llamarse **«Bloqueos SIM x Titularidad»** (antes «Titularidad · Bloqueos de SIM») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
 | 1.1.0 | Carga por defecto de «los últimos N» (tope de `GENESIS.CONFIG`), rango de fechas sin tope con aviso de tramos antes de lanzar y «Traer todo» aparte y con confirmación; barra de progreso por `fraccion`; mensajes de fin de carga ciertos en los tres modos. Columnas Línea · Operación · Resultado · Fecha primero y orden por defecto de más nuevo a más viejo. La casilla de la cabecera marca solo la página; «Seleccionar todos (N)» y «Seleccionar primeros 2.000». Mostrar/Ocultar filas (no se exportan ni se consultan). Filtro por operador. Casilla «Consultar en ambos HLR/HSS» (el HLR/HSS va en cascada por defecto) y tarjeta «HLR no concluyente». Menos recálculos de layout por repintado. Detalle de fila buscado dentro de su día. |
 | **1.0.0** | Versión inicial. Carga completa del log de Genesis, enriquecimiento bajo demanda con CM y HLR/HSS sobre las líneas marcadas, filtros, detalle con el SOAP crudo y exportación. |

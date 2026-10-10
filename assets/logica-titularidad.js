@@ -708,7 +708,7 @@ const filtros = {
 };
 
 const normaliza = s => String(s || "").toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "");
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 function filaPasaFiltros(f) {
     if (f.oculta && !filtros.verOcultas) return false;
@@ -866,7 +866,7 @@ const COLUMNAS = [
         data: null, orderable: false, width: "28px",
         render: f => `<input type="checkbox" class="chk-fila" data-id="${esc(f.__id)}"${f.sel ? " checked" : ""}>`
     },
-    { title: "Línea", data: "linea", render: l => `<span class="me-mono">${esc(l)}</span>` },
+    { title: "Línea", data: "linea", render: l => MEUI.copiable(l, "línea") },
     { title: "Operación", data: "operacion", render: v => badge(v, v === "Bloqueo" ? "err" : "ok") },
     { title: "Resultado", data: "resultadoTexto", render: (v, t, f) => badge(v, infoResultado(f.resultado).clase) },
     // `orderSequence` sin el estado «sin orden»: con DataTables 2 el tercer clic
@@ -877,6 +877,7 @@ const COLUMNAS = [
     { title: "Estado línea (CM)", data: "cmEstado", render: (v, t, f) => v ? badge(v, CLASE_ESTADO_CM[v]) : celdaPaso(f.cmPaso, f.cmError) },
     { title: "Claro", data: "hlrClaro", render: v => esc(v || "—") },
     { title: "Tigo", data: "hlrTigo", render: v => esc(v || "—") },
+    { title: "IMSI", data: "hlrImsi", render: v => MEUI.copiable(v, "IMSI") },
     { title: "Titular (CM)", data: "cmTitular", render: v => esc(v || "—") },
     { title: "Documento", data: "documento", render: v => `<span class="me-mono">${esc(v)}</span>` },
     { title: "Cuenta (BAN)", data: "cmCuenta", render: v => `<span class="me-mono">${esc(v || "—")}</span>` },

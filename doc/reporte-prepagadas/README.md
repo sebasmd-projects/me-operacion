@@ -1,6 +1,6 @@
 # Reporte de Suscripciones Prepagadas (SIME ⇄ CM) — Documentación técnica
 
-> **Versión: v9.4.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v9.5.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para **verificar de forma cruzada** las suscripciones prepagadas de **Móvil Éxito** entre dos plataformas: **SIME** (front de tipificación / negocio) y **CM / OBP** (Optiva). Por cada línea (MSISDN) consulta las dos fuentes, compara identificadores y fechas de compra, calcula los periodos del plan, detecta ciclos apilados y muestra todo en una tabla con detalle por línea, exportable a **CSV / Excel / JSON**.
@@ -266,7 +266,8 @@ Toda suscripción con `suscripcionRecurrenteId` lista sus recurrencias (nº, id,
 
 | Versión | Cambios |
 |---|---|
-| **9.4.0** | **Planes y canales en vivo desde SIME** (`GET GetCanalTipo`, el mismo servicio que llena el desplegable de SIME): id real del tipo de suscripción, canal y PLU de 1.ª compra salen de SIME, y los planes nuevos aparecen solos. Los catálogos fijos (`TIPOS_SUSCRIPCION`, `TIPO_SUSCRIPCION_ID`, `PLU_PRIMERA_COMPRA`, `CANALES_FIJOS`) quedan como respaldo si SIME no responde. El desplegable de planes usa el nombre como valor, no la posición. |
+| **9.5.0** | **IMSI** de la línea en la tabla (con botón de copiar), en el detalle (copiable) y en la exportación; sale de la SIM de la cuenta en el CM (`MEAPI.imsi`). Fix: el menú «Columnas» ocultaba una columna equivocada porque `HEADERS` no seguía el orden de la tabla. |
+| 9.4.0 | **Planes y canales en vivo desde SIME** (`GET GetCanalTipo`, el mismo servicio que llena el desplegable de SIME): id real del tipo de suscripción, canal y PLU de 1.ª compra salen de SIME, y los planes nuevos aparecen solos. Los catálogos fijos (`TIPOS_SUSCRIPCION`, `TIPO_SUSCRIPCION_ID`, `PLU_PRIMERA_COMPRA`, `CANALES_FIJOS`) quedan como respaldo si SIME no responde. El desplegable de planes usa el nombre como valor, no la posición. |
 | 9.3.1 | **Fix alta en SIME: 400 «Object reference not set to an instance of an object»**. El ID tipo de suscripción se calculaba como «posición en el catálogo + 1», y desde los planes «Pague 8 Lleve 12» SIME va corrido en uno: para «Pague 8 Lleve 12 paquete $159.200 - POS» se mandaba 46 en lugar de 47. Nueva tabla `TIPO_SUSCRIPCION_ID` con los ids reales vistos en SIME (captura `agregar recurrencia.har`), que manda sobre la posición; si un plan solo tiene el id por posición, el recálculo lo avisa. `documento: "0"` se mantiene: SIME lo acepta. |
 | 9.3 | **Uso y Balance más específico**: cada bundle muestra ahora **consumido / total** (con el porcentaje) arriba y el **disponible** destacado debajo, en vez de "disponible / total" con el consumo en letra pequeña. Mismo cambio, a la vez, en "Consumos y Paquetes (CM)". |
 | 9.2 | Cambio en la tabla de líneas, para que las acciones aparezcan de primeras. |

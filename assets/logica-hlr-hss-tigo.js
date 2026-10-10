@@ -540,7 +540,7 @@ function construirDataTable() {
             { data: "msisdn", title: "MSISDN", render: v => `<span class="me-mono">${MEUI.esc(v)}</span>` },
             { data: null, title: "Estado", render: f => celdaEstado(f) },
             { data: null, title: "RETCODE", render: f => MEUI.esc(f.retcode || "—") },
-            { data: null, title: "IMSI", render: f => MEUI.esc((f.resumen && f.resumen.imsi) || "—") },
+            { data: null, title: "IMSI", render: f => MEUI.copiable(f.resumen && f.resumen.imsi !== "—" ? f.resumen.imsi : "", "IMSI") },
             { data: null, title: "IMEI", render: f => MEUI.esc((f.resumen && f.resumen.imei) || "—") },
             { data: null, title: "Tipo SIM", render: f => MEUI.esc((f.resumen && f.resumen.cardType) || "—") },
             {

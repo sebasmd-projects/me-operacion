@@ -77,6 +77,7 @@ con `celdaUso`).
 | Aplicar PLU (`plu`) | `aplicar_plu.html` | `logica-plu.js` + `tulio-plu.js` | PLU en Tulio (`RecargaPaquete`) + verificación y borrado de bolsillos en el CM. | Sí, Tulio + CM |
 | Bloquear/Inactivar líneas (`estado-lineas`) | `estado_lineas.html` | `logica-estado-lineas.js` + `cm-lineas.js` | Bloquear/inactivar líneas en masivo. | Sí, CM |
 | Cambio IMSI Claro\|Tigo (`cambio-imsi`) | `cambio_imsi.html` | `logica-cambio-imsi.js` + `cm-lineas.js` | Cambio de SIM en masivo (`línea;imsi_nueva`). | Sí, CM |
+| Cambio MSISDN Claro\|Tigo (`cambio-msisdn`) | `cambio_msisdn.html` | `logica-cambio-msisdn.js` + `cm-lineas.js` | Cambio de número en masivo (`línea;línea_nueva`, texto o Excel): orden de portabilidad `PortInExistingSubscription`, queda pendiente. | Sí, CM |
 | Pre-factura (`prefactura`) | `prefactura.html` | `logica-prefactura.js` (`window.Prefactura`) | Pre-factura del Plan Corporativo desde su Excel: corte, impuestos, resumen y archivo por filial. Local. | No |
 | HLR/HSS (`hlr-hss`) | `hlr_hss.html` | `logica-hlr-hss-{claro,tigo,ambos}.js` | Consulta por operador y cruce; pestaña Claro opera la línea. | Sí, red Claro |
 | Portabilidad Tigo (`portabilidad-tigo`) | `validador_portabilidad_tigo.html` | `logica-portabilidad-tigo.js` | HLR Tigo con marco de portabilidad. | No |
@@ -94,16 +95,16 @@ Si se toca una, revisar la otra.
 
 ### Operaciones restringidas por usuario
 
-Guardas de interfaz (no control de acceso: el servicio acepta cualquier sesión
-válida). Todas exigen además sesión del CM vigente:
+Solo queda una lista de usuarios, en HLR/HSS Claro (guarda de interfaz, no
+control de acceso):
 
 | Constante | Archivo | Qué habilita |
 |---|---|---|
-| `USUARIOS` (antes `USUARIO_AGREGAR_PLU`) | `tulio-plu.js` | Aplicar/eliminar PLU y «+ PLU» en Consumos. |
-| `USUARIOS_AUTORIZADOS` | `cm-lineas.js` | Bloquear/Inactivar líneas y Cambio IMSI Claro\|Tigo. |
-| `USUARIOS_PROVISION` | `logica-hlr-hss-claro.js` y `logica-qdn-operaciones.js` | Aprovisionar/desaprovisionar (POST/DELETE) en QDN Claro. |
+| `USUARIOS_PROVISION` | `logica-hlr-hss-claro.js` y `logica-qdn-operaciones.js` | Aprovisionar/desaprovisionar (POST/DELETE) en QDN Claro. Hoy `["jpelaezg"]`. |
 
-Hoy todas valen `["jpelaezg"]`.
+El resto de las escrituras (Aplicar PLU, «+ PLU» en Consumos, Bloquear/Inactivar
+líneas, Cambio IMSI) solo piden **sesión del CM vigente** (`TulioPLU.puede()`,
+`CMLineas.puedeOperar()`) y doble confirmación.
 
 ## 4. Mapa de conexiones
 
@@ -179,6 +180,7 @@ del CM después; ver la orden `SwitchCarrier` accidental documentada en
 | Eliminar bolsillos de un PLU | `ChangeOffer`; ERCRT1002 se resuelve agregando la dependencia como `NO_CHANGE` | `logica-plu.js` |
 | Bloquear / inactivar | `ChangeSubscriptionState` (oferta 10008: `10006` → estado 5, `10007` → estado 2) | `cm-lineas.js` |
 | Cambio IMSI Claro\|Tigo | `ChangeSim` (oferta 10012, producto 10010, `userData` de 28 campos) | `cm-lineas.js` |
+| Cambio de número | `PortInExistingSubscription` (oferta 10012/10010, `PORTIN=true`, `ADDITIONAL_DETAIL` de portabilidad `EXITO-PORT_IN_CM`); queda en «Order Created» | `cm-lineas.js` |
 
 Cabecera `Transaction-Id` con el formato `DCRM-TRXyyyyMMddHHmmss-NNN`. El
 seguimiento usa `productOrder?customerBan="…"` (con comillas; se prueba también
@@ -255,11 +257,11 @@ Reglas críticas:
   la revisión de documentación de esta fecha y el nuevo canal de releases.
   Antes de empaquetar, confirmar con `git status` qué más entra.
 
-Versiones actuales por herramienta: Prepagadas 9.4.0 · Consumos 1.9.0 ·
-Ajustes 2.1.0 · Tipificación 2.0 · Casos 3.2 · Rechazos 2.1.1 · Aplicar PLU
-1.6.0 · Bloquear/Inactivar líneas 1.0.1 · Cambio IMSI Claro|Tigo 1.0.1 · HLR/HSS 2.4 ·
-Validador QDN 3.3 · QDN Tigo 1.2 · HLR cruzado 1.2 · Portabilidad Tigo 1.3 ·
-Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.1.0.
+Versiones actuales por herramienta: Prepagadas 9.5.0 · Consumos 1.10.0 ·
+Ajustes 2.1.0 · Tipificación 2.0 · Casos 3.3 · Rechazos 2.1.1 · Aplicar PLU
+1.7.0 · Bloquear/Inactivar líneas 1.1.0 · Cambio IMSI Claro|Tigo 1.1.0 · Cambio MSISDN Claro|Tigo 1.0.0 · HLR/HSS 2.5 ·
+Validador QDN 3.4 · QDN Tigo 1.3 · HLR cruzado 1.2 · Portabilidad Tigo 1.4 ·
+Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 
 ## 6. Cambios recientes que no deben perderse
 
@@ -272,6 +274,14 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.1.0.
 
 ### Shell (`me-ui.js`)
 
+- Al llegar resultados (una tabla registrada pasa de vacía a tener filas, sin
+  contar las de un modal) se contraen el menú y la columna de pasos
+  (`MEUI.enfocarDatos`); no se guarda ni se repite con cada filtro.
+- `MEUI.copiable(valor, nombre)`: valor + botón de copiar. El `.btn-copy`
+  común escucha en captura y corta la propagación: copiar no abre la fila.
+- `MEAPI.imsi(cardPackageID)`: IMSI de la línea (la consulta de suscriptores
+  no lo trae; sale de `/cardPackage/{id}`), con caché. Lo usan Prepagadas,
+  Consumos y Aplicar PLU; los HLR, Casos y cm-lineas ya lo traían.
 - `APPS` incluye `plu`, `estado-lineas` y `cambio-imsi`; `logica-inicio.js`
   tiene sus fichas.
 - Esc con modales anidados cierra primero el de encima (formulario) y después
@@ -332,13 +342,13 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.1.0.
 
 ### Tulio compartido (`assets/tulio-plu.js`)
 
-- `window.TulioPLU`: credenciales, token, `RecargaPaquete`, `USUARIOS`
-  autorizados y `leerPlus`. Lo cargan «Aplicar PLU» (1.6.0) y Consumos
+- `window.TulioPLU`: credenciales, token, `RecargaPaquete`, `puede()` (sesión
+  del CM vigente) y `leerPlus`. Lo cargan «Aplicar PLU» (1.6.0) y Consumos
   (1.9.0, botón «+ PLU» en el detalle: solo agrega, uno o varios).
 - «Aplicar PLU» 1.6.0: casilla «Eliminar después de cada PLU» (marcada por
   defecto) y casillas de limpieza inicial / final (`limpiarLinea`).
 
-### Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo (1.0.1)
+### Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo (1.1.0)
 
 - Tabla con casillas, filtros y ocultar/mostrar como el cierre de casos
   (`CMLineas.tablaSeleccionable`); solo se opera lo marcado y visible.
@@ -375,7 +385,17 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.1.0.
 - La hoja real declara un millón de filas: se lee celda por celda
   (`Prefactura.filasDeHoja`), nunca con `sheet_to_json` sobre el rango.
 
-### Bloqueos SIM x Titularidad (1.1.1)
+### Cambio MSISDN Claro|Tigo (1.0.0)
+
+- Orden de la interfaz del CM para el cambio de número: `PortInExistingSubscription`
+  (captura `cambio de numero.har`), calcada campo por campo. Queda en «Order
+  Created» (la portabilidad se completa después): la fila queda «Solicitada».
+- Antes de dejar marcar: línea activa con SIM, línea nueva que no sea ya activa,
+  y sin órdenes `ChangeMSISDN`/`portInExistingSubscription` pendientes en la cuenta.
+- Entrada por texto o Excel/CSV (dos primeras columnas), cualquier separador.
+- La orden `ChangeMSISDN` (sin portabilidad) no está capturada y no se usa.
+
+### Bloqueos SIM x Titularidad (1.2.0)
 
 - Única herramienta que habla con **Genesis** (`tulio.grupo-exito.com/apimew`,
   ruta `/RXDUURMWEECCKC/FechaExpedicion`). Su paginación va en una cabecera

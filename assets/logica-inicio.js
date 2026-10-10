@@ -253,13 +253,13 @@ const PROYECTOS = [
         id: "plu",
         numero: 10,
         nombre: "Aplicar PLU de paquete",
-        descripcion: "Aplica un PLU de paquete en Tulio (RecargaPaquete) sobre una línea y verifica contra el CM qué quedó: por cada paquete nuevo o con saldo sumado muestra el total, el valor anterior y cuánto se sumó. Queda de solo consulta para quien no esté autorizado. Porte de la consola local consola_bundles_movil_exito, sin su servidor Python.",
+        descripcion: "Aplica un PLU de paquete en Tulio (RecargaPaquete) sobre una línea y verifica contra el CM qué quedó: por cada paquete nuevo o con saldo sumado muestra el total, el valor anterior y cuánto se sumó. Porte de la consola local consola_bundles_movil_exito, sin su servidor Python.",
         estado: "Operación",
         abrir: "herramientas/aplicar_plu.html",
         entregables: [
             {
                 nombre: "Código", tipo: "codigo",
-                descripcion: "Archivos de la herramienta. La recarga escribe en produccion y solo esta habilitada para los usuarios de USUARIO_AGREGAR_PLU con sesion del CM vigente.",
+                descripcion: "Archivos de la herramienta. La recarga escribe en producción y pide una sesión del CM vigente.",
                 archivos: [
                     { nombre: "aplicar_plu.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/aplicar_plu.html" },
                     { nombre: "tulio-plu.js", tipo: "JS · Tulio RecargaPaquete (compartido)", icono: "bi-filetype-js", ruta: "assets/tulio-plu.js" },
@@ -314,7 +314,7 @@ const PROYECTOS = [
         entregables: [
             {
                 nombre: "Código", tipo: "codigo",
-                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
+                descripcion: "Archivos de la herramienta. Escribe en producción y pide una sesión del CM vigente; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
                 archivos: [
                     { nombre: "estado_lineas.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/estado_lineas.html" },
                     { nombre: "logica-estado-lineas.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-estado-lineas.js" },
@@ -341,7 +341,7 @@ const PROYECTOS = [
         entregables: [
             {
                 nombre: "Código", tipo: "codigo",
-                descripcion: "Archivos de la herramienta. Escribe en producción y solo los usuarios autorizados pueden operar; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
+                descripcion: "Archivos de la herramienta. Escribe en producción y pide una sesión del CM vigente; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
                 archivos: [
                     { nombre: "cambio_imsi.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/cambio_imsi.html" },
                     { nombre: "logica-cambio-imsi.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-cambio-imsi.js" },
@@ -354,6 +354,32 @@ const PROYECTOS = [
                 descripcion: "Orden ChangeSim (carrito + orden), validaciones de la IMSI nueva y verificación posterior.",
                 archivos: [
                     { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/cambio-imsi/README.md" }
+                ]
+            }
+        ]
+    },    {
+        id: "cambio-msisdn",
+        numero: 15,
+        nombre: "Cambio MSISDN Claro|Tigo",
+        descripcion: "Cambia el número (MSISDN) de líneas en el CM, en masivo, desde renglones línea;línea_nueva (texto o Excel, cualquier separador): valida la línea, que la nueva no sea ya una línea activa y que no haya otro cambio pendiente, y envía la orden de portabilidad del CM (PortInExistingSubscription), que queda pendiente hasta completarse.",
+        estado: "Operación",
+        abrir: "herramientas/cambio_msisdn.html",
+        entregables: [
+            {
+                nombre: "Código", tipo: "codigo",
+                descripcion: "Archivos de la herramienta. Escribe en producción y pide una sesión del CM vigente; cm-lineas.js se comparte entre Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo.",
+                archivos: [
+                    { nombre: "cambio_msisdn.html", tipo: "HTML · marcado", icono: "bi-filetype-html", ruta: "herramientas/cambio_msisdn.html" },
+                    { nombre: "logica-cambio-msisdn.js", tipo: "JS · reglas de negocio", icono: "bi-filetype-js", ruta: "assets/logica-cambio-msisdn.js" },
+                    { nombre: "me-cambio-msisdn-puente.js", tipo: "JS · enganche con el shell", icono: "bi-filetype-js", ruta: "assets/me-cambio-msisdn-puente.js" },
+                    { nombre: "cm-lineas.js", tipo: "JS · operaciones de línea (compartido)", icono: "bi-filetype-js", ruta: "assets/cm-lineas.js" }
+                ]
+            },
+            {
+                nombre: "Documentación", tipo: "doc",
+                descripcion: "Orden PortInExistingSubscription (carrito + orden, calcada de la captura), validaciones y estado pendiente de la portabilidad.",
+                archivos: [
+                    { nombre: "README.md", tipo: "Markdown", icono: "bi-markdown", ruta: "doc/cambio-msisdn/README.md" }
                 ]
             }
         ]

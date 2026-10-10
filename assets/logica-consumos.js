@@ -82,6 +82,7 @@ function cuentaBase(sub, linea) {
         estadoLinea: ESTADOS_CM[st.state] || null,
         creado: p.created ? new Date(p.created).toISOString() : null,
         planPrecioId: rt.primaryPricePlanID ?? null,
+        simId: p.cardPackageID ? String(p.cardPackageID) : "",
         _raw: sub
     };
 }
@@ -793,11 +794,13 @@ async function consultarLinea(msisdn) {
     try {
         const cm = await cmBuscarLinea(msisdn);
         if (!cm) return { msisdn, estadoProceso: "SIN_CM", detalle: "Sin suscriptor en el CM para esta línea.", cm: null, historico: null, movimientos: null };
-        const [uso, titular] = await Promise.all([
+        const [uso, titular, imsi] = await Promise.all([
             cmBundleBalance(cm.subscriberId),
-            resolverTitular(msisdn, cm.ban || cm.subscriberId)
+            resolverTitular(msisdn, cm.ban || cm.subscriberId),
+            MEAPI.imsi(cm.simId)          // la consulta de suscriptores no trae el IMSI
         ]);
         cm.uso = uso;
+        cm.imsi = imsi;
         cm.identificacion = titular?.identificacion || null;
         cm.tipoId = titular?.tipoId || null;
         cm.nombreTitular = titular?.nombre || null;
@@ -945,6 +948,7 @@ function construirDataTable() {
             { data: null, title: "Estado", render: celdaEstado },
             { data: null, title: "Identificación", render: f => `<span class="me-mono">${celdaIdentificacion(f)}</span>` },
             { data: null, title: "Titular", render: f => MEUI.esc(f.cm?.nombreTitular || "—") },
+            { data: null, title: "IMSI", render: f => MEUI.copiable(f.cm?.imsi, "IMSI") },
             { data: null, title: "SubscriptionID", render: f => `<span class="me-mono">${MEUI.esc(f.cm?.subscriberId || "—")}</span>` },
             { data: null, title: "Cuenta (BAN)", render: f => `<span class="me-mono">${MEUI.esc(f.cm?.ban || "—")}</span>` },
             { data: null, title: "Price Plan", render: f => MEUI.esc(f.cm?.planPrecioId ?? "—") },
@@ -960,7 +964,8 @@ function construirDataTable() {
         ]
     }));
     dataTable.on("click", "button.btn-detalle", function (e) { e.stopPropagation(); abrirDetalle(this.dataset.msisdn); });
-    dataTable.on("click", "tbody tr", function () {
+    dataTable.on("click", "tbody tr", function (e) {
+        if (e.target.closest(".btn-copy")) return;      // copiar no abre el detalle
         const fila = dataTable.row(this).data();
         if (fila && fila.msisdn) abrirDetalle(fila.msisdn);
     });
@@ -991,6 +996,7 @@ function pintarCabeceraModal(f) {
     MEUI.$("#mdMsisdn").textContent = f.msisdn;
     MEUI.$("#mdCc").textContent = f.cm?.identificacion || "—";
     MEUI.$("#mdSubId").textContent = f.cm?.subscriberId || "—";
+    MEUI.$("#mdImsi").textContent = f.cm?.imsi || "—";
     MEUI.$("#mdBan").textContent = f.cm?.ban || "—";
     MEUI.$("#mdResumen").innerHTML = f.cm
         ? celdaEstado(f)
@@ -999,6 +1005,7 @@ function pintarCabeceraModal(f) {
         "Titular": f.cm.nombreTitular || "—",
         "Identificación": f.cm.identificacion ? `${f.cm.identificacion}${f.cm.tipoId ? " (" + f.cm.tipoId + ")" : ""}` : "—",
         "SubscriptionID": f.cm.subscriberId || "—",
+        "IMSI": f.cm.imsi || "—",
         "Cuenta (BAN)": f.cm.ban || "—",
         "Estado de la línea": f.cm.estadoCmTexto || "—",
         "Price Plan ID": f.cm.planPrecioId ?? "—",
@@ -1103,12 +1110,13 @@ async function cambiarCuenta(subscriberId) {
         // persona/empresa que la cuenta que estaba activa), así que se
         // vuelve a resolver para la cuenta nueva en vez de arrastrar la
         // anterior.
-        const [uso, titular] = await Promise.all([
+        const [uso, titular, imsi] = await Promise.all([
             cmBundleBalance(c.subscriberId),
-            resolverTitular(f.msisdn, c.ban || c.subscriberId)
+            resolverTitular(f.msisdn, c.ban || c.subscriberId),
+            MEAPI.imsi(c.simId)
         ]);
         f.cm = {
-            ...f.cm, ...c, uso,
+            ...f.cm, ...c, uso, imsi,
             identificacion: titular?.identificacion || null,
             tipoId: titular?.tipoId || null,
             nombreTitular: titular?.nombre || null
@@ -1552,7 +1560,7 @@ function abrirDetalle(msisdn) {
 /* =====================================================================
    15 · EXPORTACIÓN (tabla principal)
 ===================================================================== */
-const CABECERA_EXPORT = ["MSISDN", "Estado", "Identificación", "Tipo ID", "Titular", "SubscriptionID", "Cuenta (BAN)", "Price Plan ID",
+const CABECERA_EXPORT = ["MSISDN", "Estado", "Identificación", "Tipo ID", "Titular", "IMSI", "SubscriptionID", "Cuenta (BAN)", "Price Plan ID",
     "Paquetes activos",
     "Datos consumidos (bytes)", "Datos total (bytes)", "Datos disponibles (bytes)",
     "Voz consumida (seg)", "Voz total (seg)", "Voz disponible (seg)",
@@ -1572,7 +1580,7 @@ function filasExport() {
         head: CABECERA_EXPORT,
         rows: filas.filter(filaPasaFiltros).map(f => [
             f.msisdn, estadoTabla(f), f.cm?.identificacion || "", f.cm?.tipoId || "", f.cm?.nombreTitular || "",
-            f.cm?.subscriberId || "", f.cm?.ban || "", f.cm?.planPrecioId ?? "",
+            f.cm?.imsi || "", f.cm?.subscriberId || "", f.cm?.ban || "", f.cm?.planPrecioId ?? "",
             f.cm ? (f.cm.uso || []).length : "",
             ...trioUso(f.cm, "Datos"),
             ...trioUso(f.cm, "Voz"),

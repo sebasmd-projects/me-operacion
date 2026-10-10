@@ -1,6 +1,6 @@
 # Consulta QDN · Tigo (HLR) — Documentación técnica
 
-> **Versión: v1.2** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.3** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Consulta **neutral** por MSISDN del estado de una línea en el **HLR de Tigo**, a través del servicio de autogestión de Móvil Éxito. Es el equivalente al *Validador QDN · Claro*, pero contra la otra red.
@@ -153,6 +153,7 @@ Columnas: **MSISDN, Estado, RETCODE, IMSI, IMEI, Tipo SIM, Bloqueos, Roaming, De
 
 | Versión | Cambios |
 |---|---|
-| **1.2** | Reglas de negocio de Tigo actualizadas: `3001` pasa de «Inactiva» a **Sin perfil** (no concluye por sí solo: se cruza con Optiva) y `1033` pasa de «No es de Móvil Éxito» a **Residuo en Tigo** (se escala a Tigo y luego responde `3001`). |
+| **1.3** | IMSI copiable en la tabla. |
+| 1.2 | Reglas de negocio de Tigo actualizadas: `3001` pasa de «Inactiva» a **Sin perfil** (no concluye por sí solo: se cruza con Optiva) y `1033` pasa de «No es de Móvil Éxito» a **Residuo en Tigo** (se escala a Tigo y luego responde `3001`). |
 | 1.1 | Validación de coherencia ISDN ⇄ línea consultada, estado `Revisar respuesta`, agrupación de fallidas en KPIs y columna Observaciones en la exportación. |
 | 1.0 | Versión inicial: consulta neutral Activa/Inactiva/No es de ME, concurrencia real, reintentos por timeout, perfil por secciones y JSON original. |

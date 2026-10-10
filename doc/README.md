@@ -26,9 +26,10 @@ GitHub ni permisos de administrador.
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |
 | **Bolsillos, Paquetes, Consumos · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. Además **carga paquetes** en el CM desde el detalle de la línea. | [reporte-consumos](reporte-consumos/README.md) |
-| **Aplicar PLU de paquete** | Aplica un PLU en Tulio sobre una línea, en secuencia (consultar → agregar → eliminar), y verifica en el CM cuánto se sumó a cada paquete; evidencia en Excel y CSV. Solo usuarios autorizados. | [aplicar-plu](aplicar-plu/README.md) |
-| **Bloquear/Inactivar líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. Solo usuarios autorizados. | [estado-lineas](estado-lineas/README.md) |
-| **Cambio IMSI Claro\|Tigo** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. Solo usuarios autorizados. | [cambio-imsi](cambio-imsi/README.md) |
+| **Aplicar PLU de paquete** | Aplica un PLU en Tulio sobre una línea, en secuencia (consultar → agregar → eliminar), y verifica en el CM cuánto se sumó a cada paquete; evidencia en Excel y CSV. | [aplicar-plu](aplicar-plu/README.md) |
+| **Bloquear/Inactivar líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. | [estado-lineas](estado-lineas/README.md) |
+| **Cambio IMSI Claro\|Tigo** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. | [cambio-imsi](cambio-imsi/README.md) |
+| **Cambio MSISDN Claro\|Tigo** | Cambia el número de líneas en el CM, en masivo, desde `línea;línea_nueva` (texto o Excel): valida y envía la orden de portabilidad del CM, que queda pendiente hasta completarse. | [cambio-msisdn](cambio-msisdn/README.md) |
 | **Pre-factura** | Pre-factura mensual del Plan Corporativo: corte del 15, valores e impuestos por línea, resumen por empresa y un archivo por filial. Todo local, sin servicios. | [prefactura](prefactura/README.md) |
 | **Convertir audio a MP3** | Convierte localmente uno o varios audios OGG, M4A u otros formatos compatibles y genera archivos `mp3-*.mp3`. | [audio-mp3](audio-mp3/README.md) |
 

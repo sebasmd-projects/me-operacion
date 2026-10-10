@@ -1,4 +1,4 @@
-<!-- estado_lineas.html · v1.0.1
+<!-- estado_lineas.html · v1.1.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -170,7 +170,7 @@
                         <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
                     </div>
                     <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas.
-                        Solo los usuarios autorizados pueden cambiar el estado; los demás, consultar.</div>
+                        Con la sesión vigente se puede cambiar el estado.</div>
                 </div>
             </section>
 
@@ -300,13 +300,13 @@
     <script>
         MEUI.init({
             app: "estado-lineas",
-            version: "1.0.1",
+            version: "1.1.0",
             doc: "../doc/estado-lineas/README.md",
             titulo: "Bloquear/Inactivar líneas",
             descripcion: "Bloquear o inactivar líneas en el CM, en masivo",
             sesiones: ["cm"],
             instrucciones: [
-                "1 · Conexión: la sesión del CM consulta las líneas y dice quién eres. Cambiar el estado solo está habilitado para usuarios autorizados.",
+                "1 · Conexión: la sesión del CM consulta las líneas y dice quién eres. Sin sesión solo se puede consultar.",
                 "2 · Pega las líneas (máximo 200) y presiona «Consultar líneas»: trae su cuenta, estado, IMSI y el estado de la IMSI en el inventario.",
                 "Marca en la tabla las líneas a cambiar. Como en el cierre de casos: filtros, marcar/desmarcar lo visible y ocultar/mostrar filas.",
                 "3 · Elige Bloquear o Inactivar, revisa la razón y aplica. ESCRIBE EN PRODUCCIÓN, con doble confirmación.",

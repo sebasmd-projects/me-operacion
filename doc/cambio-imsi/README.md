@@ -1,11 +1,11 @@
 # Cambio IMSI Claro|Tigo — Documentación técnica
 
-> **Versión: v1.0.1** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.1.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Cambia la SIM (IMSI) de líneas en el CM, en masivo.** Se pega un renglón por cambio, `línea;imsi_nueva`, se **validan** todos, se marcan en una tabla con casillas —mismo manejo que «Cierre masivo de casos»— y a los marcados se les envía la orden de cambio de SIM con una **nota obligatoria**. Después se vuelve a consultar cada línea para confirmar que quedó con la SIM nueva.
 
-> **Escribe en producción.** Solo los usuarios autorizados pueden cambiar la IMSI; los demás pueden validar.
+> **Escribe en producción.** Pide sesión del CM vigente; sin ella solo se puede validar.
 
 ---
 
@@ -133,7 +133,7 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con usuario, IMSI anterior
 - **Escribe en producción.** Una IMSI equivocada deja la línea sin servicio: por eso la validación previa y la doble confirmación.
 - **HELD es manual**: si la IMSI nueva viene de una línea inactivada, hay que liberarla en el BSS antes.
 - **El código de HELD no está confirmado**: cualquier estado distinto de 1 se trata como no disponible, que es lo seguro.
-- **Guarda de interfaz, no control de acceso** (`USUARIOS_AUTORIZADOS` en `cm-lineas.js`).
+- **Sin lista de usuarios**: cualquiera con sesión del CM vigente puede cambiar la IMSI; la validación previa y la doble confirmación son las guardas.
 - **Una orden aceptada no es una orden aplicada**: se sigue hasta el estado final (45 s) y además se relee la línea.
 
 ---
@@ -142,5 +142,6 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con usuario, IMSI anterior
 
 | Versión | Cambios |
 | --- | --- |
-| **1.0.1** | La herramienta pasa a llamarse **«Cambio IMSI Claro\|Tigo»** (antes «Cambio de IMSI»). |
+| **1.1.0** | Sin lista de usuarios: cambiar la IMSI solo pide sesión del CM vigente. Línea, IMSI actual e IMSI nueva copiables en la tabla. |
+| 1.0.1 | La herramienta pasa a llamarse **«Cambio IMSI Claro\|Tigo»** (antes «Cambio de IMSI»). |
 | 1.0.0 | Primera versión. Cambio IMSI Claro\|Tigo en masivo desde `línea;imsi_nueva` con la orden `ChangeSim` de la interfaz del CM (carrito + orden, verificados contra la captura), validación previa (línea activa, IMSI nueva existente y disponible, sin repetidos), revalidación justo antes de enviar, nota obligatoria, verificación posterior, tabla con casillas y filtros como el cierre de casos, y bitácora con petición y respuesta. Lógica compartida con «Bloquear/Inactivar líneas» en `cm-lineas.js`. |

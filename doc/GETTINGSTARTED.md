@@ -150,7 +150,7 @@ publicación, firma y verificación de integridad:
 
 - **Sin dependencias que instalar**: ni Node, ni Python, ni build step — HTML/JS servido tal cual, y PowerShell nativo para el lanzador y el empaquetado. El código se versiona en Git (repositorio **público**: nada de capturas HAR, credenciales ni datos de clientes en un commit), pero los analistas reciben la suite por ZIP, no por Git.
 - **Versión de cada herramienta en tres lugares**: comentario de la primera línea del `.html`, `MEUI.init({ version })` y encabezado + historial de su `README.md`. Deben coincidir.
-- **Escrituras restringidas por usuario**: las herramientas que escriben en producción habilitan el botón solo a una lista de usuarios (`USUARIOS` en `tulio-plu.js`, `USUARIOS_AUTORIZADOS`, `USUARIOS_PROVISION`). Es una guarda de interfaz, no un control de acceso.
+- **Escrituras con sesión del CM**: las herramientas que escriben en producción piden la sesión del CM vigente (dice quién opera) y doble confirmación. Solo el aprovisionamiento de HLR/HSS Claro sigue limitado a una lista de usuarios (`USUARIOS_PROVISION`). Es una guarda de interfaz, no un control de acceso.
 - **Marcado sin lógica**: cada `.html` en `herramientas/` es solo estructura; toda regla de negocio vive en `assets/logica-<algo>.js`.
 - **La herramienta no inventa datos**: un campo que el CM no devuelve queda vacío (o en `N/A` al imprimir), nunca se rellena con un supuesto.
 - **Versionado `Major.Minor.Patch`**: Major = cambio mayor, Minor = funcionalidad compatible y Patch = corrección/documentación — ver [README.md § Versionado](README.md#versionado).

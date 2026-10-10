@@ -1,6 +1,6 @@
 # HLR/HSS · Claro y Tigo — Documentación técnica
 
-> **Versión: v2.4** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v2.5** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Junta en **una sola página con pestañas** lo que antes eran **tres herramientas separadas**:
@@ -85,7 +85,8 @@ Estos tres documentos **no se duplicaron aquí**: siguen siendo la referencia t�
 
 | Versión | Cambios |
 |---|---|
-| **2.4** | Pestaña Claro: las operaciones (bloqueos, conciliación, aprovisionar…) reintentan solas los **errores de conexión** (conexión cerrada/reseteada sin respuesta, frecuente en lotes grandes), hasta 2 veces con espera creciente. El **timeout** sigue sin reintentarse solo. Ver `doc/validador-qdn/README.md` §11.4. |
+| **2.5** | IMSI copiable en las tablas de las pestañas Claro y Tigo (el detalle ya lo tenía). |
+| 2.4 | Pestaña Claro: las operaciones (bloqueos, conciliación, aprovisionar…) reintentan solas los **errores de conexión** (conexión cerrada/reseteada sin respuesta, frecuente en lotes grandes), hasta 2 veces con espera creciente. El **timeout** sigue sin reintentarse solo. Ver `doc/validador-qdn/README.md` §11.4. |
 | 2.3 | Pestaña Claro: **Aprovisionar y Conciliación** ya se ofrecen también en el menú masivo, pero solo sobre las líneas **marcadas con checkbox** (columna nueva al frente de la tabla, más un filtro `#fSel`) — no sobre todo lo filtrado, como bloqueos/desbloqueos. Desaprovisionar se queda fuera del masivo. Ver `doc/validador-qdn/README.md` §11.8. |
 | 2.2 | Pestaña Ambos: la tarjeta **Ambos / no concluyente** ahora filtra los dos resultados que requieren revisión; el desplegable de Ubicación ofrece el mismo filtro agrupado y conserva las opciones individuales. |
 | 2.1 | Pestaña Claro: menú de operaciones reorganizado (Procesos → SIM y número → Bloqueos plegados por familia, con iconos), modal de operación más ancho, entrada de texto con encabezado (la línea por nombre de columna normalizado, más `imsi`/`iccid`/`ki` si vienen) y aviso de discrepancias entre la entrada y el QDN. Ver `doc/validador-qdn/README.md` §4.1, §4.2 y §11.1. |

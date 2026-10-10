@@ -1,4 +1,4 @@
-<!-- reporte_prepagadas.html · v9.4.0
+<!-- reporte_prepagadas.html · v9.5.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -718,6 +718,7 @@
                             <th>Estado SIME</th>
                             <th>Pestaña</th>
                             <th>ID suscriptor BSS</th>
+                            <th>IMSI</th>
                             <th>Estado BSS</th>
                             <th>Plan</th>
                             <th>F. compra SIME</th>
@@ -763,6 +764,9 @@
                             Cédula <span id="mdCedula" class="me-mono">—</span>
                             <button type="button" class="btn-copy" data-copy-target="mdCedula"
                                 title="Copiar cédula">⧉</button>
+                            <span class="ms-2">· IMSI <span id="mdImsi" class="me-mono">—</span>
+                                <button type="button" class="btn-copy" data-copy-target="mdImsi"
+                                    title="Copiar IMSI">⧉</button></span>
                             <span id="mdTitular" class="ms-2" style="opacity:.8"></span>
                         </div>
                     </div>
@@ -1037,7 +1041,7 @@
     <script>
         MEUI.init({
             app: "prepagadas",
-            version: "9.4.0",
+            version: "9.5.0",
             doc: "../doc/reporte-prepagadas/README.md",
             titulo: "Prepagadas · SIME ⇄ CM",
             descripcion: "Verificación cruzada y alta de suscripciones",

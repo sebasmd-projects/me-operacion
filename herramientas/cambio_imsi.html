@@ -1,4 +1,4 @@
-<!-- cambio_imsi.html · v1.0.1
+<!-- cambio_imsi.html · v1.1.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -171,7 +171,7 @@
                         <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
                     </div>
                     <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas.
-                        Solo los usuarios autorizados pueden cambiar la IMSI; los demás, validar.</div>
+                        Con la sesión vigente se puede cambiar la IMSI.</div>
                 </div>
             </section>
 
@@ -290,13 +290,13 @@
     <script>
         MEUI.init({
             app: "cambio-imsi",
-            version: "1.0.1",
+            version: "1.1.0",
             doc: "../doc/cambio-imsi/README.md",
             titulo: "Cambio IMSI Claro|Tigo",
             descripcion: "Cambiar la SIM (IMSI) de líneas en el CM, en masivo",
             sesiones: ["cm"],
             instrucciones: [
-                "1 · Conexión: la sesión del CM valida los cambios y dice quién eres. Cambiar la IMSI solo está habilitado para usuarios autorizados.",
+                "1 · Conexión: la sesión del CM valida los cambios y dice quién eres. Sin sesión solo se puede validar.",
                 "2 · Pega un renglón por cambio, «línea;imsi_nueva» (máximo 100), y presiona «Validar cambios».",
                 "La validación revisa que la línea esté ACTIVA y que la IMSI nueva exista y esté DISPONIBLE. Si salió de una línea inactivada queda en HELD: hay que liberarla en el BSS antes.",
                 "Solo se pueden marcar los renglones que pasaron la validación. Como en el cierre de casos: filtros, marcar/desmarcar lo visible y ocultar/mostrar filas.",

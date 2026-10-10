@@ -1,4 +1,4 @@
-<!-- reporte_consumos.html · v1.9.0
+<!-- reporte_consumos.html · v1.10.0
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
@@ -894,6 +894,7 @@
                             <th>Estado</th>
                             <th>Identificación</th>
                             <th>Titular</th>
+                            <th>IMSI</th>
                             <th>SubscriptionID</th>
                             <th>Cuenta (BAN)</th>
                             <th>Price Plan</th>
@@ -935,6 +936,9 @@
                             <span class="ms-3">Cuenta (BAN) <span id="mdBan" class="me-mono">—</span></span>
                             <button type="button" class="btn-copy" data-copy-target="mdBan"
                                 title="Copiar cuenta (BAN)">⧉</button>
+                            <span class="ms-3">IMSI <span id="mdImsi" class="me-mono">—</span></span>
+                            <button type="button" class="btn-copy" data-copy-target="mdImsi"
+                                title="Copiar IMSI">⧉</button>
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
@@ -1208,7 +1212,7 @@
     <script>
         MEUI.init({
             app: "consumos",
-            version: "1.9.0",
+            version: "1.10.0",
             doc: "../doc/reporte-consumos/README.md",
             titulo: "Consumos y Paquetes · CM",
             descripcion: "Datos de la línea, paquetes activos e histórico de consumo (CDR) por rango de fechas",
