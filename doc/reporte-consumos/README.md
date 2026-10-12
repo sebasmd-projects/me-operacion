@@ -1,11 +1,11 @@
 # Consumos y Paquetes (CM) — Documentación técnica
 
-> **Versión: v1.10.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.11.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para traer, por línea, **datos básicos de la línea**, sus **paquetes activos** (uso y balance), sus **movimientos** (compras, paquetes, recurrencias) y su **histórico de consumo** (llamadas, datos y SMS) desde el CM (Optiva), con filtros, paginación, gráficas y exportación.
 
-> **Desde v1.8.0 deja de ser solo lectura en un punto concreto:** dentro del detalle de una línea hay una sección **«Cargar paquete»** que agrega paquetes en el CM. Es lo único que escribe, vive en su propio archivo (`assets/logica-paquetes-carga.js`) y tiene su propio paso de revisión y confirmación. Todo lo demás sigue siendo consulta.
+> **Desde v1.8.0 deja de ser solo lectura en un punto concreto:** dentro del detalle de una línea hay una sección **«Cargar paquete»** que agrega paquetes en el CM. Es lo único que escribe, vive en su propio archivo (`assets/herramientas/consumos/paquetes.js`) y tiene su propio paso de revisión y confirmación. Todo lo demás sigue siendo consulta.
 
 > A diferencia de "Prepagadas · SIME ⇄ CM", esta herramienta **no consulta SIME**: no verifica suscripciones, no cuenta periodos ni recurrencias — los movimientos que trae son los mismos que "Movimientos BSS" de Prepagadas, pero acotados al rango de fechas elegido, sin el cálculo de ciclos/cobertura. Tampoco es "Ajustes y paquetes" (que exporta el histórico **completo** de ajustes de dinero y de paquetes por rango, sin ligarlos a una línea puntual): esta trae, **por línea**, tanto los movimientos como los **eventos de consumo real** (CDR) y el balance vigente de los paquetes.
 
@@ -28,11 +28,11 @@ Herramienta para traer, por línea, **datos básicos de la línea**, sus **paque
 | Archivo | Qué contiene |
 |---|---|
 | `reporte_consumos.html` | Solo marcado: KPIs, pasos, tabla principal y modal de detalle (paquetes + histórico + gráficas). |
-| `assets/logica-consumos.js` | Reglas de negocio: consultas al CM, clasificación del histórico, tabla, filtros, gráficas y exportación. |
-| `assets/logica-paquetes-carga.js` | **Cargar paquete** y **+ PLU**: lo que escribe (catálogo de la oferta, carrito, orden y verificación en el CM; PLU por Tulio). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
-| `assets/tulio-plu.js` | Recarga de PLU en Tulio, **compartido con «Aplicar PLU»**. |
-| `assets/me-consumos-puente.js` | Enganche con el shell: sesión del CM, credenciales compartidas y exportación. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las herramientas de esta suite. |
+| `assets/herramientas/consumos/consumos.js` | Un solo archivo: configuración, reglas de negocio (consultas al CM, clasificación del histórico, tabla, filtros, gráficas, exportación) e interfaz (sección 17: sesión del CM, credenciales compartidas, exportación y registro). |
+| `assets/herramientas/consumos/consumos.css` | Estilos propios de la herramienta. |
+| `assets/herramientas/consumos/paquetes.js` | **Cargar paquete** y **+ PLU**: lo que escribe (catálogo de la oferta, carrito, orden y verificación en el CM; PLU por Tulio). Va aparte para poder leerla y auditarla sin mezclarla con la consulta. |
+| `assets/compartido/tulio-plu.js` | Recarga de PLU en Tulio, **compartido con «Aplicar PLU»**. |
+| `assets/base/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a las herramientas de esta suite. |
 
 ---
 
@@ -123,15 +123,15 @@ Cuando hace más de una vuelta, deja constancia en el registro de la herramienta
 
 ### Titular de la línea (identificación + nombre)
 
-**Porte directo de `assets/logica-rechazo.js`** (misma función `titularDeCuenta`, copiada porque cada herramienta carga su propia lógica y no pueden compartir constantes globales): el BAN de la línea suele ser una **cuenta hija sin documento**, y la identificación está en la cuenta de arriba. Se sube por `billingAccount.parentId` y, cuando ese campo no viene, por `accountRelationship[].account.id`, con un tope de **5 saltos**, hasta encontrar una cuenta cuyo `relatedParty` (Individual/Customer) traiga `individualIdentification`.
+**Porte directo de `assets/herramientas/rechazo/rechazo.js`** (misma función `titularDeCuenta`, copiada porque cada herramienta carga su propia lógica y no pueden compartir constantes globales): el BAN de la línea suele ser una **cuenta hija sin documento**, y la identificación está en la cuenta de arriba. Se sube por `billingAccount.parentId` y, cuando ese campo no viene, por `accountRelationship[].account.id`, con un tope de **5 saltos**, hasta encontrar una cuenta cuyo `relatedParty` (Individual/Customer) traiga `individualIdentification`.
 
 Se resuelve **en paralelo** con `bundleBalance` (no la retrasa), tanto en la consulta masiva como al cambiar de cuenta (BAN) dentro del modal — cada BAN puede tener un titular distinto, así que no se arrastra el de la cuenta anterior.
 
-**Nada se inventa**: si la cadena de cuentas no tiene identificación, o el CM devuelve el nombre de prueba `"FirstName LastName"` (cuentas de prueba sin datos reales cargados), el campo queda vacío y se avisa en el registro — igual que en `logica-rechazo.js`. Si cambia algo en esta lógica, revisa también esa herramienta.
+**Nada se inventa**: si la cadena de cuentas no tiene identificación, o el CM devuelve el nombre de prueba `"FirstName LastName"` (cuentas de prueba sin datos reales cargados), el campo queda vacío y se avisa en el registro — igual que en `assets/herramientas/rechazo/rechazo.js`. Si cambia algo en esta lógica, revisa también esa herramienta.
 
 ### Clasificación del histórico (Datos / Voz / SMS) y dirección (MO / MT)
 
-El API no trae un campo único y documentado para el tipo de evento, así que se clasifica con un criterio en cascada (tuneable en `CALLTYPE_CATEGORIA` / `UNIT_CATEGORIA_CDR` de `logica-consumos.js`):
+El API no trae un campo único y documentado para el tipo de evento, así que se clasifica con un criterio en cascada (tuneable en `CALLTYPE_CATEGORIA` / `UNIT_CATEGORIA_CDR` de `consumos.js`):
 
 1. `callType` conocido: `1` y `2` → Voz, `3` → SMS, `11` → Datos (los cuatro confirmados con datos reales).
 2. Si no, `bundleInfo[0].unitType` (mismo código que `bundleBalance`: `0` Voz, `1` Datos, `2` SMS, `3` Saldo).
@@ -144,7 +144,7 @@ La **dirección** (`direccionCdr()`) sale del parámetro `ChargedParty` dentro d
 
 ### Clasificación de los movimientos (1.ª compra / paquete / compra / recurrencia / otro)
 
-Mismas reglas que `categoriaTx` en Prepagadas — expresiones regulares (tuneables en `logica-consumos.js`, sección 6) sobre el parámetro `RNAdjustmentTypeID`:
+Mismas reglas que `categoriaTx` en Prepagadas — expresiones regulares (tuneables en `consumos.js`, sección 6) sobre el parámetro `RNAdjustmentTypeID`:
 
 | Categoría | Se marca cuando… |
 |---|---|
@@ -174,7 +174,9 @@ Igual que las demás herramientas: arrastra un Excel/CSV (se detecta la columna 
 
 ### Tabla principal
 
-Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `123456789 (CC)`), **titular**, SubscriptionID, cuenta (BAN), Price Plan, paquetes activos y, por cada categoría (**Datos**, **Voz**, **SMS**), el **consumido / total** con el **disponible** debajo — sumando todos los bundles de esa categoría, de `bundleBalance` y sin consultar el histórico. Los bundles sin tope no suman al total y se anotan aparte (`+N sin límite`). Sin identificación en la cadena de cuentas, la celda queda en `—`. Botón **👁** para abrir el detalle.
+Por defecto se ven seis columnas, en este orden: **Acciones** (botón «Ver detalle» y copiar línea), **Línea**, **IMSI**, **Estado**, **identificación** (con el tipo entre paréntesis, ej. `123456789 (CC)`) y **titular**. El menú **«Columnas»** de la barra de filtros activa el resto: SubscriptionID, cuenta (BAN), Price Plan, paquetes activos y, por cada categoría (**Datos**, **Voz**, **SMS**), el **consumido / total** con el **disponible** debajo — sumando todos los bundles de esa categoría, de `bundleBalance` y sin consultar el histórico. Los bundles sin tope no suman al total y se anotan aparte (`+N sin límite`). Sin identificación en la cadena de cuentas, la celda queda en `—`. El detalle se abre con «Ver detalle» o con un clic en la fila. El filtro de **Estado** es un desplegable con casillas (sincronizado con las tarjetas resumen) y el único buscador de texto es el «Buscar» de la tabla. La exportación conserva todas las columnas, visibles o no.
+
+El avance de la consulta se muestra en la barra de progreso del pie (N/M líneas); si alguna línea termina en error, aparece «Reintentar fallidas (k)», que reconsulta solo esas.
 
 ### Modal de detalle
 
@@ -182,7 +184,7 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
 - **Otras cuentas (BAN)** de la línea, si tiene más de una: se puede cambiar cuál se usa para paquetes e histórico.
 - **Paquetes · Uso y Balance**: tarjetas por bundle con **consumido / total** (y el porcentaje consumido), la barra de consumo y el **disponible** destacado debajo — mismo componente que Prepagadas, cambiado a la vez en las dos herramientas.
 - **Movimientos y consumo del período** — un solo rango de fechas (**Desde / Hasta**, mes en curso por defecto) y botón **Consultar movimientos y consumo** que trae los dos juntos, con dos bloques debajo:
-  - **Movimientos**: tarjetas (total, compras/paquetes, monto, vigentes) + tabla DataTables **paginada y filtrable por categoría** (dropdown "Categoría" arriba de la tabla). Las filas se colorean por categoría (mismos colores que "Movimientos BSS" de Prepagadas: amarillo 1.ª compra, ámbar compra de paquete, durazno compra/ingreso, verde recurrencia, gris otro ajuste) y llevan borde izquierdo negro cuando son la **vigente** de su categoría; la columna **Vigencia** además marca con un chip azul las que caen en el **mes en curso**. Exportación CSV/Excel/JSON propia, con el filtro de categoría aplicado.
+  - **Movimientos**: tarjetas (total, compras/paquetes, monto, vigentes) + tabla DataTables **paginada y filtrable por categoría** (desplegable «Categoría» arriba de la tabla). Las filas se colorean por categoría (mismos colores que "Movimientos BSS" de Prepagadas: amarillo 1.ª compra, ámbar compra de paquete, durazno compra/ingreso, verde recurrencia, gris otro ajuste) y llevan borde izquierdo negro cuando son la **vigente** de su categoría; la columna **Vigencia** además marca con un chip azul las que caen en el **mes en curso**. Exportación CSV/Excel/JSON propia, con el filtro de categoría aplicado.
   - **Consumo** (lo que ya traía la herramienta): tarjetas, gráficas de barras/torta, filtro Todos/Datos/Voz/SMS, tabla de detalle y su propia exportación — ver más abajo.
   - Se traen **todos** los registros del rango, sin tope, paginando de 500 en 500 cuantas veces haga falta (ver "Paginación del histórico" en la sección 4). Mientras tanto se muestra el conteo en vivo. Solo si el CM corta la paginación por su cuenta se avisa junto al conteo de que la lista puede estar incompleta.
 - **Consumo**:
@@ -193,7 +195,7 @@ Línea, estado, **identificación** (con el tipo entre paréntesis, ej. `1234567
 
 ### + PLU (v1.9.0) — uno o varios PLU por Tulio
 
-Junto a «Cargar paquete», el botón **+ PLU** abre un panel para aplicar uno o varios PLU a la línea con `RecargaPaquete` de Tulio (el mismo servicio de «Aplicar PLU», en `assets/tulio-plu.js`). Se escriben uno por renglón o separados por coma o espacio, opcionalmente `PLU costo canal` (por defecto costo 0 y canal `PPrepagadaTP`). Doble confirmación; se aplican de uno en uno y un fallo no detiene los demás. **Solo agrega**: para agregar y eliminar está «Aplicar PLU». Pide sesión del CM vigente; sin ella el panel dice por qué. Al terminar se refresca la pantalla como tras una carga del CM.
+Junto a «Cargar paquete», el botón **+ PLU** abre un panel para aplicar uno o varios PLU a la línea con `RecargaPaquete` de Tulio (el mismo servicio de «Aplicar PLU», en `assets/compartido/tulio-plu.js`). Se escriben uno por renglón o separados por coma o espacio, opcionalmente `PLU costo canal` (por defecto costo 0 y canal `PPrepagadaTP`). Antes de enviar se abre un resumen de confirmación (línea, PLU y cantidad); se aplican de uno en uno y un fallo no detiene los demás. **Solo agrega**: para agregar y eliminar está «Aplicar PLU». Pide sesión del CM vigente; sin ella el panel dice por qué. Al terminar se refresca la pantalla como tras una carga del CM.
 
 ### Cargar paquete (v1.8.0) — orden del CM
 
@@ -204,6 +206,8 @@ Son tres pasos, con el mismo lenguaje visual que los pasos de la columna izquier
 **1 · Elegir.** El panel abre con la línea ya resuelta (perfil, titular y oferta del plan) y el catálogo de esa oferta listo. El buscador filtra por **nombre, `bundleId` o `productId`** sobre los ~469 paquetes; cada resultado muestra sus dos identificadores, el precio si lo tiene y una marca **«ya activo»** si la línea ya lo trae. Se eligen con un clic y quedan como chips quitables. El catálogo se cachea **por oferta**, así que abrir otra línea del mismo plan no lo vuelve a pedir.
 
 **2 · Revisar.** Tabla de exactamente lo que se va a enviar: los componentes obligatorios en `NO_CHANGE` y lo elegido en `ADD`, con precio y total. Un `<details>` muestra el **cuerpo JSON exacto** del carrito, igual que la simulación de "Cierre masivo de casos". Si algún paquete elegido ya está activo, se avisa; si el total es distinto de 0, **el botón de enviar queda bloqueado** (ver Riesgos).
+
+Antes de enviar, el botón **Cargar en el CM** abre un resumen de confirmación (línea, paquetes, cantidad y total) y solo envía si se acepta.
 
 **3 · Resultado.** Línea de tiempo de las cuatro operaciones (carrito → orden → limpieza → verificación) con su estado y su detalle, el número de orden `SOI…` copiable, y el **antes / después** de los paquetes de la línea. Si el CM todavía no refleja el cambio —tarda unos segundos— hay un botón **Verificar de nuevo** en vez de darlo por fallido.
 
@@ -277,8 +281,10 @@ Paso 1 (sesión CM)  ->  Paso 2 (líneas)
 
 | Versión | Cambios |
 |---|---|
-| **1.10.0** | **IMSI** de la línea en la tabla (copiable), en la cabecera y los datos del detalle y en la exportación (`MEAPI.imsi`, también al cambiar de cuenta). «+ PLU» ya no tiene lista de usuarios: basta la sesión del CM vigente. Copiar en una fila no abre el detalle. |
-| 1.9.0 | **Agregar uno o varios PLU** desde el detalle de la línea: botón **«+ PLU»** junto a «Cargar paquete». Se escriben los PLU (uno por renglón o separados por coma/espacio; opcional `PLU costo canal`), se confirman dos veces y se aplican en Tulio de uno en uno (`RecargaPaquete`, el mismo servicio de «Aplicar PLU», compartido en `assets/tulio-plu.js`). Solo agrega; un fallo no detiene los demás. Habilitado solo para los usuarios de `USUARIOS` en `tulio-plu.js` con sesión del CM. Al terminar se refrescan paquetes, tabla, movimientos y consumo. |
+| _sin versión_ | Refactor interno: `logica-consumos.js` y `me-consumos-puente.js` se unen en `assets/herramientas/consumos/consumos.js`; `logica-paquetes-carga.js` pasa a `assets/herramientas/consumos/paquetes.js` (se carga antes que `consumos.js`); el `<style>` pasa a `consumos.css`. Se quita código muerto (`fechaNota`) y los chequeos de carga del puente, que ya no aplican. Sin cambios de comportamiento. |
+| **1.11.0** | Tabla menos densa: columnas por defecto Acciones (Ver detalle + copiar línea), Línea, IMSI, Estado, Identificación y Titular; el resto en el menú «Columnas». Filtros de Estado y Categoría con `MEUI.filtroMulti`. Progreso en la barra del pie con «Reintentar fallidas». Cargar paquete y «+ PLU» piden confirmación previa (`MEUI.confirmarEscritura`) y sus botones de envío son de peligro, en grupo aparte. KPI del detalle más compactas; ayudas largas movidas a «?». |
+| 1.10.0 | **IMSI** de la línea en la tabla (copiable), en la cabecera y los datos del detalle y en la exportación (`MEAPI.imsi`, también al cambiar de cuenta). «+ PLU» ya no tiene lista de usuarios: basta la sesión del CM vigente. Copiar en una fila no abre el detalle. |
+| 1.9.0 | **Agregar uno o varios PLU** desde el detalle de la línea: botón **«+ PLU»** junto a «Cargar paquete». Se escriben los PLU (uno por renglón o separados por coma/espacio; opcional `PLU costo canal`), se confirman dos veces y se aplican en Tulio de uno en uno (`RecargaPaquete`, el mismo servicio de «Aplicar PLU», compartido en `assets/compartido/tulio-plu.js`). Solo agrega; un fallo no detiene los demás. Habilitado solo para los usuarios de `USUARIOS` en `tulio-plu.js` con sesión del CM. Al terminar se refrescan paquetes, tabla, movimientos y consumo. |
 | 1.8.1 | **Fix «Cargar paquete»**: el catálogo se pedía al hacer clic, pero el spinner quedaba en el botón que el panel oculta, así que parecía no pasar nada hasta darle «Cancelar». Ahora el catálogo se **precarga al abrir el detalle de la línea**: el botón muestra «Cargando catálogo…» deshabilitado y se habilita como «+ Cargar paquete» cuando está listo (o «Reintentar catálogo» si falló). Las respuestas de una línea que ya se cerró se descartan. |
 | 1.8.0 | Nueva sección **«Cargar paquete»** dentro del detalle de la línea: agrega paquetes en el CM mediante carrito + orden de cambio de oferta, en tres pasos (elegir del catálogo de la oferta · revisar el cuerpo exacto · confirmar), con verificación contra `subscriberProfile`, borrado del carrito pase lo que pase, sin reintento automático de la orden y bloqueo de cualquier selección con costo. Al quedar aplicada se refrescan paquetes, tabla principal, movimientos y consumo con datos nuevos del CM. La lógica vive aparte en `assets/logica-paquetes-carga.js`; la consulta no cambió. |
 | **1.7.0** | La identificación aparece en la cabecera del detalle con botón de copia rápida. La resolución del titular incorpora dos respaldos confirmados con el flujo de Postman: `individual.fullName` y el `id` de la cuenta como posible `individualID` cuando falta la relación `Individual`, conservando la búsqueda multinivel existente. |

@@ -1,6 +1,6 @@
 # Exportar casos · Tipificación — Documentación técnica
 
-> **Versión: v2.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v2.1.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para exportar casos/tickets del CRM de tipificación de **Móvil Éxito** (plataforma Optiva / OBP). Se autentica contra Keycloak, consulta el API gateway interno, descarga los casos paginados, los enriquece con datos relacionados (usuarios, grupos, organizaciones, estados, prioridades) y permite exportarlos a **CSV / Excel / JSON**.
@@ -22,10 +22,10 @@ Herramienta para exportar casos/tickets del CRM de tipificación de **Móvil Éx
 
 | Archivo | Qué contiene |
 |---|---|
-| `export_tipificacion.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
-| `assets/logica-tipificacion.js` | Reglas de negocio: armado de la query, motor de descarga, división de rangos, enriquecimiento y validaciones. |
-| `assets/me-tipificacion-puente.js` | Enganche con el shell: sesión, pestañas y registro. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
+| `herramientas/export_tipificacion.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
+| `assets/herramientas/tipificacion/tipificacion.js` | Todo el código de la herramienta, en tres bloques: 1 configuración y constantes · 2 reglas de negocio (fechas, query, motor de descarga, enriquecimiento, aplanado) · 3 interfaz (validación, tablas, exportación, sesión y arranque). Va en una IIFE; no expone nombres globales. |
+| `assets/herramientas/tipificacion/tipificacion.css` | Estilos propios: Tom Select con error, pestañas y pills de autenticación. |
+| `assets/base/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 
@@ -148,7 +148,7 @@ Pasos 1–3 (credenciales + filtros)  ->  validarYLeer()
 ## 7. Flujo de la descarga en detalle
 
 1. Se arma la query con los estados y el rango de fechas.
-2. `contarCasos` (con `per_page=1`) estima el total. **Solo** alimenta la barra de progreso y decide si conviene **pre-dividir** el rango.
+2. `contarCasos` (con `per_page=1`) estima el total. **Solo** alimenta la barra de progreso común del pie y decide si conviene **pre-dividir** el rango.
 3. `descargarPaginas` pide **lotes** de hasta `concurrencia` páginas consecutivas con `Promise.all`, guarda los resultados en un `Map`, los **reensambla en orden de página**, acumula ids y mezcla los `assets`.
 4. Continúa hasta que aparece una **página corta** (`length < perPage` → fin de datos) o se alcanza `maxPagES` (la ventana de 10.000). Si topa la ventana con páginas aún llenas, marca `truncado`.
 5. En modo *todas las páginas*, si `truncado` —o si el conteo previo ya daba ≥ 10.000— el rango se **divide por la mitad** y cada mitad se procesa recursivamente. Así se superan los 10.000 **por consulta** sumando sub-rangos.
@@ -195,5 +195,7 @@ Puntos críticos:
 
 | Versión | Cambios |
 |---|---|
+| **2.1.0** (refactor interno) | Un solo archivo de código por herramienta en `assets/herramientas/tipificacion/` (une la lógica y el puente) y estilos movidos a `tipificacion.css`. Los límites y valores por defecto del formulario quedan como constantes al comienzo. Sin cambios de comportamiento. |
+| **2.1.0** | Progreso común y estados de tablas con reintento; ayudas compactas. Ayudas «?» y accesibilidad. |
 | **2.0** | Migración a la base compartida: HTML solo con marcado, lógica en `assets/logica-tipificacion.js` y acceso al CRM en `me-api.js`. Se retira el sidenav propio; los tres pasos pasan al shell y los botones de acción a un paso de descarga; resultados y vista previa en pestañas al alto útil; validaciones que abren el paso del error; exportación con el separador compartido (`;` por defecto). |
 | 1.0 | Versión inicial: descarga por rango y estados, división recursiva de fechas ante el límite de 10.000, enriquecimiento con assets y exportación CSV / Excel / JSON. |

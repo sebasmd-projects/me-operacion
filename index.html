@@ -1,7 +1,7 @@
 <!-- index.html · v2.0
      ---------------------------------------------------------------------
      Portada del backlog operativo. Solo marcado: el catálogo de proyectos
-     y sus rutas viven en assets/logica-inicio.js, que es donde se hace
+     y sus rutas viven en assets/base/catalogo.js, que es donde se hace
      cualquier rename.
      --------------------------------------------------------------------- -->
 <!DOCTYPE html>
@@ -14,311 +14,17 @@
     <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
     <title>Herramientas de Operación</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="assets/me-ui.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Librerías de CDN: versiones y URLs en assets/base/dependencias.js (Bootstrap, iconos y fuentes siempre) -->
+    <script src="assets/base/dependencias.js" data-me-deps="marked"></script>
+    <link rel="stylesheet" href="assets/base/me-ui.css">
 
-    <style>
-        /* Estilos propios de la portada. Lo estructural vive en me-ui.css. */
-
-        .min-w-0 {
-            min-width: 0;
-        }
-
-        /* ---------- Tarjeta de proyecto ---------- */
-        .proyecto {
-            background: #fff;
-            border: 1px solid var(--me-borde);
-            border-radius: .65rem;
-            overflow: hidden;
-            margin-bottom: .75rem;
-        }
-
-        .proyecto-cab {
-            display: flex;
-            align-items: center;
-            gap: .9rem;
-            padding: .9rem 1rem;
-            cursor: pointer;
-            user-select: none;
-            transition: background .15s ease;
-        }
-
-        .proyecto-cab:hover {
-            background: #FBFAF6;
-        }
-
-        .proyecto-n {
-            width: 42px;
-            height: 42px;
-            flex: 0 0 42px;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            background: var(--me-negro);
-            color: var(--me-amarillo);
-            font-size: 1.05rem;
-            font-weight: 800;
-        }
-
-        .proyecto-titulo {
-            margin: 0;
-            font-size: 1.05rem;
-            font-weight: 700;
-        }
-
-        .proyecto-desc {
-            margin: .15rem 0 0;
-            color: var(--me-suave);
-            font-size: .82rem;
-        }
-
-        .proyecto-flecha {
-            color: var(--me-suave);
-            transition: transform .2s ease;
-        }
-
-        .proyecto-cab[aria-expanded="true"] .proyecto-flecha {
-            transform: rotate(180deg);
-        }
-
-        .proyecto-cuerpo {
-            padding: 0 1rem 1rem;
-        }
-
-        .badge-operacion {
-            color: var(--me-ok);
-            background: #E3F3E9;
-        }
-
-        .badge-comun {
-            color: #795800;
-            background: #FFF1BD;
-        }
-
-        .badge-codigo {
-            color: #795800;
-            background: #FFF1BD;
-        }
-
-        .badge-falta {
-            color: var(--me-err);
-            background: #FBE2DF;
-            font-size: .65rem;
-            font-weight: 600;
-        }
-
-        .btn-falta {
-            border-color: var(--me-err);
-            color: var(--me-err);
-        }
-
-        [data-bajar]:disabled {
-            opacity: .45;
-        }
-
-        .badge-doc {
-            color: var(--me-info);
-            background: #E5ECF8;
-        }
-
-        /* ---------- Entregable ---------- */
-        .entregable {
-            border: 1px solid var(--me-borde);
-            border-radius: .55rem;
-            overflow: hidden;
-        }
-
-        .entregable+.entregable {
-            margin-top: .6rem;
-        }
-
-        .entregable-cab {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: .6rem .8rem;
-            background: #FAFAF7;
-            border-bottom: 1px solid var(--me-borde);
-        }
-
-        .entregable-titulo {
-            margin: 0;
-            font-size: .9rem;
-            font-weight: 700;
-        }
-
-        .entregable-desc {
-            margin: .1rem 0 0;
-            color: var(--me-suave);
-            font-size: .76rem;
-        }
-
-        .entregable-cuerpo {
-            padding: .6rem .8rem;
-        }
-
-        /* ---------- Archivo ---------- */
-        .archivo {
-            border: 1px solid var(--me-borde);
-            border-radius: .5rem;
-            overflow: hidden;
-        }
-
-        .archivo+.archivo {
-            margin-top: .6rem;
-        }
-
-        .archivo-cab {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .8rem;
-            flex-wrap: wrap;
-            padding: .5rem .7rem;
-            background: #F8F8F5;
-        }
-
-        .archivo-nombre {
-            display: flex;
-            align-items: center;
-            gap: .4rem;
-            font-family: var(--me-mono);
-            font-size: .8rem;
-            font-weight: 700;
-        }
-
-        .archivo-tipo {
-            color: var(--me-suave);
-            font-size: .7rem;
-            margin-top: .1rem;
-        }
-
-        .archivo-cuerpo {
-            padding: .6rem .7rem;
-        }
-
-        /* Vista de código: 10 líneas y el botón «Expandir» para verlo entero */
-        .codigo {
-            margin: 0;
-            padding: .7rem .9rem;
-            border-radius: .45rem;
-            background: #17171A;
-            color: #DDDDD6;
-            font-family: var(--me-mono);
-            font-size: 12px;
-            line-height: 1.5;
-            white-space: pre;
-            overflow: auto;
-            max-height: calc(10 * 1.5 * 12px + 1.4rem);
-            scrollbar-width: thin;
-        }
-
-        .codigo.codigo-completo {
-            max-height: 70vh;
-        }
-
-        .codigo.codigo-error {
-            color: #FF8C82;
-            white-space: pre-wrap;
-        }
-
-        /* ---------- Documentación en el modal ---------- */
-        .markdown {
-            line-height: 1.65;
-        }
-
-        .markdown> :first-child {
-            margin-top: 0;
-        }
-
-        .markdown h1 {
-            font-size: 1.55rem;
-        }
-
-        .markdown h2 {
-            font-size: 1.2rem;
-            padding-bottom: .3rem;
-            border-bottom: 1px solid var(--me-borde);
-        }
-
-        .markdown h3 {
-            font-size: 1.02rem;
-        }
-
-        .markdown h1,
-        .markdown h2,
-        .markdown h3,
-        .markdown h4 {
-            margin: 1.4rem 0 .7rem;
-        }
-
-        .markdown table {
-            width: 100%;
-            margin: 1rem 0;
-            border-collapse: collapse;
-            font-size: .85rem;
-        }
-
-        .markdown th,
-        .markdown td {
-            padding: .5rem;
-            border: 1px solid var(--me-borde);
-            text-align: left;
-        }
-
-        .markdown th {
-            background: #F4F4F0;
-        }
-
-        .markdown code {
-            padding: .12rem .3rem;
-            border-radius: .25rem;
-            background: #EEEEEA;
-            font-family: var(--me-mono);
-            font-size: .85em;
-        }
-
-        .markdown pre {
-            margin: 1rem 0;
-            padding: .9rem;
-            overflow: auto;
-            border-radius: .45rem;
-            background: #17171A;
-            color: #DDDDD6;
-        }
-
-        .markdown pre code {
-            padding: 0;
-            background: transparent;
-            color: inherit;
-        }
-
-        .markdown blockquote {
-            margin: 1rem 0;
-            padding: .6rem .9rem;
-            border-left: 4px solid var(--me-amarillo);
-            background: #FAFAF5;
-        }
-
-        .markdown img {
-            max-width: 100%;
-        }
-
-        @media (max-width: 767.98px) {
-            .proyecto-acciones {
-                display: none;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="assets/herramientas/inicio/inicio.css">
 </head>
 
-<body class="me-body">
+<body class="me-body" data-me-herramienta="inicio">
+
+    <!-- ============ ACCESOS ============ -->
+    <nav id="accesos" aria-label="Herramientas"></nav>
 
     <!-- ============ RESUMEN ============ -->
     <div class="me-kpis">
@@ -378,18 +84,12 @@
         </div>
     </div>
 
-    <!-- ============ LIBRERÍAS ============ -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
     <!-- 1 · Shell común -->
-    <script src="assets/me-ui.js"></script>
+    <script src="assets/base/catalogo.js"></script>
+    <script src="assets/base/me-ui.js"></script>
     <script>
         MEUI.init({
             app: "inicio",
-            version: "2.0",
-            doc: "doc/lanzador/README.md",
-            titulo: "Herramientas de Operación",
-            descripcion: "Backlog de proyectos y entregables · Móvil Éxito",
             sesiones: ["sime", "cm"],
             instrucciones: [
                 "Cada tarjeta es una herramienta: «Abrir» la ejecuta, «Descargar» empaqueta sus archivos en un .zip.",
@@ -402,7 +102,7 @@
     </script>
 
     <!-- 2 · Catálogo de proyectos y acciones de la portada -->
-    <script src="assets/logica-inicio.js"></script>
+    <script src="assets/herramientas/inicio/inicio.js"></script>
 </body>
 
 </html>

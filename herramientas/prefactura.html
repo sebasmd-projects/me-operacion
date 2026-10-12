@@ -1,11 +1,12 @@
 <!-- prefactura.html · v1.0.0
      ---------------------------------------------------------------------
-     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+     Este archivo es SOLO marcado. Nada de lógica ni estilos viven aquí:
 
-       assets/me-ui.css / me-ui.js        marco visual, registro, tablas
-       assets/logica-prefactura.js        reglas del corte, tarifas,
-                                          impuestos y libros de Excel
-       assets/me-prefactura-puente.js     enganche con la interfaz
+       assets/base/me-ui.css / me-ui.js        marco visual, registro, tablas
+       assets/herramientas/prefactura/
+           calculo.js        reglas del corte, tarifas, impuestos y libros de Excel
+           prefactura.js     interfaz
+           prefactura.css    estilos propios
 
      Pre-factura del Plan Corporativo. Todo es local: no llama a ningún
      servicio. Ver doc/prefactura/README.md.
@@ -19,114 +20,13 @@
     <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
     <title>Pre-factura</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="../assets/me-ui.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-    <style>
-        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
-        td.num,
-        th.num {
-            text-align: right;
-        }
-
-        .me-tabs {
-            border-bottom: 1px solid var(--me-borde);
-            gap: .2rem;
-        }
-
-        .me-tabs .nav-link {
-            border: 1px solid transparent;
-            border-bottom: none;
-            border-radius: .45rem .45rem 0 0;
-            color: var(--me-suave);
-            font-weight: 600;
-            font-size: .86rem;
-            padding: .4rem .9rem;
-        }
-
-        .me-tabs .nav-link.active {
-            background: #fff;
-            border-color: var(--me-borde);
-            color: var(--me-tinta);
-        }
-
-        .me-tabs .cuenta {
-            font-size: .72rem;
-            font-weight: 600;
-            margin-left: .25rem;
-            color: var(--me-suave);
-        }
-
-        .tag {
-            font-size: .7rem;
-            font-weight: 600;
-            border-radius: .35rem;
-            padding: .25em .5em;
-            white-space: nowrap;
-        }
-
-        .tag.ok {
-            background: #E2F2E8;
-            color: var(--me-ok);
-        }
-
-        .tag.warn {
-            background: #FBEED8;
-            color: var(--me-warn);
-        }
-
-        .tag.err {
-            background: #FBE2DF;
-            color: var(--me-err);
-        }
-
-        .tag.neutro {
-            background: #F0F0EC;
-            color: var(--me-suave);
-        }
-
-        .tarifas {
-            border: 1px solid var(--me-borde);
-            border-radius: .45rem;
-            background: #FBFAF6;
-            max-height: 260px;
-            overflow-y: auto;
-        }
-
-        .tarifas table {
-            margin: 0;
-            font-size: .78rem;
-        }
-
-        .tarifas td {
-            padding: .15rem .3rem;
-            vertical-align: middle;
-        }
-
-        .tarifas input,
-        .tarifas select {
-            font-size: .78rem;
-            padding: .1rem .3rem;
-        }
-
-        .tarifas tr.falta td {
-            background: #FBE2DF;
-        }
-
-        .aviso-tarifa {
-            border-left: 4px solid var(--me-err);
-        }
-    </style>
+    <!-- Librerías de CDN: versiones y URLs en assets/base/dependencias.js (Bootstrap, iconos y fuentes siempre) -->
+    <script src="../assets/base/dependencias.js" data-me-deps="datatables xlsx jszip"></script>
+    <link rel="stylesheet" href="../assets/base/me-ui.css">
+    <link rel="stylesheet" href="../assets/herramientas/prefactura/prefactura.css">
 </head>
 
-<body class="me-body">
+<body class="me-body" data-me-herramienta="prefactura">
 
     <!-- ============ RESUMEN ============ -->
     <div class="me-kpis">
@@ -185,10 +85,7 @@
 
             <!-- 2 · Tarifas -->
             <section data-me-paso="2" data-me-titulo="Tarifas por plan" data-me-abierto="nunca">
-                <div class="me-hint mb-1">Valor <b>con IVA</b> de cada plan («Hoja2» de Liquidación Corporativo 2).
-                    Bruto = valor / 1,19; IVA 19 %; Voz suma ICO 4 % del bruto; retefuente 2,5 % del bruto. Un plan
-                    con valor <b>0</b> se factura en cero (roaming); uno <b>vacío</b> bloquea la descarga. Se guarda en
-                    este equipo.</div>
+                <button type="button" class="me-ayuda" data-me-ayuda="Valor con IVA de cada plan («Hoja2» de Liquidación Corporativo 2). Bruto = valor / 1,19; IVA 19 %; Voz suma ICO 4 % del bruto; retefuente 2,5 % del bruto. Un plan con valor 0 se factura en cero (roaming); uno vacío bloquea la descarga. Se guarda en este equipo." aria-label="Ayuda">?</button>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="chkIcoIncluido">
                     <label class="form-check-label small" for="chkIcoIncluido">ICO de voz <b>incluido</b> en el valor
@@ -319,21 +216,12 @@
         </div>
     </div>
 
-    <!-- ============ LIBRERÍAS ============ -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
-
     <!-- 1 · Shell común -->
-    <script src="../assets/me-ui.js"></script>
+    <script src="../assets/base/catalogo.js"></script>
+    <script src="../assets/base/me-ui.js"></script>
     <script>
         MEUI.init({
             app: "prefactura",
-            version: "1.0.0",
-            doc: "../doc/prefactura/README.md",
-            titulo: "Pre-factura",
-            descripcion: "Pre-factura del Plan Corporativo: corte, liquidación e impuestos, y un archivo por filial",
             sesiones: [],
             instrucciones: [
                 "1 · Carga el «Plan Corporativo» (.xlsx). Se lee la hoja Activos. Revisa el mes y el día de corte (15).",
@@ -347,11 +235,9 @@
         });
     </script>
 
-    <!-- 2 · Reglas de esta herramienta -->
-    <script src="../assets/logica-prefactura.js"></script>
-
-    <!-- 3 · Enganche con la interfaz -->
-    <script src="../assets/me-prefactura-puente.js"></script>
+    <!-- 2 · Esta herramienta: reglas de cálculo e interfaz -->
+    <script src="../assets/herramientas/prefactura/calculo.js"></script>
+    <script src="../assets/herramientas/prefactura/prefactura.js"></script>
 </body>
 
 </html>

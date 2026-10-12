@@ -1,0 +1,270 @@
+/* hlr-hss.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Las operaciones de escritura llevan btn-me-peligro y van en un grupo
+   .me-acciones-escritura (me-ui.css): no se confunden con una consulta. */
+.hlr-fm { display: contents; }
+
+details.bloque-operaciones {
+    border: 1px solid #EAC4BF;
+    border-radius: .5rem;
+    padding: .6rem .8rem;
+    background: #FFF8F7;
+}
+
+details.bloque-operaciones>summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: .86rem;
+    color: var(--me-err);
+}
+
+/* ---------- Menú de operaciones (modal de la línea) ----------
+   Procesos y SIM arriba, como botones sueltos; Bloqueos al final,
+   plegados, una fila por familia con su par bloquear | desbloquear. */
+.op-grupo { margin-bottom: .75rem; }
+
+.op-grupo-tit {
+    font-weight: 700;
+    font-size: .78rem;
+    color: var(--me-suave);
+    margin-bottom: .35rem;
+}
+
+details.op-bloqueos > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+details.op-bloqueos > summary::-webkit-details-marker { display: none; }
+
+details.op-bloqueos > summary::before {
+    content: "▸";
+    display: inline-block;
+    width: 1em;
+    transition: transform .15s;
+}
+
+details.op-bloqueos[open] > summary::before { transform: rotate(90deg); }
+
+.op-familias {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: .4rem .9rem;
+    margin-top: .35rem;
+}
+
+.op-familia {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+    padding: .35rem .5rem;
+    background: #fff;
+}
+
+.op-familia-nom {
+    font-size: .8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.op-familia-nom .bi { margin-right: .25rem; color: var(--me-suave); }
+
+.op-familia-par { display: flex; gap: .3rem; flex-shrink: 0; }
+
+.btn-operacion .bi { margin-right: .2rem; }
+
+.op-menu-familia {
+    padding: .35rem .75rem .1rem;
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--me-suave);
+}
+
+.op-menu-familia .bi { margin-right: .25rem; }
+
+/* ---------- Tabla de confirmación de una operación ----------
+   Reparto de ancho fijo (table-layout) en vez de automático: con
+   el automático las columnas se peleaban el espacio y el valor
+   actual terminaba encimado con el input de al lado. */
+.tabla-operacion-scroll {
+    overflow: auto;
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+}
+
+.tabla-operacion {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.tabla-operacion thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #F7F6F1;
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    white-space: nowrap;
+}
+
+.tabla-operacion thead th small {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    color: var(--me-suave);
+}
+
+.tabla-operacion td,
+.tabla-operacion th {
+    vertical-align: top;
+    padding: .4rem .5rem;
+}
+
+.tabla-operacion th.col-linea,
+.tabla-operacion td.col-linea {
+    width: 8.5rem;
+}
+
+.tabla-operacion th.col-features,
+.tabla-operacion td.col-features {
+    width: 11rem;
+}
+
+.tabla-operacion .linea-msisdn {
+    font-weight: 600;
+    font-size: .82rem;
+}
+
+/* El input ocupa el ancho de su celda y nada más: sin min-width no
+   puede empujar a las columnas vecinas ni desbordar la tabla. */
+.tabla-operacion input.form-control {
+    width: 100%;
+    min-width: 0;
+    font-size: .78rem;
+}
+
+.tabla-operacion .me-hint {
+    font-size: .67rem;
+    line-height: 1.25;
+    margin-top: .15rem;
+    overflow-wrap: anywhere;
+}
+
+.tabla-operacion .me-hint.hint-aviso {
+    color: var(--me-warn);
+}
+
+/* "antes / después": dos renglones etiquetados y alineados, para que
+   se lea de un vistazo de qué valor a qué valor va el cambio. */
+.tabla-operacion .cambio-fila {
+    display: flex;
+    align-items: baseline;
+    gap: .4rem;
+}
+
+.tabla-operacion .cambio-fila+.cambio-fila {
+    margin-top: .25rem;
+}
+
+.tabla-operacion .cambio-lbl {
+    flex: 0 0 3.6rem;
+    font-size: .6rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #9a9a94;
+}
+
+.tabla-operacion .cambio-lbl.nuevo {
+    color: var(--me-ok);
+    font-weight: 700;
+}
+
+.tabla-operacion .cambio-actual {
+    font-size: .78rem;
+    color: var(--me-suave);
+    overflow-wrap: anywhere;
+}
+
+.tabla-operacion .cambio-campo {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Bloques plegables del modal de operación (líneas omitidas y
+   "cuerpo que se envía"): cerrados por defecto para que el
+   formulario se lea de corrido. */
+details.op-plegable>summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: .8rem;
+}
+
+.op-seccion-tit {
+    font-weight: 700;
+    font-size: .8rem;
+    margin-bottom: .35rem;
+}
+
+.op-conteo {
+    display: inline-block;
+    background: #EBEAE4;
+    border-radius: 999px;
+    padding: 0 .45em;
+    font-family: var(--me-mono);
+    font-size: .72rem;
+    font-weight: 600;
+}
+
+th.col-sel,
+td.col-sel {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* ---------------------------------------------------------------
+   Interruptor de pestañas: propio de esta página, no del sistema
+   de diseño común (ninguna otra herramienta tiene varios motores
+   montados/desmontados en un mismo documento).
+--------------------------------------------------------------- */
+.hlr-tabs {
+    display: flex;
+    gap: .4rem;
+    padding: .6rem .6rem 0;
+}
+
+.hlr-tab {
+    border: 1px solid var(--me-borde-2);
+    border-bottom: none;
+    border-radius: .5rem .5rem 0 0;
+    background: #F0F0EC;
+    color: var(--me-suave);
+    font-weight: 700;
+    font-size: .85rem;
+    padding: .5rem 1.1rem;
+    cursor: pointer;
+}
+
+.hlr-tab:hover {
+    background: #FFFBE6;
+    color: var(--me-negro);
+}
+
+.hlr-tab.activa {
+    background: #fff;
+    color: var(--me-negro);
+    border-color: var(--me-borde-2);
+    box-shadow: 0 -2px 0 var(--me-amarillo) inset;
+}
+
+.hlr-tab .bi {
+    margin-right: .35rem;
+}
+
+#panelMontado {
+    background: #fff;
+    border-top: 1px solid var(--me-borde-2);
+}

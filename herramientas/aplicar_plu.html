@@ -2,12 +2,14 @@
      ---------------------------------------------------------------------
      Este archivo es SOLO marcado. Nada de lógica vive aquí:
 
-       assets/me-ui.css / me-ui.js   marco visual, sesión, registro,
+       assets/base/me-ui.css / me-ui.js   marco visual, sesión, registro,
                                      tablas y exportación
-       assets/me-api.js              Keycloak, auth y GET al CM
-       assets/logica-plu.js          cuenta de la línea, paquetes, token y
-                                     recarga en Tulio, comparación antes/después
-       assets/me-plu-puente.js       enganche entre la lógica y el shell
+       assets/base/me-api.js              Keycloak, auth y GET al CM
+       assets/herramientas/plu/plu.js   configuración, reglas de negocio (cuenta de
+                                        la línea, paquetes, comparación antes/después)
+                                        e interfaz
+       assets/herramientas/plu/plu.css  estilos propios
+       assets/compartido/tulio-plu.js   token y recarga en Tulio
 
      Porte de la operación «Agregar PLU» de la consola local
      `consola_bundles_movil_exito`, sin su servidor Python: aquí todo corre
@@ -24,516 +26,14 @@
     <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
     <title>Aplicar PLU de paquete</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="../assets/me-ui.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Librerías de CDN: versiones y URLs en assets/base/dependencias.js (Bootstrap, iconos y fuentes siempre) -->
+    <script src="../assets/base/dependencias.js" data-me-deps="datatables xlsx"></script>
+    <link rel="stylesheet" href="../assets/base/me-ui.css">
+    <link rel="stylesheet" href="../assets/herramientas/plu/plu.css">
 
-    <style>
-        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
-
-        .badge-estado {
-            font-size: .7rem;
-            font-weight: 600;
-            letter-spacing: .03em;
-            border-radius: .35rem;
-            padding: .3em .55em;
-            white-space: nowrap;
-        }
-
-        .badge-estado.ok {
-            background: #E2F2E8;
-            color: var(--me-ok);
-        }
-
-        .badge-estado.off {
-            background: #ECECEA;
-            color: var(--me-off);
-        }
-
-        .badge-estado.warn {
-            background: #FBEED8;
-            color: var(--me-warn);
-        }
-
-        .badge-estado.err {
-            background: #FBE2DF;
-            color: var(--me-err);
-        }
-
-        .badge-estado.neutro {
-            background: #F0F0EC;
-            color: var(--me-suave);
-        }
-
-        td.col-accion {
-            white-space: nowrap;
-            text-align: center;
-        }
-
-        .aviso-fila {
-            cursor: help;
-            color: var(--me-warn);
-        }
-
-        /* --- Recarga: se ve distinta del resto a propósito, para que no se
-               confunda con una consulta. --- */
-        .btn-recargar {
-            border: 1px solid #EAC4BF;
-            background: #FBE2DF;
-            color: var(--me-err);
-            font-weight: 600;
-        }
-
-        .btn-recargar:hover,
-        .btn-recargar:focus {
-            background: var(--me-err);
-            border-color: var(--me-err);
-            color: #fff;
-        }
-
-        /* Modal de detalle */
-        .modal-header {
-            background: var(--me-negro);
-            color: #fff;
-        }
-
-        .modal-header .modal-title {
-            font-weight: 800;
-        }
-
-        .modal-header .modal-title span {
-            color: var(--me-amarillo);
-        }
-
-        .dl-grid {
-            display: grid;
-            grid-template-columns: 190px 1fr;
-            gap: .25rem .9rem;
-            font-size: .82rem;
-        }
-
-        .dl-grid dt {
-            color: var(--me-suave);
-            font-weight: 500;
-        }
-
-        .dl-grid dd {
-            font-family: var(--me-mono);
-            margin: 0;
-            word-break: break-all;
-        }
-
-        /* ---------- Cuadro «cuánto se sumó» ----------
-           Los tres valores van uno debajo del otro en un solo cuadro:
-           Total, Valor anterior y el agregado/nuevo, que es el que se
-           resalta porque es el dato que se está verificando. */
-        .plu-cambios {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: .6rem;
-        }
-
-        .plu-cambio {
-            border: 1px solid var(--me-borde);
-            border-left: 4px solid var(--me-borde-2);
-            border-radius: .5rem;
-            padding: .6rem .7rem;
-            background: #fff;
-        }
-
-        .plu-cambio.es-nuevo {
-            border-left-color: var(--me-ok);
-        }
-
-        .plu-cambio.es-suma {
-            border-left-color: var(--me-info);
-        }
-
-        .plu-cambio-cab {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: .35rem;
-            margin-bottom: .45rem;
-        }
-
-        .plu-cambio-nom {
-            font-weight: 700;
-            font-size: .82rem;
-        }
-
-        .plu-cambio-id,
-        .plu-cambio-cat {
-            font-size: .7rem;
-            color: var(--me-suave);
-        }
-
-        .plu-badge {
-            font-size: .64rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            border-radius: .35rem;
-            padding: .2em .45em;
-        }
-
-        .plu-badge.nuevo {
-            background: #E2F2E8;
-            color: var(--me-ok);
-        }
-
-        .plu-badge.suma {
-            background: #E2E9F2;
-            color: var(--me-info);
-        }
-
-        .plu-cifras {
-            border: 1px solid var(--me-borde);
-            border-radius: .4rem;
-            overflow: hidden;
-        }
-
-        .plu-cifra {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: .75rem;
-            padding: .3rem .55rem;
-        }
-
-        .plu-cifra+.plu-cifra {
-            border-top: 1px solid var(--me-borde);
-        }
-
-        .plu-cifra-lbl {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            color: var(--me-suave);
-        }
-
-        .plu-cifra-val {
-            font-size: .84rem;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        /* El valor agregado/nuevo: es lo que se viene a comprobar. */
-        .plu-cifra.destacada {
-            background: #FFFBE6;
-            border-top: 1px solid var(--me-amarillo);
-        }
-
-        .plu-cifra.destacada .plu-cifra-lbl {
-            color: #8A6D1F;
-            font-weight: 700;
-        }
-
-        .plu-cifra.destacada .plu-cifra-val {
-            font-size: 1.05rem;
-            font-weight: 800;
-        }
-
-        .plu-cambio-pie {
-            font-size: .7rem;
-            color: var(--me-suave);
-            font-family: var(--me-mono);
-            margin-top: .4rem;
-        }
-
-        .plu-promo {
-            color: var(--me-warn);
-        }
-
-        .plu-paso {
-            font-family: var(--me-mono);
-            font-size: .78rem;
-        }
-
-        /* Cuentas de la línea: cuando hay más de una se muestran TODAS,
-           porque elegir la equivocada es lo que rompe la operación. */
-        .cuentas-linea {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-        }
-
-        .cuenta-chip {
-            border: 1px solid var(--me-borde);
-            border-radius: 999px;
-            padding: .15rem .55rem;
-            font-family: var(--me-mono);
-            font-size: .72rem;
-            background: #fff;
-        }
-
-        .cuenta-chip.usada {
-            border-color: var(--me-negro);
-            font-weight: 700;
-        }
-
-        /* ---------- Filas de PLU de la secuencia ---------- */
-        .seq-cab,
-        .seq-fila {
-            display: grid;
-            grid-template-columns: 1fr 5.5rem 1fr 1.75rem;
-            gap: .25rem;
-            align-items: center;
-        }
-
-        .seq-cab {
-            font-size: .62rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            color: var(--me-suave);
-            margin-bottom: .15rem;
-        }
-
-        .seq-fila+.seq-fila {
-            margin-top: .25rem;
-        }
-
-        .seq-fila input.is-invalid {
-            background-image: none;
-        }
-
-        /* Separador entre el pegado masivo y el formulario fila a fila */
-        .seq-o {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            margin: .6rem 0 .35rem;
-            color: var(--me-suave);
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-
-        .seq-o::before,
-        .seq-o::after {
-            content: "";
-            flex: 1;
-            border-top: 1px solid var(--me-borde);
-        }
-
-        .seq-previa {
-            max-height: 190px;
-            overflow: auto;
-            border: 1px solid var(--me-borde);
-            border-radius: .4rem;
-        }
-
-        .seq-previa table {
-            font-size: .76rem;
-            margin: 0;
-        }
-
-        .seq-previa thead th {
-            position: sticky;
-            top: 0;
-            background: #F7F6F1;
-        }
-
-        .seq-previa td {
-            font-family: var(--me-mono);
-        }
-
-        .seq-previa tr.mala td {
-            color: var(--me-err);
-        }
-
-        .seq-quitar {
-            border: 1px solid var(--me-borde);
-            background: #fff;
-            color: var(--me-suave);
-            border-radius: .3rem;
-            line-height: 1;
-            padding: .2rem 0;
-            font-weight: 700;
-        }
-
-        .seq-quitar:hover {
-            background: #ECECEA;
-            color: var(--me-err);
-        }
-
-        /* Resultado de la secuencia, un renglón por PLU */
-        .seq-resultado {
-            border-top: 1px solid var(--me-borde);
-        }
-
-        .seq-item {
-            border-bottom: 1px solid var(--me-borde);
-            padding: .5rem 0;
-        }
-
-        .seq-item-cab {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: .4rem;
-            font-size: .82rem;
-        }
-
-        .seq-item-plu {
-            font-family: var(--me-mono);
-            font-weight: 700;
-        }
-
-        .seq-item-paso {
-            font-family: var(--me-mono);
-            font-size: .72rem;
-            color: var(--me-suave);
-        }
-
-        .seq-estado {
-            font-size: .64rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            border-radius: .35rem;
-            padding: .2em .45em;
-            white-space: nowrap;
-        }
-
-        .seq-estado.espera {
-            background: #F0F0EC;
-            color: var(--me-suave);
-        }
-
-        .seq-estado.corriendo {
-            background: #E2E9F2;
-            color: var(--me-info);
-        }
-
-        .seq-estado.ok {
-            background: #E2F2E8;
-            color: var(--me-ok);
-        }
-
-        .seq-estado.aviso {
-            background: #FBEED8;
-            color: var(--me-warn);
-        }
-
-        .seq-estado.error {
-            background: #FBE2DF;
-            color: var(--me-err);
-        }
-
-        .seq-estado.cancelado {
-            background: #ECECEA;
-            color: var(--me-off);
-        }
-        /* ---------- Barra de avance por etapas ----------
-           Un tramo por etapa del PLU (o por PLU, en el título del panel).
-           Lo ya pasado en verde, lo que corre en azul hasta su fracción, y
-           el tramo donde se detuvo según cómo terminó. */
-        .etapas {
-            display: inline-flex;
-            gap: 3px;
-            min-width: 150px;
-            flex: 0 1 220px;
-        }
-
-        .etapas-seq {
-            flex-basis: 260px;
-        }
-
-        .etapa {
-            flex: 1 1 0;
-            height: 8px;
-            border-radius: 3px;
-            background: #EBEAE4;
-            overflow: hidden;
-        }
-
-        .etapa-fill {
-            display: block;
-            height: 100%;
-            width: 0;
-            transition: width .35s ease;
-        }
-
-        .etapa.hecho .etapa-fill {
-            background: var(--me-ok);
-        }
-
-        .etapa.curso .etapa-fill {
-            background: var(--me-info);
-        }
-
-        .etapa.fallo .etapa-fill {
-            background: var(--me-err);
-        }
-
-        .etapa.novedad .etapa-fill {
-            background: var(--me-warn);
-        }
-
-        .etapa.parado .etapa-fill {
-            background: #B8B8B2;
-        }
-
-        .etapas-rotulo {
-            font-family: var(--me-mono);
-            font-size: .68rem;
-            color: var(--me-suave);
-            white-space: nowrap;
-        }
-
-        /* Bolsillos de cada PLU, plegados por defecto */
-        details.seq-paquetes {
-            margin-top: .4rem;
-        }
-
-        details.seq-paquetes>summary {
-            cursor: pointer;
-            list-style: none;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: .5rem;
-            font-size: .76rem;
-        }
-
-        details.seq-paquetes>summary::-webkit-details-marker {
-            display: none;
-        }
-
-        details.seq-paquetes>summary::before {
-            content: "▸";
-            display: inline-block;
-            transition: transform .15s;
-            color: var(--me-suave);
-        }
-
-        details.seq-paquetes[open]>summary::before {
-            transform: rotate(90deg);
-        }
-
-        .seq-paquetes-n {
-            font-weight: 700;
-        }
-
-        .seq-paquetes-res {
-            font-family: var(--me-mono);
-            color: var(--me-suave);
-        }
-
-        .seq-paquetes-alerta {
-            color: var(--me-err);
-            font-weight: 600;
-        }
-    </style>
 </head>
 
-<body class="me-body">
+<body class="me-body" data-me-herramienta="plu">
 
     <!-- ============ RESUMEN ============ -->
     <div class="me-kpis">
@@ -562,9 +62,7 @@
 
             <!-- 1 · Conexión -->
             <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
-                <div class="me-hint mb-2">La sesión del CM sirve para dos cosas: consultar la línea y sus paquetes,
-                    y <strong>decir quién eres</strong> (queda en la bitácora).
-                </div>
+                <button type="button" class="me-ayuda" data-me-ayuda="La sesión del CM sirve para dos cosas: consultar la línea y sus paquetes, y decir quién eres (queda en la bitácora)." aria-label="Ayuda">?</button>
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="me-lbl" for="user">Usuario</label>
@@ -578,8 +76,7 @@
                     <div class="col-12">
                         <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
                     </div>
-                    <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas:
-                        si ya iniciaste sesión en otra pestaña, llegan solas.</div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="Son las mismas credenciales del CM que usan las demás herramientas: si ya iniciaste sesión en otra pestaña, llegan solas." aria-label="Ayuda">?</button>
                 </div>
 
             </section>
@@ -597,9 +94,7 @@
             <section data-me-paso="3" data-me-titulo="Secuencia de PLU" data-me-abierto="con-sesion">
                 <div id="pluBloqueado" class="alert alert-warning py-2 mb-2" hidden></div>
                 <div id="pluCampos">
-                    <div class="me-hint mb-2">Una línea y los PLU que se le van a aplicar <strong>uno detrás de
-                            otro</strong>. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y (si
-                        está marcado abajo) los elimina; luego sigue con el siguiente.</div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="Una línea y los PLU que se le van a aplicar uno detrás de otro. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y (si está marcado abajo) los elimina; luego sigue con el siguiente." aria-label="Ayuda">?</button>
 
                     <label class="me-lbl" for="seqLinea">Línea</label>
                     <input class="form-control form-control-sm me-mono" id="seqLinea" inputmode="numeric"
@@ -610,9 +105,7 @@
                     <label class="me-lbl" for="seqPlusTexto">PLU</label>
                     <textarea id="seqPlusTexto" class="form-control form-control-sm me-mono" rows="4"
                         placeholder="10021 0 PPrepagadaTP&#10;10020 0 PPrepagadaTP"></textarea>
-                    <div class="me-hint"><strong>PLU costo canal</strong> separados
-                        por espacio, tabulación, coma, <code>;</code> o <code>|</code>. Acepta encabezado
-                        (<code>plu,costo,canal</code>).</div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="PLU costo canal separados por espacio, tabulación, coma, ; o |. Acepta encabezado (plu,costo,canal)." aria-label="Ayuda">?</button>
 
                     <div class="seq-o"><span>o uno por uno</span></div>
 
@@ -624,10 +117,7 @@
                         <button class="btn btn-sm btn-me-line" id="seqAgregar" type="button">+ Agregar PLU</button>
                         <button class="btn btn-sm btn-me-line" id="seqLimpiar" type="button">Limpiar</button>
                     </div>
-                    <div class="me-hint mt-1">
-                        En el formulario: <strong>Enter</strong> agrega otra fila debajo · <strong>Tab</strong> pasa al
-                        campo siguiente y selecciona su contenido para sobrescribirlo.
-                    </div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="En el formulario: Enter agrega otra fila debajo · Tab pasa al campo siguiente y selecciona su contenido para sobrescribirlo." aria-label="Ayuda">?</button>
 
                     <div class="seq-previa mt-2" id="seqPrevia" hidden>
                         <div class="me-lbl">Se van a aplicar en este orden</div>
@@ -664,8 +154,8 @@
                     </div>
 
                     <div class="me-hint mt-2" id="seqResumen">0 PLU válidos.</div>
-                    <button class="btn btn-sm btn-recargar mt-1 w-100" id="seqEjecutar" type="button">Ejecutar
-                        secuencia</button>
+                    <div class="me-acciones-escritura"><button class="btn btn-sm btn-me-peligro mt-1 w-100" id="seqEjecutar" type="button">Ejecutar
+                        secuencia</button></div>
                     <button class="btn btn-sm btn-me-line mt-1 w-100" id="seqDetener" type="button" hidden>Detener al
                         terminar el PLU actual</button>
                 </div>
@@ -686,15 +176,19 @@
         <!-- ================= COLUMNA DERECHA: tabla ================= -->
         <div class="me-trabajo-datos">
 
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <div class="me-hint flex-grow-1" id="estadoTabla">Consulta líneas para ver sus paquetes.</div>
-                <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
-                <button id="btnCSV" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-csv"></i>
-                    CSV</button>
-                <button id="btnXLSX" class="btn btn-sm btn-me-line" type="button"><i
-                        class="bi bi-file-earmark-excel"></i> Excel</button>
-                <button id="btnJSON" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-json"></i>
-                    JSON</button>
+            <div class="me-barras">
+                <div class="me-filtros">
+                    <div class="me-hint flex-grow-1" id="estadoTabla">Consulta líneas para ver sus paquetes.</div>
+                    <div class="me-filtros-der">
+                    <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                    <button id="btnCSV" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-csv"></i>
+                        CSV</button>
+                    <button id="btnXLSX" class="btn btn-sm btn-me-line" type="button"><i
+                            class="bi bi-file-earmark-excel"></i> Excel</button>
+                    <button id="btnJSON" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-json"></i>
+                        JSON</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Secuencia en curso / terminada: un renglón por PLU -->
@@ -702,7 +196,6 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                     <div class="fw-bold small flex-grow-1 d-flex flex-wrap align-items-center gap-2">
                         <span>Secuencia · línea <span id="seqPanelLinea" class="me-mono"></span></span>
-                        <span id="seqPanelBarra" class="d-inline-flex align-items-center gap-2"></span>
                     </div>
                     <button id="btnEvidenciaXlsx" class="btn btn-sm btn-me-line" type="button"
                         title="Resumen + una hoja por PLU, con request/response (mismo formato que la consola)"><i
@@ -716,23 +209,9 @@
             <div class="me-tabla-panel">
                 <table id="tablaResultados" class="table table-striped table-hover align-middle w-100"
                     style="display:none">
-                    <thead>
-                        <tr>
-                            <th>Línea (MSISDN)</th>
-                            <th>Estado</th>
-                            <th>IMSI</th>
-                            <th>SubscriptionID</th>
-                            <th>Cuenta (BAN)</th>
-                            <th>Titular</th>
-                            <th>Paquetes activos</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
+                        <thead></thead>
                 </table>
-                <div class="me-hint p-2" id="msgVacio">
-                    Escribe las líneas en el paso <strong>2</strong> y presiona
-                    <strong>Consultar paquetes</strong> para verlas aquí.
-                </div>
+                <div class="me-hint p-2" id="msgVacio">Consulta líneas para ver sus paquetes.</div>
             </div>
         </div>
     </div>
@@ -742,8 +221,7 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title mb-0">Línea <span id="mdMsisdn" class="me-mono"></span>
-                        <button type="button" class="btn-copy" data-copy-target="mdMsisdn" title="Copiar línea">⧉</button>
+                    <h5 class="modal-title mb-0">Línea <span class="me-copiable"><button type="button" class="btn-copy" data-copy-target="mdMsisdn" title="Copiar línea">⧉</button><span id="mdMsisdn" class="me-mono"></span></span>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                         aria-label="Cerrar"></button>
@@ -755,9 +233,7 @@
                     <div id="mdCuentasWrap" class="mb-3" hidden>
                         <div class="fw-bold small mb-1">Cuentas de esta línea en el CM</div>
                         <div class="cuentas-linea" id="mdCuentas"></div>
-                        <div class="me-hint mt-1">Se usa la <strong>activa más reciente</strong>. Si hay más de una
-                            activa queda avisado en el registro: operar sobre la cuenta equivocada es lo que hace
-                            fallar la orden en el CM.</div>
+                        <button type="button" class="me-ayuda" data-me-ayuda="Se usa la activa más reciente. Si hay más de una activa queda avisado en el registro: operar sobre la cuenta equivocada es lo que hace fallar la orden en el CM." aria-label="Ayuda">?</button>
                     </div>
 
                     <div id="mdAvisos" class="mb-3"></div>
@@ -787,32 +263,23 @@
                     <button type="button" class="btn btn-sm btn-me-line" id="btnRefrescar">Actualizar paquetes</button>
                     <button type="button" class="btn btn-sm btn-me-line" id="btnUsarEnSecuencia">Usar esta línea en la
                         secuencia</button>
-                    <button type="button" class="btn btn-sm btn-recargar" id="btnEliminar">Eliminar paquetes</button>
+                    <div class="me-acciones-escritura"><button type="button" class="btn btn-sm btn-me-peligro" id="btnEliminar">Eliminar paquetes</button></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ============ LIBRERÍAS ============ -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
-
     <!-- 1 · Shell común -->
-    <script src="../assets/me-ui.js"></script>
+    <script src="../assets/base/catalogo.js"></script>
+    <script src="../assets/base/me-ui.js"></script>
     <script>
         MEUI.init({
             app: "plu",
-            version: "1.7.0",
-            doc: "../doc/aplicar-plu/README.md",
-            titulo: "Aplicar PLU de paquete",
-            descripcion: "Recarga de paquete en Tulio y verificación contra el CM",
             sesiones: ["cm"],
             instrucciones: [
                 "1 · Conexión: la sesión del CM consulta la línea Y dice quién eres. Sin sesión no se puede aplicar PLU.",
                 "2 · Escribe las líneas (máximo 50) y presiona «Consultar paquetes»: trae la cuenta de cada línea y sus paquetes activos.",
-                "3 · Secuencia de PLU: una línea y los PLU que se le aplican uno detrás de otro. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y los ELIMINA; luego sigue con el siguiente. ESCRIBE EN PRODUCCIÓN, con doble confirmación.",
+                "3 · Secuencia de PLU: una línea y los PLU que se le aplican uno detrás de otro. Por cada PLU: consulta el estado, agrega sus bolsillos, los verifica y los ELIMINA; luego sigue con el siguiente. ESCRIBE EN PRODUCCIÓN; antes de aplicar se muestra un resumen para confirmar.",
                 "Al escribir los PLU: Enter agrega otra fila, Tab pasa al campo siguiente seleccionando su contenido (para sobrescribirlo), y en el campo de PLU se puede pegar desde Excel.",
                 "Después de cada PLU se muestra por cada bolsillo el total, el valor anterior y CUÁNTO SE SUMÓ (el valor resaltado), y si la eliminación lo dejó activo.",
                 "«Detener» no corta a mitad de un PLU: termina el que está corriendo y para. Un PLU que falla no detiene la secuencia, queda registrado y sigue el siguiente.",
@@ -823,15 +290,13 @@
     </script>
 
     <!-- 2 · Acceso al CM (compartido con las otras herramientas) -->
-    <script src="../assets/me-api.js"></script>
+    <script src="../assets/base/me-api.js"></script>
 
-    <!-- 3 · Reglas de negocio de esta herramienta -->
-    <!-- Tulio (token y RecargaPaquete), compartido con Consumos -->
-    <script src="../assets/tulio-plu.js"></script>
-    <script src="../assets/logica-plu.js"></script>
+    <!-- 3 · Tulio (token y RecargaPaquete), compartido con Consumos -->
+    <script src="../assets/compartido/tulio-plu.js"></script>
 
-    <!-- 4 · Enganche entre la lógica y el shell -->
-    <script src="../assets/me-plu-puente.js"></script>
+    <!-- 4 · La herramienta: configuración, reglas de negocio e interfaz -->
+    <script src="../assets/herramientas/plu/plu.js"></script>
 </body>
 
 </html>

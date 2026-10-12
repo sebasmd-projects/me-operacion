@@ -1,14 +1,14 @@
-<!-- estado_lineas.html · v1.1.0
+<!-- estado_lineas.html · v1.2.0
      ---------------------------------------------------------------------
-     Este archivo es SOLO marcado. Nada de lógica vive aquí:
+     Este archivo es SOLO marcado. Nada de lógica ni estilos viven aquí:
 
-       assets/me-ui.css / me-ui.js          marco visual, sesión, registro,
+       assets/base/me-ui.css / me-ui.js          marco visual, sesión, registro,
                                             tablas y exportación
-       assets/me-api.js                     Keycloak, auth y llamadas al CM
-       assets/cm-lineas.js                  resolver la línea, órdenes del CM
+       assets/base/me-api.js                     Keycloak, auth y llamadas al CM
+       assets/compartido/cm-lineas.js                  resolver la línea, órdenes del CM
                                             y tabla con casillas (compartido)
-       assets/logica-estado-lineas.js       consulta y cambio de estado
-       assets/me-estado-lineas-puente.js    enganche con la interfaz
+       assets/herramientas/estado-lineas/       estado-lineas.js (reglas e interfaz)
+                                                y estado-lineas.css (estilos)
 
      Bloquea o inactiva líneas en el CM, en masivo. ESCRIBE EN PRODUCCIÓN.
      Ver doc/estado-lineas/README.md.
@@ -22,112 +22,13 @@
     <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
     <title>Bloquear/Inactivar líneas</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.bootstrap5.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="../assets/me-ui.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-    <style>
-        /* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
-        .badge-estado {
-            font-size: .7rem;
-            font-weight: 600;
-            letter-spacing: .03em;
-            border-radius: .35rem;
-            padding: .3em .55em;
-            white-space: nowrap;
-        }
-
-        .badge-estado.ok {
-            background: #E2F2E8;
-            color: var(--me-ok);
-        }
-
-        .badge-estado.off {
-            background: #ECECEA;
-            color: var(--me-off);
-        }
-
-        .badge-estado.warn {
-            background: #FBEED8;
-            color: var(--me-warn);
-        }
-
-        .badge-estado.err {
-            background: #FBE2DF;
-            color: var(--me-err);
-        }
-
-        .badge-estado.info {
-            background: #E2E9F2;
-            color: var(--me-info);
-        }
-
-        .badge-estado.neutro {
-            background: #F0F0EC;
-            color: var(--me-suave);
-        }
-
-        tr.fila-oculta {
-            opacity: .45;
-        }
-
-        tr.fila-oculta td {
-            text-decoration: line-through;
-            text-decoration-color: rgba(0, 0, 0, .25);
-        }
-
-        .celda-detalle {
-            max-width: 26rem;
-            font-size: .75rem;
-            white-space: normal;
-        }
-
-        .btn-operar {
-            border: 1px solid #EAC4BF;
-            background: #FBE2DF;
-            color: var(--me-err);
-            font-weight: 600;
-        }
-
-        .btn-operar:hover,
-        .btn-operar:focus {
-            background: var(--me-err);
-            border-color: var(--me-err);
-            color: #fff;
-        }
-
-        .barra-filtros {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem;
-            align-items: end;
-            margin-bottom: .5rem;
-        }
-
-        .barra-filtros>div {
-            min-width: 8rem;
-        }
-
-        .barra-lote {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .3rem;
-            align-items: center;
-            margin-bottom: .5rem;
-        }
-
-        .aviso-held {
-            border-left: 4px solid var(--me-warn);
-        }
-    </style>
+    <!-- Librerías de CDN: versiones y URLs en assets/base/dependencias.js (Bootstrap, iconos y fuentes siempre) -->
+    <script src="../assets/base/dependencias.js" data-me-deps="datatables xlsx"></script>
+    <link rel="stylesheet" href="../assets/base/me-ui.css">
+    <link rel="stylesheet" href="../assets/herramientas/estado-lineas/estado-lineas.css">
 </head>
 
-<body class="me-body">
+<body class="me-body" data-me-herramienta="estado-lineas">
 
     <!-- ============ RESUMEN ============ -->
     <div class="me-kpis">
@@ -169,8 +70,7 @@
                     <div class="col-12">
                         <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
                     </div>
-                    <div class="col-12 me-hint">Son las mismas credenciales del CM que usan las demás herramientas.
-                        Con la sesión vigente se puede cambiar el estado.</div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="Son las mismas credenciales del CM que usan las demás herramientas. Con la sesión vigente se puede cambiar el estado." aria-label="Ayuda">?</button>
                 </div>
             </section>
 
@@ -179,8 +79,7 @@
                 <label class="me-lbl" for="inputLineas">Líneas (máximo 200)</label>
                 <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="5"
                     placeholder="3332463395&#10;3332463394"></textarea>
-                <div class="me-hint" id="infoLineas">Separadas por espacio, coma, punto y coma o salto de línea.
-                    También se puede pegar una columna de Excel.</div>
+                <div class="me-hint" id="infoLineas">0 líneas cargadas.</div>
                 <button class="btn btn-sm btn-me mt-2 w-100" id="btnConsultar" type="button">Consultar líneas</button>
             </section>
 
@@ -188,31 +87,26 @@
             <section data-me-paso="3" data-me-titulo="Cambio de estado" data-me-abierto="con-sesion">
                 <div id="accionBloqueada" class="alert alert-warning py-2 mb-2" hidden></div>
                 <div id="accionCampos">
+                    <p class="small text-danger">Escribe en producción.</p>
                     <label class="me-lbl" for="selDestino">Nuevo estado</label>
                     <select id="selDestino" class="form-select form-select-sm">
                         <option value="bloquear">Bloquear</option>
                         <option value="inactivar">Inactivar</option>
                     </select>
 
-                    <div class="alert alert-warning py-2 mt-2 mb-0 small aviso-held" id="avisoHeld" hidden>
-                        <b>Al inactivar, la IMSI pasa a HELD</b> en el inventario y no queda libre sola. Para volver a
-                        usarla (por ejemplo en un cambio de IMSI) hay que pasarla a disponible <b>a mano en el
-                            BSS</b>.
-                    </div>
+                    <div class="alert alert-warning py-2 mt-2 mb-0 small aviso-held" id="avisoHeld" hidden>Al inactivar, la IMSI queda en HELD; su liberación en el BSS es manual.</div>
 
                     <label class="me-lbl mt-2" for="inputRazon">Razón</label>
                     <input id="inputRazon" class="form-control form-control-sm" value="Exito Razón bloqueo">
-                    <div class="me-hint">Va en <span class="me-mono">REASON</span>. Se precarga con la que usa la
-                        interfaz del CM para ese estado; se puede cambiar.</div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="Va en REASON. Se precarga con la que usa la interfaz del CM para ese estado; se puede cambiar." aria-label="Ayuda">?</button>
 
                     <label class="me-lbl mt-2" for="inputNota">Nota (opcional)</label>
                     <textarea id="inputNota" class="form-control form-control-sm" rows="2"
                         placeholder="Motivo del cambio"></textarea>
-                    <div class="me-hint">Se envía como <span class="me-mono" id="vistaNota">—</span></div>
+                    <div class="me-hint">Nota: <span id="vistaNota">—</span></div>
 
                     <div class="me-hint mt-2" id="resumenAccion">Marca en la tabla las líneas a cambiar.</div>
-                    <button class="btn btn-sm btn-operar mt-1 w-100" id="btnEjecutar" type="button" disabled>Aplicar
-                        a las marcadas</button>
+
                 </div>
             </section>
 
@@ -229,87 +123,62 @@
 
         <!-- ================= COLUMNA DERECHA: tabla ================= -->
         <div class="me-trabajo-datos">
-            <div class="barra-filtros">
-                <div class="flex-grow-1">
-                    <label class="me-lbl" for="fTexto">Buscar</label>
-                    <input id="fTexto" class="form-control form-control-sm" placeholder="Línea, cuenta, IMSI…">
+            <div class="me-barras">
+                <div class="me-filtros">
+                    <div id="fEstado"></div>
+                    <div id="fProceso"></div>
+                    <div id="fSel"></div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkVerOcultas">
+                        <label class="form-check-label small" for="chkVerOcultas">Ver ocultas (<span id="numOcultas">0</span>)</label>
+                    </div>
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros" type="button">Limpiar filtros</button>
+                    <div id="fColumnas"></div>
+                    <div class="me-filtros-der">
+                        <label class="visually-hidden" for="separadorCSV">Separador CSV</label>
+                        <select id="separadorCSV" class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                        <button id="btnCSV" class="btn btn-sm btn-me-line" type="button">CSV</button>
+                        <button id="btnXLSX" class="btn btn-sm btn-me-line" type="button">Excel</button>
+                        <button id="btnJSON" class="btn btn-sm btn-me-line" type="button">JSON</button>
+                    </div>
                 </div>
-                <div>
-                    <label class="me-lbl" for="fEstado">Estado en el CM</label>
-                    <select id="fEstado" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                    </select>
+                <div class="me-filtros barra-lote">
+                    <button class="btn btn-sm btn-me-line" id="btnMarcarTodo" type="button">Marcar todo</button>
+                    <button class="btn btn-sm btn-me-line" id="btnDesmarcarTodo" type="button">Desmarcar todo</button>
+                    <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar visibles</button>
+                    <button class="btn btn-sm btn-me-line" id="btnDesmarcarVisibles" type="button">Desmarcar visibles</button>
+                    <button class="btn btn-sm btn-me-line" id="btnRestaurarOcultas" type="button">Mostrar todas</button>
+                    <span class="me-hint ms-auto" id="resumenSeleccion"></span>
                 </div>
-                <div>
-                    <label class="me-lbl" for="fProceso">Proceso</label>
-                    <select id="fProceso" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                    </select>
+                <div class="me-lote" id="barraLote" hidden>
+                    <span data-me-lote-n></span>
+                    <button class="btn btn-sm btn-me-line" id="btnOcultarSel" type="button">Ocultar marcadas</button>
+                    <button class="btn btn-sm btn-me-line" id="btnOcultarNoSel" type="button">Ocultar no marcadas</button>
+                    <div class="me-acciones-escritura"><button class="btn btn-sm btn-me-peligro mt-1" id="btnEjecutar" type="button" disabled>Aplicar
+                            a las marcadas</button></div>
                 </div>
-                <div>
-                    <label class="me-lbl" for="fSel">Selección</label>
-                    <select id="fSel" class="form-select form-select-sm">
-                        <option value="">Todas</option>
-                        <option value="si">Marcadas</option>
-                        <option value="no">Sin marcar</option>
-                    </select>
-                </div>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" id="chkVerOcultas">
-                    <label class="form-check-label small" for="chkVerOcultas">Ver ocultas (<span
-                            id="numOcultas">0</span>)</label>
-                </div>
-                <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros" type="button">Limpiar filtros</button>
-            </div>
-
-            <div class="barra-lote">
-                <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar visibles</button>
-                <button class="btn btn-sm btn-me-line" id="btnDesmarcarVisibles" type="button">Desmarcar
-                    visibles</button>
-                <button class="btn btn-sm btn-me-line" id="btnOcultarSel" type="button">Ocultar marcadas</button>
-                <button class="btn btn-sm btn-me-line" id="btnOcultarNoSel" type="button">Ocultar no
-                    marcadas</button>
-                <button class="btn btn-sm btn-me-line" id="btnRestaurarOcultas" type="button">Mostrar todas</button>
-                <span class="me-hint ms-auto" id="resumenSeleccion"></span>
-                <select class="form-select form-select-sm" data-me-sep style="width:auto"></select>
-                <button id="btnCSV" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-csv"></i>
-                    CSV</button>
-                <button id="btnXLSX" class="btn btn-sm btn-me-line" type="button"><i
-                        class="bi bi-file-earmark-excel"></i> Excel</button>
-                <button id="btnJSON" class="btn btn-sm btn-me-line" type="button"><i class="bi bi-filetype-json"></i>
-                    JSON</button>
             </div>
 
             <div class="me-tabla-panel">
                 <table id="tablaLineas" class="table table-sm table-hover table-striped w-100"
                     style="display:none"></table>
-                <div class="me-hint p-2" id="msgVacio">Escribe las líneas en el paso <strong>2</strong> y presiona
-                    <strong>Consultar líneas</strong>.</div>
+                <div class="me-hint p-2" id="msgVacio">Carga las líneas y consulta para comenzar.</div>
             </div>
         </div>
     </div>
 
-    <!-- ============ LIBRERÍAS ============ -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.bootstrap5.js"></script>
-
     <!-- 1 · Shell común -->
-    <script src="../assets/me-ui.js"></script>
+    <script src="../assets/base/catalogo.js"></script>
+    <script src="../assets/base/me-ui.js"></script>
     <script>
         MEUI.init({
             app: "estado-lineas",
-            version: "1.1.0",
-            doc: "../doc/estado-lineas/README.md",
-            titulo: "Bloquear/Inactivar líneas",
-            descripcion: "Bloquear o inactivar líneas en el CM, en masivo",
             sesiones: ["cm"],
             instrucciones: [
                 "1 · Conexión: la sesión del CM consulta las líneas y dice quién eres. Sin sesión solo se puede consultar.",
                 "2 · Pega las líneas (máximo 200) y presiona «Consultar líneas»: trae su cuenta, estado, IMSI y el estado de la IMSI en el inventario.",
                 "Marca en la tabla las líneas a cambiar. Como en el cierre de casos: filtros, marcar/desmarcar lo visible y ocultar/mostrar filas.",
-                "3 · Elige Bloquear o Inactivar, revisa la razón y aplica. ESCRIBE EN PRODUCCIÓN, con doble confirmación.",
+                "3 · Elige Bloquear o Inactivar, revisa la razón y aplica. ESCRIBE EN PRODUCCIÓN: antes de enviar se muestra un resumen para confirmar.",
                 "Al INACTIVAR, la IMSI pasa a HELD y hay que liberarla a mano en el BSS para volver a usarla.",
                 "Después de cada orden la línea se vuelve a consultar: la columna Estado muestra lo que el CM tiene de verdad."
             ]
@@ -317,16 +186,13 @@
     </script>
 
     <!-- 2 · Acceso al CM -->
-    <script src="../assets/me-api.js"></script>
+    <script src="../assets/base/me-api.js"></script>
 
-    <!-- 3 · Operaciones sobre líneas, compartidas con «Cambio IMSI Claro|Tigo» -->
-    <script src="../assets/cm-lineas.js"></script>
+    <!-- 3 · Operaciones sobre líneas, compartidas con «Cambio IMSI y línea Claro|Tigo» -->
+    <script src="../assets/compartido/cm-lineas.js"></script>
 
-    <!-- 4 · Reglas de esta herramienta -->
-    <script src="../assets/logica-estado-lineas.js"></script>
-
-    <!-- 5 · Enganche con la interfaz -->
-    <script src="../assets/me-estado-lineas-puente.js"></script>
+    <!-- 4 · Esta herramienta: reglas e interfaz -->
+    <script src="../assets/herramientas/estado-lineas/estado-lineas.js"></script>
 </body>
 
 </html>

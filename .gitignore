@@ -10,3 +10,6 @@ har nuevas/
 
 # Archivos reales de facturación (NIT, líneas, nombres, códigos SAP): solo locales.
 Documentos Pre-Factura/
+
+# Capturas de errores: traen usuarios, lineas e IMSI reales
+bugs/

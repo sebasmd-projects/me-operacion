@@ -1,0 +1,4 @@
+/* audio-mp3.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Convertir audio a MP3 · estilos propios de la herramienta */
+.audio-preview { width: 12rem; height: 2rem; }
+.audio-file-name { max-width: 22rem; overflow-wrap: anywhere; }

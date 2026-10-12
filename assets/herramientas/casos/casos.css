@@ -1,0 +1,84 @@
+/* casos.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Celdas editables dentro de la tabla */
+.celda-edit {
+    min-width: 150px;
+    font-size: 13px;
+    padding: .15rem .35rem;
+}
+
+.celda-edit.ancha {
+    min-width: 300px;
+}
+
+.celda-edit.editada {
+    border-color: #0d6efd;
+    background: #F2F7FF;
+}
+
+/* Título de una fila «solo nota»: no se toca, así que no se edita */
+.celda-edit[readonly] {
+    background: #F5F4F0;
+    color: #75756F;
+    cursor: not-allowed;
+}
+
+/* Campo obligatorio todavía sin llenar (nota de un caso que sí se cierra) */
+.celda-edit.falta {
+    border-color: var(--me-err);
+    background: #FFF6F5;
+}
+
+/* Vista previa del archivo */
+#vistaPrevia {
+    max-height: 260px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    padding: .4rem;
+}
+
+#vistaPrevia table {
+    font-size: 12px;
+    margin: 0;
+}
+
+#vistaPrevia td,
+#vistaPrevia th {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Pestañas Casos / Informe */
+
+.me-tabs .nav-link .badge {
+    font-weight: 600;
+}
+
+/* Tabla de la regla del archivo, en el paso 3 */
+.tabla-regla {
+    width: 100%;
+    font-size: .74rem;
+    border-collapse: collapse;
+}
+
+.tabla-regla th,
+.tabla-regla td {
+    border: 1px solid var(--me-borde);
+    padding: .25rem .4rem;
+    vertical-align: top;
+}
+
+.tabla-regla th {
+    background: #FAFAF7;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tabla-regla code {
+    font-family: var(--me-mono);
+    color: var(--me-tinta);
+}

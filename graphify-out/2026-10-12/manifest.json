@@ -1,0 +1,578 @@
+{
+  "assets/cm-lineas.js": {
+    "mtime": 1791647624.069975,
+    "seen": 1791821797.3517194,
+    "ast_hash": "d97662c2dbdbe3e4153388dc5eb95ccb",
+    "semantic_hash": ""
+  },
+  "assets/logica-ajustes.js": {
+    "mtime": 1789742982.0,
+    "seen": 1790784790.3408737,
+    "ast_hash": "248c414436e25719dd213a8af12aa5c8",
+    "semantic_hash": "248c414436e25719dd213a8af12aa5c8"
+  },
+  "assets/logica-audio-mp3.js": {
+    "mtime": 1789760504.0,
+    "seen": 1790784790.340876,
+    "ast_hash": "4e478b3c33ca61460884b5eea507f921",
+    "semantic_hash": "4e478b3c33ca61460884b5eea507f921"
+  },
+  "assets/logica-cambio-imsi.js": {
+    "mtime": 1791395223.9350946,
+    "seen": 1791821797.351735,
+    "ast_hash": "ad44c5a8b6d6baf1472e7cbccf419d0c",
+    "semantic_hash": ""
+  },
+  "assets/logica-casos.js": {
+    "mtime": 1791645698.6075706,
+    "seen": 1791821797.3517375,
+    "ast_hash": "4451b52e0720b176ee765d97de6b004c",
+    "semantic_hash": ""
+  },
+  "assets/logica-consumos.js": {
+    "mtime": 1791645631.578459,
+    "seen": 1791821797.351739,
+    "ast_hash": "482473ea18256b6f6e8e90540442c50a",
+    "semantic_hash": ""
+  },
+  "assets/logica-estado-lineas.js": {
+    "mtime": 1790632804.0,
+    "seen": 1790784790.3408804,
+    "ast_hash": "d125e3dacb64ba5cf973cd773f9f442e",
+    "semantic_hash": "d125e3dacb64ba5cf973cd773f9f442e"
+  },
+  "assets/logica-hlr-cruzado.js": {
+    "mtime": 1789739356.0,
+    "seen": 1790784790.3408813,
+    "ast_hash": "680c1e331c7c94238f7910253b001e17",
+    "semantic_hash": "680c1e331c7c94238f7910253b001e17"
+  },
+  "assets/logica-hlr-hss-ambos.js": {
+    "mtime": 1789739354.0,
+    "seen": 1790784790.340882,
+    "ast_hash": "0e3ad67b4d53163f411cb6e89ce7e931",
+    "semantic_hash": "0e3ad67b4d53163f411cb6e89ce7e931"
+  },
+  "assets/logica-hlr-hss-claro.js": {
+    "mtime": 1791645673.0619864,
+    "seen": 1791821797.351743,
+    "ast_hash": "2454760e186ea842183bd777fa113d62",
+    "semantic_hash": ""
+  },
+  "assets/logica-hlr-hss-tigo.js": {
+    "mtime": 1791645673.130699,
+    "seen": 1791821797.3517435,
+    "ast_hash": "e5b8d615285fb53a5428e568e43b4578",
+    "semantic_hash": ""
+  },
+  "assets/logica-inicio.js": {
+    "mtime": 1791647559.6722295,
+    "seen": 1791821797.3517444,
+    "ast_hash": "484a95e3269e1aecb607cd9421abd229",
+    "semantic_hash": ""
+  },
+  "assets/logica-paquetes-carga.js": {
+    "mtime": 1791645507.387782,
+    "seen": 1791821797.3517451,
+    "ast_hash": "63b5db54a0b69a2a9ce5c6cdef4c309e",
+    "semantic_hash": ""
+  },
+  "assets/logica-plu.js": {
+    "mtime": 1791645639.8813467,
+    "seen": 1791821797.351746,
+    "ast_hash": "b643b3b92323fdac8f1a49f15897d328",
+    "semantic_hash": ""
+  },
+  "assets/logica-portabilidad-tigo.js": {
+    "mtime": 1791645673.1761794,
+    "seen": 1791821797.3517468,
+    "ast_hash": "43968eaa66e7c6da5be94a4aef219cbf",
+    "semantic_hash": ""
+  },
+  "assets/logica-prepagadas.js": {
+    "mtime": 1791645556.4807186,
+    "seen": 1791821797.3517487,
+    "ast_hash": "0419f38ec016388b1f9c63c36900df4e",
+    "semantic_hash": ""
+  },
+  "assets/logica-qdn-operaciones.js": {
+    "mtime": 1790099852.0,
+    "seen": 1790784790.3408895,
+    "ast_hash": "2adb9c6721644f25465362fc86f159a3",
+    "semantic_hash": "2adb9c6721644f25465362fc86f159a3"
+  },
+  "assets/logica-qdn-tigo.js": {
+    "mtime": 1791645673.212004,
+    "seen": 1791821797.3517506,
+    "ast_hash": "62793a3e55aac7e5f8acc79850736ba2",
+    "semantic_hash": ""
+  },
+  "assets/logica-qdn.js": {
+    "mtime": 1791645673.2542412,
+    "seen": 1791821797.3517513,
+    "ast_hash": "25e8af6015fd8ae68b989fb15275593b",
+    "semantic_hash": ""
+  },
+  "assets/logica-rechazo.js": {
+    "mtime": 1790608970.0,
+    "seen": 1790784790.340892,
+    "ast_hash": "702e56d9c7eed41b07727eb55b68c893",
+    "semantic_hash": "702e56d9c7eed41b07727eb55b68c893"
+  },
+  "assets/logica-tipificacion.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.340893,
+    "ast_hash": "a90aa34eeb3f3f5654c12e551d25d12d",
+    "semantic_hash": "a90aa34eeb3f3f5654c12e551d25d12d"
+  },
+  "assets/me-ajustes-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.340894,
+    "ast_hash": "cf9e0a865ad5aaa9090b8475963a3c0d",
+    "semantic_hash": "cf9e0a865ad5aaa9090b8475963a3c0d"
+  },
+  "assets/me-api.js": {
+    "mtime": 1791645408.6241126,
+    "seen": 1791821797.3517556,
+    "ast_hash": "c64406fd5eaa4a4dbc382aa4959f3eb8",
+    "semantic_hash": ""
+  },
+  "assets/me-audio-mp3-puente.js": {
+    "mtime": 1789762210.0,
+    "seen": 1790784790.340896,
+    "ast_hash": "1ffa400c597ba397ad779eba7d213638",
+    "semantic_hash": "1ffa400c597ba397ad779eba7d213638"
+  },
+  "assets/me-cambio-imsi-puente.js": {
+    "mtime": 1791645709.592425,
+    "seen": 1791821797.351757,
+    "ast_hash": "fe3a035a09897ec6bef9a5d753ba2e06",
+    "semantic_hash": ""
+  },
+  "assets/me-casos-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.3408978,
+    "ast_hash": "2f89c69fbef837c9c5d081755d555beb",
+    "semantic_hash": "2f89c69fbef837c9c5d081755d555beb"
+  },
+  "assets/me-consumos-puente.js": {
+    "mtime": 1790177590.0,
+    "seen": 1790784790.3408988,
+    "ast_hash": "d9b30968ee339037af6431ae55f9de2e",
+    "semantic_hash": "d9b30968ee339037af6431ae55f9de2e"
+  },
+  "assets/me-estado-lineas-puente.js": {
+    "mtime": 1791645698.6648855,
+    "seen": 1791821797.3517618,
+    "ast_hash": "792438d102cc93eff53203b7a11afd26",
+    "semantic_hash": ""
+  },
+  "assets/me-hlr-cruzado-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.3409007,
+    "ast_hash": "c07538a11a469dce8c2b9850a11ff178",
+    "semantic_hash": "c07538a11a469dce8c2b9850a11ff178"
+  },
+  "assets/me-hlr-hss-puente.js": {
+    "mtime": 1789662798.0,
+    "seen": 1790784790.3409014,
+    "ast_hash": "d9841651eef83ad48d30e79a13ef3933",
+    "semantic_hash": "d9841651eef83ad48d30e79a13ef3933"
+  },
+  "assets/me-plu-puente.js": {
+    "mtime": 1791645631.4608724,
+    "seen": 1791821797.3517642,
+    "ast_hash": "20990dcdc38f5e4648d229a62d30fc9d",
+    "semantic_hash": ""
+  },
+  "assets/me-portabilidad-tigo-puente.js": {
+    "mtime": 1789422760.0,
+    "seen": 1790784790.3409033,
+    "ast_hash": "dae6ea619c68dc41ac0671fa6b108bf7",
+    "semantic_hash": "dae6ea619c68dc41ac0671fa6b108bf7"
+  },
+  "assets/me-prepagadas-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.3409042,
+    "ast_hash": "cc77fb7e05836b9ce9c4514604b10eb0",
+    "semantic_hash": "cc77fb7e05836b9ce9c4514604b10eb0"
+  },
+  "assets/me-qdn-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.3409052,
+    "ast_hash": "c60d41de4bb7b86d34a11855bfc9a6c8",
+    "semantic_hash": "c60d41de4bb7b86d34a11855bfc9a6c8"
+  },
+  "assets/me-qdn-tigo-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.340906,
+    "ast_hash": "3082ffe24594795d0315198d40d80f17",
+    "semantic_hash": "3082ffe24594795d0315198d40d80f17"
+  },
+  "assets/me-rechazo-puente.js": {
+    "mtime": 1789592112.0,
+    "seen": 1790784790.3409069,
+    "ast_hash": "1d58ed27b1de537de43822f29c05dab6",
+    "semantic_hash": "1d58ed27b1de537de43822f29c05dab6"
+  },
+  "assets/me-tipificacion-puente.js": {
+    "mtime": 1789391210.0,
+    "seen": 1790784790.3409078,
+    "ast_hash": "6c8a3a60fa80bab05501f6bbce31232f",
+    "semantic_hash": "6c8a3a60fa80bab05501f6bbce31232f"
+  },
+  "assets/me-ui.js": {
+    "mtime": 1791818290.628294,
+    "seen": 1791821797.3517706,
+    "ast_hash": "7c9ff7d1aac2da9ade6d8c07570287ec",
+    "semantic_hash": ""
+  },
+  "release/version.json": {
+    "mtime": 1791647838.6730585,
+    "seen": 1791821797.3517718,
+    "ast_hash": "18fb7da99dd3e898a4f6a0268c8b973d",
+    "semantic_hash": ""
+  },
+  "scripts/actualizar.ps1": {
+    "mtime": 1790885495.7418332,
+    "seen": 1791821797.3517728,
+    "ast_hash": "58e0f19d3ac92d2a14c9d06d53625fc2",
+    "semantic_hash": "58e0f19d3ac92d2a14c9d06d53625fc2"
+  },
+  "scripts/empaquetar-release.ps1": {
+    "mtime": 1790957367.257206,
+    "seen": 1791821797.3517733,
+    "ast_hash": "51b13e9268952ab4dc441b8a7203a5d4",
+    "semantic_hash": ""
+  },
+  "scripts/lanzador.ps1": {
+    "mtime": 1791383423.3560114,
+    "seen": 1791821797.3517742,
+    "ast_hash": "95bf2f82420bdfd8840fce25a41d4f51",
+    "semantic_hash": ""
+  },
+  "CODEX.md": {
+    "mtime": 1791818062.8418484,
+    "seen": 1791821797.3517747,
+    "ast_hash": "41127dad98f14338981ca44997af4de3",
+    "semantic_hash": ""
+  },
+  "doc/GETTINGSTARTED.md": {
+    "mtime": 1791645949.4936392,
+    "seen": 1791821797.3517752,
+    "ast_hash": "cb727cb6e882e2552c6d75ecdd1c35e7",
+    "semantic_hash": ""
+  },
+  "doc/README.md": {
+    "mtime": 1791647672.9955,
+    "seen": 1791821797.351776,
+    "ast_hash": "d7d16410817e49a2bc229ad87c7c508e",
+    "semantic_hash": ""
+  },
+  "doc/aplicar-plu/README.md": {
+    "mtime": 1791645998.6495917,
+    "seen": 1791821797.3517768,
+    "ast_hash": "c559a2f14ffba444c95001406e7902ea",
+    "semantic_hash": ""
+  },
+  "doc/audio-mp3/README.md": {
+    "mtime": 1790804693.3526244,
+    "seen": 1790807307.1104252,
+    "ast_hash": "8e329d96a6fe4e430bd104931008aaa9",
+    "semantic_hash": "8e329d96a6fe4e430bd104931008aaa9"
+  },
+  "doc/cambio-imsi/README.md": {
+    "mtime": 1791645999.264549,
+    "seen": 1791821797.3517785,
+    "ast_hash": "cd19b5f0591a6b966f373170f30aa2d3",
+    "semantic_hash": ""
+  },
+  "doc/cerrar-casos/README.md": {
+    "mtime": 1791646029.1082084,
+    "seen": 1791821797.3517802,
+    "ast_hash": "c5f72955df85d0fcb0190c1f84f799a5",
+    "semantic_hash": ""
+  },
+  "doc/consulta-qdn-tigo/README.md": {
+    "mtime": 1791646029.2429955,
+    "seen": 1791821797.3517807,
+    "ast_hash": "e8c8e09167f8c501befc440db67f7ebb",
+    "semantic_hash": ""
+  },
+  "doc/estado-lineas/README.md": {
+    "mtime": 1791645998.9994366,
+    "seen": 1791821797.3517814,
+    "ast_hash": "c96ff4cd034781220b94b55b3e33eade",
+    "semantic_hash": ""
+  },
+  "doc/generar-rechazo/README.md": {
+    "mtime": 1789742960.0,
+    "seen": 1790784790.3409226,
+    "ast_hash": "940f449e04b348ddce90cbe88673a89b",
+    "semantic_hash": "940f449e04b348ddce90cbe88673a89b"
+  },
+  "doc/hlr-cruzado/README.md": {
+    "mtime": 1789740212.0,
+    "seen": 1790784790.3409235,
+    "ast_hash": "91104d7ce02268751ff98cf49d74537b",
+    "semantic_hash": "91104d7ce02268751ff98cf49d74537b"
+  },
+  "doc/hlr-hss/README.md": {
+    "mtime": 1791646000.1791215,
+    "seen": 1791821797.351785,
+    "ast_hash": "9f149679f8428383cc28c4497275c9ae",
+    "semantic_hash": ""
+  },
+  "doc/lanzador/README.md": {
+    "mtime": 1791818503.5362158,
+    "seen": 1791821797.3517854,
+    "ast_hash": "2a172e54e508145e252e7340a16370c2",
+    "semantic_hash": ""
+  },
+  "doc/portabilidad-tigo/README.md": {
+    "mtime": 1791646029.3095996,
+    "seen": 1791821797.3517873,
+    "ast_hash": "9d868fa97daaf5b2451d13392ab7e842",
+    "semantic_hash": ""
+  },
+  "doc/reporte-ajustes/README.md": {
+    "mtime": 1790804619.7841275,
+    "seen": 1790807307.1104345,
+    "ast_hash": "9fd8a851852d8a6356077854ddf10c41",
+    "semantic_hash": "9fd8a851852d8a6356077854ddf10c41"
+  },
+  "doc/reporte-ajustes/recarga-de-paquetes-cm.md": {
+    "mtime": 1790177590.0,
+    "seen": 1790784790.3409283,
+    "ast_hash": "be0f9b77d00baeac32f585c39e1f1d91",
+    "semantic_hash": "be0f9b77d00baeac32f585c39e1f1d91"
+  },
+  "doc/reporte-consumos/README.md": {
+    "mtime": 1791645998.504906,
+    "seen": 1791821797.3517904,
+    "ast_hash": "b8811b147e950a2d23c6c1b4bfd0663f",
+    "semantic_hash": ""
+  },
+  "doc/reporte-prepagadas/README.md": {
+    "mtime": 1791645998.3999374,
+    "seen": 1791821797.351791,
+    "ast_hash": "f26885c049e87b9522fdccd1d925e23e",
+    "semantic_hash": ""
+  },
+  "doc/reporte-tipificacion/README.md": {
+    "mtime": 1790804619.8342884,
+    "seen": 1790807307.1104763,
+    "ast_hash": "a646c14c3ec11e6d67ae4b63e15c9cf2",
+    "semantic_hash": "a646c14c3ec11e6d67ae4b63e15c9cf2"
+  },
+  "doc/validador-qdn/README.md": {
+    "mtime": 1791646029.1727278,
+    "seen": 1791821797.3517928,
+    "ast_hash": "9f0f2c082aa6c77a568906beefb7b180",
+    "semantic_hash": ""
+  },
+  "herramientas/aplicar_plu.html": {
+    "mtime": 1791645998.559794,
+    "seen": 1791821797.3517938,
+    "ast_hash": "550c9aed6e32cd1b8a92d33d1685fd3b",
+    "semantic_hash": ""
+  },
+  "herramientas/cambio_imsi.html": {
+    "mtime": 1791645999.1311824,
+    "seen": 1791821797.3517942,
+    "ast_hash": "5b7691d9491102e500276fce2f88aebf",
+    "semantic_hash": ""
+  },
+  "herramientas/convertir_audio_mp3.html": {
+    "mtime": 1789760500.0,
+    "seen": 1790784790.3409345,
+    "ast_hash": "ca34fc28e17c21f6d4c08561dc14e915",
+    "semantic_hash": "ca34fc28e17c21f6d4c08561dc14e915"
+  },
+  "herramientas/estado_lineas.html": {
+    "mtime": 1791645998.8045793,
+    "seen": 1791821797.3517964,
+    "ast_hash": "136993e41a29088f790d8d701e33c04f",
+    "semantic_hash": ""
+  },
+  "herramientas/generar_rechazo.html": {
+    "mtime": 1789742954.0,
+    "seen": 1790784790.3409362,
+    "ast_hash": "9c9a3dc55ae2c3b9ac2900ee3bfd831b",
+    "semantic_hash": "9c9a3dc55ae2c3b9ac2900ee3bfd831b"
+  },
+  "herramientas/hlr_hss.html": {
+    "mtime": 1791645999.9986794,
+    "seen": 1791821797.3517997,
+    "ast_hash": "72a14e4033d93411601c0f9ac0eddf9b",
+    "semantic_hash": ""
+  },
+  "herramientas/reporte_casos_masivos.html": {
+    "mtime": 1791646000.2880025,
+    "seen": 1791821797.3518012,
+    "ast_hash": "e41a4f28fb56ba02fe97bc992e9e132c",
+    "semantic_hash": ""
+  },
+  "herramientas/validador_qdn.html": {
+    "mtime": 1791646029.1367142,
+    "seen": 1791821797.3518078,
+    "ast_hash": "17d4f4218cf15cbf0b3485341ac17123",
+    "semantic_hash": ""
+  },
+  "herramientas/validador_qdn_tigo.html": {
+    "mtime": 1791646029.206035,
+    "seen": 1791821797.3518088,
+    "ast_hash": "fd08ae119449ced8023e56b67c77e785",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1790950211.7560315,
+    "seen": 1791821797.3518097,
+    "ast_hash": "dcf09e231026511560dfb2d37ab40cf4",
+    "semantic_hash": ""
+  },
+  "doc/lanzador/plan-3.0.0.md": {
+    "mtime": 1790806814.303815,
+    "seen": 1790807307.110432,
+    "ast_hash": "b464e2ac364b3a0de6f95d3f89188b2f",
+    "semantic_hash": "b464e2ac364b3a0de6f95d3f89188b2f"
+  },
+  "herramientas/export_ajustes.html": {
+    "mtime": 1789742952.0,
+    "seen": 1790807307.1104808,
+    "ast_hash": "645106538a53fe87e0df61fabeb4b5e6",
+    "semantic_hash": "645106538a53fe87e0df61fabeb4b5e6"
+  },
+  "herramientas/export_tipificacion.html": {
+    "mtime": 1789740288.0,
+    "seen": 1790807307.1104832,
+    "ast_hash": "c0eb32ea7bcf39034f1ed6da37233ae3",
+    "semantic_hash": "c0eb32ea7bcf39034f1ed6da37233ae3"
+  },
+  "herramientas/reporte_consumos.html": {
+    "mtime": 1791645998.4447312,
+    "seen": 1791821797.351802,
+    "ast_hash": "e540f6b23844fabc9364e0a0a9fcd24a",
+    "semantic_hash": ""
+  },
+  "herramientas/reporte_prepagadas.html": {
+    "mtime": 1791645998.3550417,
+    "seen": 1791821797.351803,
+    "ast_hash": "6af35cec68a7ab01e4ab875d0ce5bd7d",
+    "semantic_hash": ""
+  },
+  "herramientas/validador_hlr_cruzado.html": {
+    "mtime": 1790111568.0,
+    "seen": 1790807307.1104906,
+    "ast_hash": "730d5493e7da155ad2edfdca079bfd9d",
+    "semantic_hash": "730d5493e7da155ad2edfdca079bfd9d"
+  },
+  "herramientas/validador_portabilidad_tigo.html": {
+    "mtime": 1791646029.2754328,
+    "seen": 1791821797.3518064,
+    "ast_hash": "0135c0aac062a4d1844fcdcc5dd33a68",
+    "semantic_hash": ""
+  },
+  "assets/genesis-api.js": {
+    "mtime": 1790951672.1137612,
+    "seen": 1791821797.3517246,
+    "ast_hash": "ff84ae23dbb301675d2bada560a72fe9",
+    "semantic_hash": ""
+  },
+  "assets/genesis-bookmarklet.js": {
+    "mtime": 1790953885.2274642,
+    "seen": 1791821797.351726,
+    "ast_hash": "d6244493bee587e8e51b0be1bfa17d31",
+    "semantic_hash": ""
+  },
+  "assets/hlr-consulta.js": {
+    "mtime": 1790951672.1392314,
+    "seen": 1791821797.351727,
+    "ast_hash": "ffb841005ddd2eebd56c659a9e88ada7",
+    "semantic_hash": ""
+  },
+  "assets/logica-cambio-msisdn.js": {
+    "mtime": 1791647491.9981189,
+    "seen": 1791821797.351736,
+    "ast_hash": "35c3e4273096a012f87420e180978486",
+    "semantic_hash": ""
+  },
+  "assets/logica-prefactura.js": {
+    "mtime": 1791647624.307278,
+    "seen": 1791821797.3517475,
+    "ast_hash": "4daa39d8e2eedf38ecc384bc3137e6f1",
+    "semantic_hash": ""
+  },
+  "assets/logica-titularidad.js": {
+    "mtime": 1791647624.3926644,
+    "seen": 1791821797.351754,
+    "ast_hash": "ce3159ed55ab1ac14e071f0d154ce8e7",
+    "semantic_hash": ""
+  },
+  "assets/me-cambio-msisdn-puente.js": {
+    "mtime": 1791647541.7052786,
+    "seen": 1791821797.3517575,
+    "ast_hash": "e22f522086c9050e201df15cc972605c",
+    "semantic_hash": ""
+  },
+  "assets/me-prefactura-puente.js": {
+    "mtime": 1791239596.3559556,
+    "seen": 1791821797.3517654,
+    "ast_hash": "fac1688424d49b3c3c7aeb2e6ae9732c",
+    "semantic_hash": ""
+  },
+  "assets/me-titularidad-puente.js": {
+    "mtime": 1790956057.0418882,
+    "seen": 1791821797.35177,
+    "ast_hash": "1d9d640b77a8a56df4c03f31d6ec5c32",
+    "semantic_hash": ""
+  },
+  "assets/tulio-plu.js": {
+    "mtime": 1791645486.8814275,
+    "seen": 1791821797.351771,
+    "ast_hash": "6f7a2dce7ffb95b647dcc3c58f70a22c",
+    "semantic_hash": ""
+  },
+  "doc/cambio-msisdn/README.md": {
+    "mtime": 1791647659.364331,
+    "seen": 1791821797.351779,
+    "ast_hash": "c739d3944a61425e38e2f4ab641e0238",
+    "semantic_hash": ""
+  },
+  "doc/genesis-login.md": {
+    "mtime": 1790953885.3341177,
+    "seen": 1791821797.3517835,
+    "ast_hash": "70cb4c25c880d7e9cda7c89990a5a040",
+    "semantic_hash": ""
+  },
+  "doc/prefactura/README.md": {
+    "mtime": 1791239944.5217583,
+    "seen": 1791821797.3517878,
+    "ast_hash": "68b7f982b8e517ffcbb0f3eea7e8aaef",
+    "semantic_hash": ""
+  },
+  "doc/titularidad/README.md": {
+    "mtime": 1791645999.6572688,
+    "seen": 1791821797.3517923,
+    "ast_hash": "d14d04414ae2a8a7946c127ba7a01e07",
+    "semantic_hash": ""
+  },
+  "herramientas/cambio_msisdn.html": {
+    "mtime": 1791647559.5014534,
+    "seen": 1791821797.351795,
+    "ast_hash": "48f7e23b68cac28f90c3b222b3323318",
+    "semantic_hash": ""
+  },
+  "herramientas/prefactura.html": {
+    "mtime": 1791239596.3730395,
+    "seen": 1791821797.3518002,
+    "ast_hash": "2ef36f8ff0637181052cc19f407e566a",
+    "semantic_hash": ""
+  },
+  "herramientas/titularidad.html": {
+    "mtime": 1791645999.3832624,
+    "seen": 1791821797.3518043,
+    "ast_hash": "ef44c86232849702badf5f94add38d48",
+    "semantic_hash": ""
+  }
+}

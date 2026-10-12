@@ -1,6 +1,6 @@
 # Convertir audio a MP3 — Documentación técnica
 
-> **Versión: v1.0.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.2.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Convierte uno o varios archivos de audio a **MP3 real** sin cargar información a servidores. Está optimizada inicialmente para archivos `.ogg` y `.m4a` y acepta los demás formatos que el navegador pueda decodificar.
@@ -20,8 +20,10 @@ Convierte uno o varios archivos de audio a **MP3 real** sin cargar información 
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/convertir_audio_mp3.html` | Marcado. Sin lógica. |
-| `assets/logica-audio-mp3.js` | Decodificación, normalización a 44,1 kHz, codificación MP3, nombres de salida y ZIP. |
-| `assets/me-audio-mp3-puente.js` | Enganche con el shell (`MEUI.init`, versión, registro). |
+| `assets/herramientas/audio-mp3/audio-mp3.js` | Un solo archivo con tres secciones: configuración, reglas (decodificación, normalización a 44,1 kHz, codificación MP3, nombres de salida y ZIP) e interfaz (render, eventos y enganche con `MEUI.init`). |
+| `assets/herramientas/audio-mp3/audio-mp3.css` | Estilos propios del reproductor y del nombre de archivo. |
+
+La interfaz usa `MEUI.zonaArchivo`, pasos plegables y columna contraíble en `.me-trabajo`, resultados en `.me-trabajo-datos` y `MEUI.progreso`. Cada avance actualiza únicamente la fila en curso; los reproductores y las descargas ya listas se conservan. La preparación PCM y la codificación ceden el control entre bloques para mantener la interfaz disponible.
 
 No usa `me-api.js`: no consulta ningún servicio interno.
 
@@ -43,7 +45,7 @@ No usa `me-api.js`: no consulta ningún servicio interno.
 2. Arrastra uno o varios audios, o selecciónalos desde el explorador de archivos.
 3. Elige la calidad. Para audios de voz se recomienda **128 kbps**; 96 kbps reduce el tamaño.
 4. Pulsa **Convertir pendientes**.
-5. Escucha cada resultado en el reproductor y descárgalo, o usa **Descargar resultados**. Si hay varios, se genera un ZIP.
+5. Escucha y descarga cada resultado listo, incluso mientras se convierten los siguientes archivos. Al terminar, usa **Descargar resultados** para obtener el lote; si hay varios, se genera un ZIP.
 
 ### Convención de nombres
 
@@ -67,4 +69,7 @@ No usa `me-api.js`: no consulta ningún servicio interno.
 
 | Versión | Cambios |
 | --- | --- |
+| **1.2.0** | Diseño común con pasos y botón «Contraer»; zona de archivo de la base; filas persistentes para escuchar y descargar resultados durante las siguientes conversiones; pausas entre bloques de preparación y codificación. |
+| _sin versión_ | Refactor interno: la lógica y el enganche con el shell se unen en `assets/herramientas/audio-mp3/audio-mp3.js`; el `<style>` pasa a `audio-mp3.css`; constantes ajustables agrupadas arriba. Sin cambios de comportamiento. |
+| **1.1.0** | Progreso común por archivos y reintento exclusivo de conversiones fallidas. Ayudas «?» y accesibilidad. |
 | **1.0.0** | Conversión local de OGG, M4A y otros formatos compatibles a MP3; selección múltiple y arrastrar/soltar; calidades de 96, 128, 192 y 256 kbps; descarga individual o conjunta en ZIP; prefijo `mp3-` con control de nombres repetidos; reproductor para validar cada resultado antes de descargarlo. Documentación llevada a la estructura común (sin cambio de versión de la herramienta). |

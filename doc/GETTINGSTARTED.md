@@ -87,29 +87,25 @@ Te muestra la versión nueva y sus novedades, pregunta si quieres instalarla, y 
 
 ```txt
 herramientas/<algo>.html        marcado, SIN lógica
-assets/logica-<algo>.js         reglas de negocio: consultas, validaciones, formato
-assets/me-<algo>-puente.js      enganche entre esa lógica y el shell común
+assets/herramientas/<id>/<id>.js   configuración, reglas de negocio e interfaz
+assets/herramientas/<id>/<id>.css  estilos exclusivos; lo compartido va a base/me-ui.css
 ```
 
 Más lo que comparten todas:
 
 ```txt
-assets/me-ui.css / me-ui.js     diseño, shell, sesión compartida, registro, tablas
-assets/me-api.js                endpoints del CM/Keycloak, auth, getJson()/api()
+assets/base/me-ui.css / me-ui.js     diseño, shell, sesión compartida, registro, tablas
+assets/base/me-api.js                endpoints del CM/Keycloak, auth, getJson()/api()
+assets/base/catalogo.js              catálogo único de herramientas (menú, Inicio, título, versión)
+assets/base/dependencias.js          registro único de librerías de CDN (versión y URLs)
+assets/compartido/*.js               módulos que usan varias herramientas (cm-lineas, tulio-plu…)
 ```
 
 Detalle completo de esta arquitectura, el orden de carga y por qué está separada así: [lanzador/README.md § 2](lanzador/README.md#2-arquitectura-y-archivos).
 
 ### Agregar una herramienta nueva
 
-Se registra en **dos sitios** (si falta uno, queda a medias):
-
-| Dónde | Qué agregar |
-| --- | --- |
-| `assets/me-ui.js` → `APPS` | Entrada del **menú lateral**, igual en todas las páginas. |
-| `assets/logica-inicio.js` → `PROYECTOS` | Tarjeta en la **portada** (`index.html`), con sus entregables y su doc. |
-
-El `id` debe coincidir en los dos sitios y con el `app` que la página pasa a `MEUI.init()`. `dame click.bat` no hace falta tocarlo. Detalle: [lanzador/README.md § "Dar de alta una herramienta nueva"](lanzador/README.md#dar-de-alta-una-herramienta-nueva).
+Se registra en **un solo sitio**: un objeto nuevo en `herramientas` de `assets/base/catalogo.js` (id, nombre, grupo y orden del menú, icono, descripción, contexto, estado, versión, rutas del HTML y del README, y sus archivos). De ahí salen el menú lateral, la tarjeta y el Backlog de la portada y el título, la descripción y la versión de la página. Define las palabras del buscador global únicamente en `contexto: [...]` de esa entrada, según sus sistemas, datos y acciones reales. El `id` es el `app` que la página pasa a `MEUI.init()`. Si usa una librería de CDN, se declara en `data-me-deps` de `dependencias.js`; si es una nueva, se registra una vez en `assets/base/dependencias.js`. `dame click.bat` no hace falta tocarlo. Detalle: [lanzador/README.md § "Dar de alta una herramienta nueva"](lanzador/README.md#dar-de-alta-una-herramienta-nueva).
 
 ### Probar cambios localmente
 
@@ -149,9 +145,9 @@ publicación, firma y verificación de integridad:
 ### Convenciones del proyecto
 
 - **Sin dependencias que instalar**: ni Node, ni Python, ni build step — HTML/JS servido tal cual, y PowerShell nativo para el lanzador y el empaquetado. El código se versiona en Git (repositorio **público**: nada de capturas HAR, credenciales ni datos de clientes en un commit), pero los analistas reciben la suite por ZIP, no por Git.
-- **Versión de cada herramienta en tres lugares**: comentario de la primera línea del `.html`, `MEUI.init({ version })` y encabezado + historial de su `README.md`. Deben coincidir.
+- **Versión de cada herramienta**: vive en `assets/base/catalogo.js`; el encabezado y el historial de su README la documentan. `MEUI.init({ app })` toma la versión del catálogo.
 - **Escrituras con sesión del CM**: las herramientas que escriben en producción piden la sesión del CM vigente (dice quién opera) y doble confirmación. Solo el aprovisionamiento de HLR/HSS Claro sigue limitado a una lista de usuarios (`USUARIOS_PROVISION`). Es una guarda de interfaz, no un control de acceso.
-- **Marcado sin lógica**: cada `.html` en `herramientas/` es solo estructura; toda regla de negocio vive en `assets/logica-<algo>.js`.
+- **Marcado sin lógica**: cada `.html` en `herramientas/` es solo estructura; toda regla de negocio vive en `assets/herramientas/<id>/<id>.js`.
 - **La herramienta no inventa datos**: un campo que el CM no devuelve queda vacío (o en `N/A` al imprimir), nunca se rellena con un supuesto.
 - **Versionado `Major.Minor.Patch`**: Major = cambio mayor, Minor = funcionalidad compatible y Patch = corrección/documentación — ver [README.md § Versionado](README.md#versionado).
 - **Todo interactivo por consola**: el lanzador y el actualizador nunca abren cuadros de diálogo de Windows (pueden quedar ocultos o bloqueados por política del equipo).

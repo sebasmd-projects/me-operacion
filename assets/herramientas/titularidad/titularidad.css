@@ -1,0 +1,223 @@
+/* titularidad.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Propio de Bloqueos SIM x Titularidad. Lo estructural vive en assets/base/me-ui.css. */
+
+.paso-pend {
+    color: #B9B9B2;
+}
+
+/* La descripción de Genesis es una frase larga; se corta en la celda
+   y se ve completa en el tooltip y en el detalle. */
+td .desc {
+    display: inline-block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+#tablaTitularidad td,
+#tablaTitularidad th {
+    font-size: .8rem;
+}
+
+/* Qué se cargó (paso 2): la verdad sobre el tope, a la vista y no solo en el registro */
+.carga-nota {
+    font-size: .74rem;
+    color: var(--me-suave);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.carga-nota.tope {
+    color: var(--me-warn);
+    font-weight: 600;
+}
+
+/* Rango de fechas del paso 2 */
+.rango-aviso {
+    font-size: .74rem;
+    color: var(--me-suave);
+    margin-top: .35rem;
+}
+
+.rango-aviso.largo {
+    color: var(--me-warn);
+    font-weight: 600;
+}
+
+.rango-aviso.error {
+    color: var(--me-err);
+    font-weight: 600;
+}
+
+/* Acciones de selección: texto, no botones; son atajos de la casilla
+   de la cabecera, no operaciones. */
+.btn-texto {
+    border: 0;
+    background: none;
+    padding: 0 .15rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--me-info);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.btn-texto:hover {
+    color: var(--me-negro);
+}
+
+.btn-texto:disabled {
+    color: var(--me-off);
+    text-decoration: none;
+    cursor: default;
+}
+
+.g-favorito {
+    display: flex;
+    gap: .6rem;
+    align-items: flex-start;
+    background: var(--me-fondo-suave, #f6f6f4);
+    border: 1px solid var(--me-linea, #e2e2dd);
+    border-radius: 8px;
+    padding: .6rem .7rem;
+}
+
+.g-favorito-num {
+    flex: 0 0 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    background: var(--me-negro, #1a1a1a);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.g-favorito-txt {
+    font-size: .8rem;
+    line-height: 1.45;
+}
+
+.g-favorito-nota {
+    font-size: .72rem;
+    color: var(--me-suave);
+    margin-top: .35rem;
+}
+
+/* Parece un botón pero es un <a href="javascript:…">: tiene que ser un
+   enlace de verdad para que arrastrarlo a la barra de favoritos cree el
+   favorito. Un <button> no se puede arrastrar así. */
+.g-favorito-arrastrar {
+    display: inline-block;
+    padding: .3rem .7rem;
+    border-radius: 6px;
+    background: var(--me-negro, #1a1a1a);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: grab;
+}
+
+.g-favorito-arrastrar:hover {
+    color: #fff;
+    opacity: .88;
+}
+
+/* Secundario a propósito: el paso 1 (arrastrar el favorito) es el que
+   tiene que destacar; esto solo abre Genesis si no lo tienes abierto. */
+.g-favorito-abrir {
+    display: inline-block;
+    padding: .28rem .65rem;
+    border: 1px solid var(--me-borde);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--me-negro);
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.g-favorito-abrir:hover {
+    color: var(--me-negro);
+    background: var(--me-fondo-suave, #f6f6f4);
+}
+
+.g-avanzado>summary {
+    font-size: .78rem;
+    color: var(--me-suave);
+    cursor: pointer;
+}
+
+.acciones-sel {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+#resumenSeleccion {
+    font-size: .76rem;
+    font-family: var(--me-mono);
+    color: var(--me-suave);
+}
+
+/* Petición y respuesta del detalle: dos bloques, cada uno con su
+   conmutador y su botón de copiar. El cuerpo del modal ya hace scroll
+   (modal-dialog-scrollable); cada bloque se topa en 32vh para que una
+   carga larga desplace por dentro y no empuje a la otra fuera de
+   alcance. Con el resumen arriba no caben los dos enteros en una
+   pantalla de ~900 px: el segundo asoma y se llega con un scroll. */
+.payload+.payload {
+    margin-top: .9rem;
+}
+
+.payload-cab {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: .3rem;
+}
+
+.payload-cab h6 {
+    margin: 0;
+    font-weight: 700;
+}
+
+.payload-tipo {
+    font-size: .62rem;
+    letter-spacing: .04em;
+    padding: .05rem .4rem;
+    border-radius: .3rem;
+    background: #EBEAE4;
+    color: var(--me-tinta);
+}
+
+.payload-cab .conmutador {
+    margin-left: auto;
+}
+
+.payload-pre {
+    max-height: 32vh;
+    min-height: 3rem;
+    overflow: auto;
+    margin: 0;
+    background: #FAFAF7;
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    padding: .6rem .7rem;
+    font-size: .68rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.payload-pre:empty::before {
+    content: "(vacío)";
+    color: var(--me-suave);
+}

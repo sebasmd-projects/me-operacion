@@ -1,6 +1,6 @@
 # Pre-factura (Plan Corporativo) — Documentación técnica
 
-> **Versión: v1.0.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.1.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Genera la pre-factura mensual de las líneas del Plan Corporativo**: aplica el corte a la hoja *Activos* del archivo «Plan Corporativo», calcula valor bruto, IVA, ICO, retefuente y neto de cada línea, resume por empresa y tipo (Voz / Datos), compara cada filial con el mes anterior y entrega un archivo por filial listo para enviar.
@@ -24,8 +24,9 @@ Reemplaza el proceso en Excel que se explicó en la reunión **«Prefactura»** 
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/prefactura.html` | Marcado. Sin lógica. |
-| `assets/logica-prefactura.js` | Lectura de la hoja, reglas de corte, tarifas e impuestos, resumen, comparación con el mes anterior y libros de Excel. Se publica como `window.Prefactura`. |
-| `assets/me-prefactura-puente.js` | Interfaz: archivo, editor de tarifas, agrupación de filiales, tablas y descargas. |
+| `assets/herramientas/prefactura/calculo.js` | Lectura de la hoja, reglas de corte, tarifas e impuestos, resumen, comparación con el mes anterior y libros de Excel. Se publica como `window.Prefactura`. |
+| `assets/herramientas/prefactura/prefactura.js` | Interfaz: archivo, editor de tarifas, agrupación de filiales, tablas y descargas (secciones: configuración, reglas en `calculo.js`, interfaz). |
+| `assets/herramientas/prefactura/prefactura.css` | Estilos propios: pestañas, etiquetas de estado y editor de tarifas. |
 
 No usa `me-api.js`: no hay sesión ni servicio.
 
@@ -219,7 +220,7 @@ Archivos: **Plan Corporativo 1** (el maestro de líneas), **Liquidación Corpora
                 └─ …
     ```
 
-    Una página no puede escribir en una ruta por su cuenta: usa el selector de carpetas de Edge (*File System Access*). La primera vez en la sesión pide elegir la carpeta **Plan Corporativo** y deja la ruta copiada para pegarla en la barra del selector; también se puede elegir directamente «2026 Facturación» o «10. Octubre». Crea «AAAA Facturación» y la carpeta del mes si no existen. Si la carpeta del mes **ya tiene** archivos con esos nombres, no escribe nada y pide un segundo clic para reemplazarlos.
+    Una página no puede escribir en una ruta por su cuenta: usa el selector de carpetas de Edge (*File System Access*). La primera vez en la sesión pide elegir la carpeta **Plan Corporativo** y deja la ruta copiada para pegarla en la barra del selector; también se puede elegir directamente «2026 Facturación» o «10. Octubre». Crea «AAAA Facturación» y la carpeta del mes si no existen. Si la carpeta del mes **ya tiene** archivos con esos nombres, no escribe nada y abre el modal de confirmación con la carpeta y los nombres antes de reemplazarlos.
   - **Si falla** (sin VPN, sin permiso de escritura, selector no disponible): avisa con el motivo y abre «Guardar como» para el **`10. Octubre.zip`** (adentro, la carpeta «10. Octubre» con los archivos), para guardarlo donde se quiera y copiarlo a la red. Si el navegador ya no acepta abrir «Guardar como» sin un clic nuevo, queda un botón en el aviso.
   - **ZIP**: el mismo `.zip`, sin intentar la red.
 
@@ -243,4 +244,6 @@ Archivos: **Plan Corporativo 1** (el maestro de líneas), **Liquidación Corpora
 
 | Versión | Cambios |
 | --- | --- |
+| 1.1.0 (refactor) | Reorganización interna sin subir versión: `logica-prefactura.js` pasa a `assets/herramientas/prefactura/calculo.js` (reglas de cálculo, sin cambios en los resultados; se quitan de `window.Prefactura` las exportaciones sin uso), el puente a `prefactura.js` y el `<style>` de la página a `prefactura.css`. |
+| **1.1.0** | Confirmación de sobrescrituras en red y ZIP; progreso de lectura y generación; estados de tablas. Ayudas «?» y accesibilidad. |
 | **1.0.0** | Primera versión, a partir de la reunión «Prefactura» (2025-03-17) y validada contra los archivos reales del proceso. Lee la hoja *Activos* del Plan Corporativo, aplica el corte del 15 a observaciones acumuladas (con ubicación del año), arma una fila por línea y tipo (Botmaker incluido), calcula bruto, IVA, ICO, retefuente y neto con las fórmulas y tarifas de «Liquidación Corporativo 2» (ICO incluido como opción), suma cargos de roaming por valor bruto, resume por empresa y tipo, agrupa filiales como la carpeta Compañía, compara con el mes anterior y genera el consolidado y un archivo por filial. Todo local. |

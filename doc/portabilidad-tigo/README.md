@@ -1,6 +1,6 @@
 # Validador Portabilidad · Tigo — Documentación técnica
 
-> **Versión: v1.4** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v1.6** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Valida por **MSISDN** en qué punto del proceso de portabilidad quedó una línea en el **HLR de Tigo**. Consume el mismo servicio de autogestión que *Consulta QDN · Tigo*, pero traduce el `RETCODE` al lenguaje del proceso.
@@ -11,17 +11,23 @@ Valida por **MSISDN** en qué punto del proceso de portabilidad quedó una líne
 
 ---
 
+Los filtros usan `MEUI.filtroMulti`, con selección múltiple y KPI sincronizados. El único buscador es **Buscar** de DataTables; exportaciones respetan también esa búsqueda. Los controles permanecen disponibles con cero coincidencias. El progreso se muestra en el pie con sello horario y **Reintentar fallidas**, que conserva los resultados correctos y vuelve a consultar solo los errores o timeout; las entradas inválidas deben corregirse en el origen. Las ayudas extensas pasan a **?** y los detalles aprovechan el tamaño del modal.
+
+La herramienta es de lectura: no requiere selección de filas, barra de lote ni confirmación de escrituras.
+Los errores al consultar el estado CM también habilitan el reintento de esa línea.
+
 ## 1. Arquitectura y archivos
 
 | Archivo | Qué contiene |
 |---|---|
 | `herramientas/validador_portabilidad_tigo.html` | Solo marcado: KPIs, pasos, filtros, tabla y modal. |
-| `assets/logica-portabilidad-tigo.js` | Autenticación por `X-Api-Key` (Tigo), catálogo de RETCODE, parseo del perfil HLR, concurrencia, reintentos, **y la consulta opcional al CM** (`estadoCM()`). |
-| `assets/me-api.js` | Acceso al CM (Keycloak + `/api/v1/subscribers`). **Común.** Opcional para esta herramienta: sin sesión, simplemente no se usa. |
-| `assets/me-portabilidad-tigo-puente.js` | Enganche con el shell: sesión del CM, exportaciones, spinners, registro. |
-| `assets/me-ui.js` / `me-ui.css` | Shell, tablas y exportación. **Común.** |
+| `assets/herramientas/portabilidad-tigo/portabilidad-tigo.js` | Todo el código en un solo archivo, con tres secciones: 1 · configuración y constantes (ambiente, RETCODE, columnas, cabeceras); 2 · reglas de negocio (autenticación por `X-Api-Key`, parseo del perfil HLR, concurrencia, reintentos, **y la consulta opcional al CM** `estadoCM()`); 3 · interfaz (tabla, filtros, detalle, exportación, archivo y enganche con el shell: sesión del CM, spinners, registro). |
+| `assets/herramientas/portabilidad-tigo/portabilidad-tigo.css` | Estilos propios: insignias, chips de bloqueo, zona de carga, modal de detalle. |
+| `assets/compartido/hlr-consulta.js` | Motor compartido de Claro: se reutilizan `consultarClaro`, su configuración y sus etiquetas, sin repetir autenticación ni cargas útiles. |
+| `assets/base/me-api.js` | Acceso al CM (Keycloak + `/api/v1/subscribers`). **Común.** Opcional para esta herramienta: sin sesión, simplemente no se usa. |
+| `assets/base/me-ui.js` / `me-ui.css` | Shell, tablas y exportación. **Común.** |
 
-Comparte motor de Tigo con `logica-qdn-tigo.js`; lo único que cambia ahí es el catálogo de estados. La consulta al CM (`estadoCM()`) sigue el mismo servicio y el mismo criterio de "cuenta activa más reciente" que `assets/logica-consumos.js` — ver esa herramienta si cambia algo en `/api/v1/subscribers`.
+Comparte motor de Tigo con la lógica de «Consulta QDN Tigo»; lo único que cambia ahí es el catálogo de estados. La consulta al CM (`estadoCM()`) sigue el mismo servicio y el mismo criterio de "cuenta activa más reciente" que la lógica de «Reporte de consumos» — ver esa herramienta si cambia algo en `/api/v1/subscribers`.
 
 ---
 
@@ -46,11 +52,11 @@ Solo dice que **no hay perfil**. Hay que cruzarlo con el estado de la línea en 
 
 | Estado en ME | Lectura | Qué hacer |
 |---|---|---|
-| **Activa** | Inconsistencia: activa en ME pero sin perfil en el HLR. | **Escalar a Optiva.** |
+| **Activa** | Se consulta además Claro con el motor compartido. | Si Claro la reporta activa: **«Sigue en Claro: la portabilidad no se completó»**. Si no la reporta activa: **escalar a Optiva**. Si falla Claro: reintentar antes de concluir. |
 | Desactivada / Disponible / Bloqueada | Esperado: si no está activa, es razonable que no tenga perfil. | Nada. |
 | **No está en el CM** | El número no es de Móvil Éxito (puede ser un Port Out). | Descartar del lote. |
 
-Cuando el cruce da la inconsistencia (`RETCODE 3001` + `Estado ME: Activa`), el modal de detalle la marca sola con un aviso — no hace falta leer las dos columnas a mano para notarla.
+Desde v1.6, **solo `RETCODE 3001` + CM confirmado Activa** dispara la consulta adicional a Claro. El estado de Claro y la conclusión aparecen en la fila, el detalle y las exportaciones; el JSON del detalle conserva ambas respuestas. Con CM inactivo, ausente, sin sesión o con error, no se consulta Claro. Un fallo de Claro habilita **Reintentar fallidas**. El progreso cuenta las consultas de Tigo, CM (si se consultó) y Claro, agregando esta última al total cuando corresponde.
 
 > Ojo con la lectura anterior de esta herramienta: `3001` **no** significa "es nuestro pero falta crearlo", y `1033` **no** significa "no es nuestro". `1033` es precisamente lo contrario — la línea **sí** pasó a Móvil Éxito y lo que falta es que Tigo la borre.
 
@@ -109,14 +115,14 @@ Si el servicio (o un stub de QA) devolviera siempre el mismo perfil, esta valida
 
 ## 6. Tabla, filtros y exportación
 
-Columnas: **MSISDN, Estado, Estado ME, RETCODE, IMSI, IMEI, Tipo SIM, Bloqueos, Roaming, Desvíos, Detalle (👁)**. «Estado ME» es ocultable como cualquier otra desde el menú de columnas — útil si nadie inició sesión del CM en esa ejecución.
+Columnas: **MSISDN, Estado, Estado ME, HLR Claro, Conclusión, RETCODE, IMSI, IMEI, Tipo SIM, Bloqueos, Roaming, Desvíos, Detalle (👁)**. «Estado ME» es ocultable como cualquier otra desde el menú de columnas — útil si nadie inició sesión del CM en esa ejecución.
 
 - **Tarjetas**: Creadas · Sin perfil (pendiente) · Residuo en Tigo · **Revisar respuesta** · Errores/timeout.
 - **Filtros**: Estado y Restricciones; mostrar/ocultar columnas.
 - **Exportación** CSV / Excel / JSON con columna **Observaciones** (avisos de inconsistencia).
 - El modal trae el perfil HLR por secciones, la información técnica y el **JSON original**.
 
-Sobre la interpretación de bloqueos y desvíos del perfil (heurística declarada, campos ODB con mapeo estándar, `PROV` = provisionado): ver `doc/consulta-qdn-tigo/README.md` §6 y §7 — el motor es el mismo.
+Sobre la interpretación de bloqueos y desvíos del perfil (heurística declarada, campos ODB con mapeo estándar, `PROV` = provisionado): ver `doc/hlr-hss/README.md#tigo` §6 y §7 — el motor es el mismo.
 
 ---
 
@@ -133,6 +139,9 @@ Sobre la interpretación de bloqueos y desvíos del perfil (heurística declarad
 
 | Versión | Cambios |
 |---|---|
+| 1.6 | Consulta adicional a Claro para Tigo `3001` + CM Activa; estado y conclusión en fila, detalle y exportación; progreso por consultas y reintento de errores de Claro. |
+| 1.5 (refactor) | Reorganización interna sin subir versión: `logica-portabilidad-tigo.js` y `me-portabilidad-tigo-puente.js` se unen en `assets/herramientas/portabilidad-tigo/portabilidad-tigo.js` (secciones numeradas; las columnas salen de una sola definición; se quitan las comprobaciones de carga que dejaron de tener sentido) y el `<style>` de la página pasa a `portabilidad-tigo.css`. Sin cambios de comportamiento. |
+| 1.5 | Filtros múltiples y KPI sincronizados, progreso común con reintento de fallidas, estados de tabla, ayudas y accesibilidad. |
 | **1.4** | IMSI copiable en la tabla. |
 | 1.3 | Sesión del CM **opcional** (paso 2 nuevo): cada línea trae también su **Estado ME** (Activa/Desactivada/Disponible/Bloqueada/No está en el CM), consultado en paralelo con el HLR de Tigo — mismo servicio y criterio que `logica-consumos.js`. Es el dato que hacía falta para leer el `RETCODE 3001` sin salir de la herramienta (§2.1); cuando el cruce da la inconsistencia (`3001` + `Activa`), el modal de detalle la marca sola. Sin sesión del CM, la herramienta funciona exactamente igual que antes. |
 | 1.2 | Reglas de negocio de Tigo actualizadas: `3001` = **Sin perfil** (no prueba pertenencia a ME; se cruza con Optiva) y `1033` = **Residuo en Tigo** (la línea sí se portó a ME, Tigo no la eliminó de su HLR/HSS; se escala a Tigo y luego pasa a `3001`). Reemplaza la lectura de la v1.1. |

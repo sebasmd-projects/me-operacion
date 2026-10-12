@@ -1,0 +1,45 @@
+/* prefactura.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Estilos propios de ESTA herramienta. Lo estructural vive en me-ui.css. */
+td.num,
+th.num {
+    text-align: right;
+}
+
+.me-tabs .cuenta {
+    font-size: .72rem;
+    font-weight: 600;
+    margin-left: .25rem;
+    color: var(--me-suave);
+}
+
+.tarifas {
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    background: #FBFAF6;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.tarifas table {
+    margin: 0;
+    font-size: .78rem;
+}
+
+.tarifas td {
+    padding: .15rem .3rem;
+    vertical-align: middle;
+}
+
+.tarifas input,
+.tarifas select {
+    font-size: .78rem;
+    padding: .1rem .3rem;
+}
+
+.tarifas tr.falta td {
+    background: #FBE2DF;
+}
+
+.aviso-tarifa {
+    border-left: 4px solid var(--me-err);
+}

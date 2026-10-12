@@ -1,0 +1,36 @@
+/* cambio-imsi-linea.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Interruptor de pestañas: mismo diseño que HLR/HSS (propio de la página,
+   no del sistema de diseño común). Las pestañas las pinta el puente. */
+.cl-tabs {
+    display: flex;
+    gap: .4rem;
+    padding: .6rem .6rem 0;
+    border-bottom: 1px solid var(--me-borde-2);
+}
+
+.cl-tab {
+    border: 1px solid var(--me-borde-2);
+    border-bottom: none;
+    border-radius: .5rem .5rem 0 0;
+    background: #F0F0EC;
+    color: var(--me-suave);
+    font-weight: 700;
+    font-size: .85rem;
+    padding: .5rem 1.1rem;
+    cursor: pointer;
+}
+
+.cl-tab:hover {
+    background: #FFFBE6;
+    color: var(--me-negro);
+}
+
+.cl-tab.activa {
+    background: #fff;
+    color: var(--me-negro);
+    box-shadow: 0 -2px 0 var(--me-amarillo) inset;
+}
+
+.cl-tab .bi {
+    margin-right: .35rem;
+}

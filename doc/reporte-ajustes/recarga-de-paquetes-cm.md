@@ -2,7 +2,7 @@
 
 > **Estado: IMPLEMENTADO en «Bolsillos, Paquetes, Consumos»** (`reporte_consumos.html`
 > v1.8.0, sección «Cargar paquete» del detalle de la línea · lógica en
-> `assets/logica-paquetes-carga.js`). Este documento sigue siendo la
+> `assets/herramientas/consumos/paquetes.js`). Este documento sigue siendo la
 > referencia del flujo: describe el comportamiento real del front del CM
 > (`obp-cms-frontend`) y es contra él que se validó la implementación.
 > La sección 6 (preguntas abiertas) **sigue abierta** y explica por qué la
@@ -48,7 +48,7 @@ Los cinco nuevos son exactamente los cinco paquetes agregados: `234`, `238`,
 Notas importantes para la implementación:
 
 - El `Access-Control-Allow-Headers` del preflight **sí incluye `authorization`**,
-  así que el token Bearer que ya pone `MEAPI` (`assets/me-api.js`) es aceptado.
+  así que el token Bearer que ya pone `MEAPI` (`assets/base/me-api.js`) es aceptado.
   Es decir: se puede reutilizar `MEAPI.api()` tal cual, sin tocar el acceso común.
 - La herramienta de Ajustes ya usa `MEAPI.configurar({ locale: "en" })`, que
   coincide con el `locale: en` de esta captura.
@@ -434,12 +434,12 @@ a pedir el número. Respeta la arquitectura de tres capas de la suite:
 | Capa | Archivo | Qué le toca |
 |---|---|---|
 | Marcado | `herramientas/reporte_consumos.html` | Sección «Cargar paquete» dentro del modal de detalle: pasos, buscador, revisión y resultado. Sin reglas. |
-| Lógica | `assets/logica-paquetes-carga.js` | Todo el flujo: perfil, oferta, catálogo, carrito, orden, limpieza y verificación. Archivo propio, porque es lo único que escribe. |
-| Consulta | `assets/logica-consumos.js` | Solo dos enganches: monta la sección al abrir el detalle y refresca «Uso y Balance» cuando una orden queda aplicada. |
-| Común | `assets/me-api.js` | **Sin cambios.** `MEAPI.api()` ya cubre `POST`/`DELETE` y las cabeceras; `Transaction-Id` va en `headers` de esa llamada. |
+| Lógica | `assets/herramientas/consumos/paquetes.js` | Todo el flujo: perfil, oferta, catálogo, carrito, orden, limpieza y verificación. Archivo propio, porque es lo único que escribe. |
+| Consulta | `assets/herramientas/consumos/consumos.js` | Solo dos enganches: monta la sección al abrir el detalle y refresca «Uso y Balance» cuando una orden queda aplicada. |
+| Común | `assets/base/me-api.js` | **Sin cambios.** `MEAPI.api()` ya cubre `POST`/`DELETE` y las cabeceras; `Transaction-Id` va en `headers` de esa llamada. |
 
-> `logica-paquetes-carga.js` va dentro de un IIFE y expone solo `window.MEPAQ`.
-> Es obligatorio: se carga en la misma página que `logica-consumos.js`, y dos
+> `assets/herramientas/consumos/paquetes.js` va dentro de un IIFE y expone solo `window.MEPAQ`.
+> Es obligatorio: se carga en la misma página que `assets/herramientas/consumos/consumos.js`, y dos
 > scripts clásicos no pueden declarar `CONFIG`, `auth` o `getJson` dos veces.
 
 ### Diferencias deliberadas con la captura

@@ -1,0 +1,28 @@
+/* tipificacion.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Tom Select también tiene que verse en rojo cuando falta un dato */
+.ts-invalid .ts-control {
+  border-color: var(--me-err) !important;
+}
+
+.ts-invalid+.invalid-feedback,
+.ts-invalid~.invalid-feedback {
+  display: block;
+}
+
+.ts-wrapper .ts-control {
+  font-size: .85rem;
+  min-height: 31px;
+  padding: .15rem .4rem;
+}
+
+/* Pestañas de autenticación (usuario / token) */
+#authTabs .nav-link {
+  font-size: .8rem;
+  padding: .25rem .6rem;
+  color: var(--me-suave);
+}
+
+#authTabs .nav-link.active {
+  background: var(--me-negro);
+  color: #fff;
+}

@@ -1,6 +1,6 @@
 # Generar archivo de rechazo — Documentación técnica
 
-> **Versión: v2.1.1** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v2.3.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Arma el soporte PDF que se adjunta a un rechazo de portabilidad. Reemplaza las
@@ -60,14 +60,14 @@ el cargue en un instante y deja de estar expuesto al corte.
 | Archivo | Qué contiene |
 | --- | --- |
 | `herramientas/generar_rechazo.html` | Marcado de pasos, campos, zona de imágenes y visor. No contiene reglas de negocio. |
-| `assets/logica-rechazo.js` | Catálogo de causales, validaciones, nombres, consulta al CM, compresión de imágenes y generación del PDF. |
-| `assets/me-rechazo-puente.js` | Estado de la interfaz, reloj de fechas, eventos, vista previa y guardado. |
-| `assets/me-api.js` | Sesión de Keycloak y acceso compartido al API del CM. |
-| `assets/me-ui.js` · `assets/me-ui.css` | Shell común, pasos, registro, avisos y estilos. |
+| `assets/herramientas/rechazo/rechazo.js` | Todo el código en un solo archivo, con tres secciones: 1 · configuración y constantes (causales y campos, desplegables, claves de almacenamiento, medidas del PDF, logos); 2 · reglas de negocio (validaciones, nombres, consulta al CM, compresión de imágenes y generación del PDF); 3 · interfaz (estado, reloj de fechas, eventos, vista previa y guardado). |
+| `assets/herramientas/rechazo/rechazo.css` | Estilos propios: selector de causal, campos, imágenes y visor. |
+| `assets/base/me-api.js` | Sesión de Keycloak y acceso compartido al API del CM. |
+| `assets/base/me-ui.js` · `assets/base/me-ui.css` | Shell común, pasos, registro, avisos y estilos. |
 
 Todo corre en el navegador del analista. No existe un backend propio: la página
 consulta directamente el CM y genera el PDF localmente. Los logos se incluyen
-como base64 en `logica-rechazo.js`, por lo que no dependen de archivos vecinos.
+como base64 en `rechazo.js`, por lo que no dependen de archivos vecinos.
 
 ---
 
@@ -125,7 +125,12 @@ causal se conserva lo que ya estaba escrito.
 ### 5.3. Línea y consulta al CM
 
 Se escribe el MSISDN (10 dígitos que empiezan por 3; si se pega con el `57`
-delante, se quita solo) y se presiona **CM**. La herramienta consulta el BSS por
+delante, se quita solo). Con sesión iniciada, la consulta se hace automáticamente
+tras 400 ms sin escribir, al pegar o al salir del campo. No se repite si la
+línea no cambió; el botón **CM**, con título «Revalidar en el CM», permite
+consultarla de nuevo. Si cambia la línea durante una consulta, se descarta la
+respuesta anterior. Sin sesión, no consulta y muestra una línea para iniciarla.
+La herramienta consulta el BSS por
 el mismo camino que la herramienta de Prepagadas:
 
 | Dato | De dónde sale |
@@ -145,11 +150,11 @@ con un tope de 5 saltos. El `accountID` viene como `41041348619-1` y el
 `externalID` de la cuenta es la parte antes del guion, así que se prueban las dos
 formas.
 
-Si cambia algo aquí, conviene mirar también `assets/logica-prepagadas.js`.
+Si cambia algo aquí, conviene mirar también la lógica de «Prepagadas».
 
 > **Pendiente de conectar.** El CUN todavía se escribe a mano: no está
 > identificado qué servicio del CM lo expone. En cuanto se sepa, basta con
-> llenar `salida.cun` dentro de `consultarCM()` en `logica-rechazo.js` y el
+> llenar `salida.cun` dentro de `consultarCM()` en `rechazo.js` y el
 > campo se rellena solo, sin tocar nada más.
 >
 > El mapeo de la **fecha de desactivación** (`status.startDate` con el estado en
@@ -165,7 +170,7 @@ como aviso.
 > reales cargados devuelven ese nombre literal (con distinto espaciado o
 > mayúsculas). No es el nombre de nadie: se detecta y se descarta igual que si
 > el CM no hubiera devuelto nombre, con un aviso en el registro explicando por
-> qué el campo quedó vacío. Ver `esNombrePlaceholder()` en `logica-rechazo.js`.
+> qué el campo quedó vacío. Ver `esNombrePlaceholder()` en `rechazo.js`.
 
 ### 5.4. Datos del formato
 
@@ -444,6 +449,9 @@ el tamaño del archivo descargado es un múltiplo exacto de 4096, está truncado
 
 | Versión | Cambios |
 | --- | --- |
+| **2.3.0** | Consulta automática al CM con espera de 400 ms, pegado y salida del campo; evita duplicados y descarta respuestas de una línea anterior. Botón CM para revalidar y aviso sin sesión. |
+| 2.2.0 (refactor) | Reorganización interna sin subir versión: `logica-rechazo.js` y `me-rechazo-puente.js` se unen en `assets/herramientas/rechazo/rechazo.js` (se elimina la fachada `RECHAZO`, ya sin sentido), el `<style>` de la página pasa a `rechazo.css`. Sin cambios de comportamiento. |
+| **2.2.0** | Progreso común en consulta y generación; ayudas compactas y acceso por teclado a imágenes. Ayudas «?» y accesibilidad. |
 | **2.1.1** | La resolución del titular incorpora los respaldos confirmados con la colección de Postman: usa `individual.fullName` y prueba el `id` de la cuenta como `individualID` cuando no llega una relación `Individual`, sin perder la búsqueda de hasta cinco niveles. |
 | 2.1 | Se corrige el guardado de archivos de 0 KB en Chromium/Edge: el selector nativo escribe un `ArrayBuffer`, relee el archivo y compara su tamaño; si la verificación falla, repite mediante la descarga clásica. Cancelar el selector no consume el consecutivo. |
 | 2.0 | Migración a la base compartida (`me-ui.js`, `me-api.js` y puente separado); HTML solo con marcado. Se incorporan sesión compartida del CM, formulario por causal, consulta de línea y titular, fechas automáticas con segundos, múltiples imágenes comprimidas, plantillas persistentes de nombre, consecutivo diario, vista previa del PDF real y selector de destino. |

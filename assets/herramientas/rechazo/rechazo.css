@@ -1,0 +1,323 @@
+/* rechazo.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* ---------- Selector de causal ---------- */
+.causales {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem;
+}
+
+.causal {
+    border: 1px solid var(--me-borde-2);
+    border-radius: .5rem;
+    background: #fff;
+    padding: .6rem .5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+}
+
+.causal:hover {
+    border-color: var(--me-negro);
+    background: #FFFBE6;
+}
+
+.causal.activa {
+    border-color: var(--me-negro);
+    background: var(--me-amarillo);
+    box-shadow: inset 0 0 0 1px var(--me-negro);
+}
+
+.causal .cod {
+    font-family: var(--me-mono);
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: block;
+}
+
+.causal .txt {
+    font-size: .68rem;
+    color: #4A4A45;
+    line-height: 1.25;
+    display: block;
+    margin-top: .1rem;
+}
+
+.causal.activa .txt {
+    color: var(--me-negro);
+}
+
+/* ---------- Campos del formato ---------- */
+.campo {
+    margin-bottom: .55rem;
+}
+
+.campo .me-lbl {
+    display: block;
+    margin-bottom: .12rem;
+}
+
+.pista-cm {
+    display: inline-block;
+    margin-left: .3rem;
+    padding: 0 .28rem;
+    border-radius: .2rem;
+    background: #E5ECF8;
+    color: var(--me-info);
+    font-family: var(--me-mono);
+    font-size: .6rem;
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+.req {
+    color: var(--me-err);
+    margin-left: .2rem;
+    font-weight: 700;
+}
+
+/* Los tres grupos siguen el orden de trabajo del analista:
+   llenar → revisar → automáticos. La franja de color a la izquierda
+   dice de un vistazo cuánta atención pide cada bloque. */
+.grupo-titulo {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--me-tinta);
+    margin: 1.25rem 0 .5rem;
+    padding: .25rem .5rem;
+    border-left: 3px solid var(--me-borde-2);
+    background: #F4F4F0;
+    border-radius: 0 .25rem .25rem 0;
+}
+
+.grupo-titulo small {
+    margin-left: auto;
+    font-size: .64rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--me-suave);
+}
+
+.grupo-titulo.llenar {
+    border-left-color: var(--me-err);
+    background: #FBE2DF;
+}
+
+.grupo-titulo.revisar {
+    border-left-color: var(--me-warn);
+    background: #FBEED8;
+}
+
+.grupo-titulo.automatico {
+    border-left-color: var(--me-off);
+}
+
+.grupo-titulo:first-child {
+    margin-top: 0;
+}
+
+/* Los automáticos se ven atenuados: están para mirarlos, no tocarlos. */
+#grupoAutomatico .campo .form-control {
+    background: #FBFBF9;
+    color: #55554F;
+}
+
+/* ---------- Nombre del archivo ---------- */
+#despieceNombre {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: .3rem;
+    font-family: var(--me-mono);
+    font-size: .72rem;
+}
+
+#despieceNombre span {
+    padding: .1rem .35rem;
+    border-radius: .2rem;
+    background: #F0F0EC;
+    color: #4A4A45;
+}
+
+#despieceNombre span:nth-child(1) {
+    background: #ECECEA;
+}
+
+#despieceNombre span:nth-child(2) {
+    background: #E5ECF8;
+    color: var(--me-info);
+}
+
+#despieceNombre span:nth-child(3) {
+    background: #FFF1BD;
+    color: #795800;
+}
+
+#despieceNombre span:nth-child(4) {
+    background: #E3F3E9;
+    color: var(--me-ok);
+}
+
+/* ---------- Imagen ---------- */
+
+/* Una fila por imagen, en el mismo orden en que se apilan en el PDF:
+   la lista se ve tal como queda el documento. */
+.imagen-item {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .35rem .4rem;
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+    background: #fff;
+}
+
+.imagen-item+.imagen-item {
+    margin-top: .4rem;
+}
+
+.imagen-item img {
+    width: 46px;
+    height: 34px;
+    object-fit: contain;
+    background: #F4F4F0;
+    border-radius: .25rem;
+    flex: none;
+}
+
+.imagen-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.imagen-info .nombre {
+    font-size: .76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.imagen-info .peso-item {
+    font-size: .68rem;
+    color: var(--me-suave);
+    font-family: var(--me-mono);
+}
+
+.btn-quitar {
+    border: none;
+    background: transparent;
+    color: var(--me-suave);
+    padding: .2rem .35rem;
+    border-radius: .3rem;
+    flex: none;
+}
+
+.btn-quitar:hover {
+    background: #FBE2DF;
+    color: var(--me-err);
+}
+
+/* ---------- Editor de plantilla de nombre ---------- */
+.editor-plantilla {
+    margin-top: .5rem;
+    padding: .6rem .6rem .2rem;
+    border: 1px dashed var(--me-borde-2);
+    border-radius: .5rem;
+    background: #FCFBF8;
+}
+
+/* ---------- Avisos ---------- */
+.aviso {
+    font-size: .75rem;
+    padding: .35rem .5rem;
+    border-left: 3px solid var(--me-warn);
+    background: #FBEED8;
+    border-radius: 0 .25rem .25rem 0;
+    margin-top: .35rem;
+}
+
+.aviso.nota {
+    border-left-color: var(--me-info);
+    background: #E5ECF8;
+}
+
+/* El shell dispone la zona de datos con `align-items: start`, así que
+   esta columna NO recibe altura del contenedor: hay que dársela. Sin
+   esto el iframe se queda en su alto por defecto y el PDF se ve
+   cortado, con el marco gris ocupando el resto. Se usa la misma
+   medida que el shell aplica a la columna de pasos. */
+.panel-salida {
+    display: flex;
+    flex-direction: column;
+    height: calc(var(--me-alto-util) - 2rem);
+    min-height: 460px;
+}
+
+.barra-salida {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+    padding: .5rem .6rem;
+    background: #FAFAF7;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem .5rem 0 0;
+}
+
+.peso {
+    font-size: .76rem;
+    padding: .18rem .5rem;
+    border-radius: .25rem;
+    white-space: nowrap;
+}
+
+.peso.ok {
+    background: #E3F3E9;
+    color: var(--me-ok);
+}
+
+.peso.warn {
+    background: #FBEED8;
+    color: var(--me-warn);
+}
+
+.peso.err {
+    background: #FBE2DF;
+    color: var(--me-err);
+}
+
+.marco-visor {
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--me-borde);
+    border-top: none;
+    border-radius: 0 0 .5rem .5rem;
+    background: #57565B;
+    overflow: hidden;
+    display: flex;
+}
+
+/* Como elemento flexible crece con el marco; `height:100%` solo no
+   bastaba porque el padre no tenía altura definida. */
+#visor {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border: 0;
+}
+
+#visorVacio {
+    margin: auto;
+    padding: 2rem;
+    color: #E8E8E3;
+    font-size: .85rem;
+    text-align: center;
+}

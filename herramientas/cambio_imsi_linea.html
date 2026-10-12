@@ -1,0 +1,203 @@
+<!-- cambio_imsi_linea.html · v2.0.0
+     ---------------------------------------------------------------------
+     Este archivo es SOLO marcado. Nada de lógica ni estilos viven aquí:
+
+       assets/base/me-ui.css / me-ui.js          marco visual, sesión, registro,
+                                            tablas y exportación
+       assets/base/me-api.js                     Keycloak, auth y llamadas al CM
+       assets/compartido/cm-lineas.js                  resolver la línea, órdenes del CM
+                                            y tabla con casillas (compartido)
+       assets/herramientas/cambio-imsi-linea/
+           imsi.js, msisdn.js     un motor de reglas por pestaña: «Cambio IMSI»
+                                  (linea;imsi) y «Cambio de línea (MSISDN)»
+                                  (linea;linea_nueva)
+           cambio-imsi-linea.js   interfaz y pestañas (un solo juego de
+                                  controles cuyo texto sale de la pestaña activa)
+           cambio-imsi-linea.css  estilos propios
+
+     Cambia la IMSI (SIM) o el número (MSISDN) de líneas en el CM, en masivo,
+     con una sola sesión del CM para las dos pestañas. ESCRIBE EN PRODUCCIÓN.
+     Ver doc/cambio-imsi-linea/README.md.
+     --------------------------------------------------------------------- -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Versionado: Major.Minor.Patch · fix/documentación incrementa Patch -->
+    <title>Cambio IMSI y línea Claro|Tigo</title>
+
+    <!-- Librerías de CDN: versiones y URLs en assets/base/dependencias.js (Bootstrap, iconos y fuentes siempre) -->
+    <script src="../assets/base/dependencias.js" data-me-deps="datatables xlsx"></script>
+    <link rel="stylesheet" href="../assets/base/me-ui.css">
+    <link rel="stylesheet" href="../assets/herramientas/cambio-imsi-linea/cambio-imsi-linea.css">
+</head>
+
+<body class="me-body" data-me-herramienta="cambio-imsi-linea">
+
+    <div class="cl-tabs" id="pestanas" role="tablist" aria-label="Qué cambiar"></div>
+
+    <!-- ============ RESUMEN ============ -->
+    <div class="me-kpis">
+        <div class="me-kpi neutro" style="cursor:default">
+            <div class="n" id="kTotal">0</div>
+            <div class="lbl">Cambios</div>
+        </div>
+        <div class="me-kpi info" style="cursor:default">
+            <div class="n" id="kSel">0</div>
+            <div class="lbl">Marcadas</div>
+        </div>
+        <div class="me-kpi ok" style="cursor:default">
+            <div class="n" id="kOk">0</div>
+            <div class="lbl" id="kOkEtiqueta">Cambiadas</div>
+        </div>
+        <div class="me-kpi err" style="cursor:default">
+            <div class="n" id="kErr">0</div>
+            <div class="lbl">Con error</div>
+        </div>
+    </div>
+
+    <div class="me-trabajo">
+
+        <!-- ================= COLUMNA IZQUIERDA: pasos ================= -->
+        <div class="me-trabajo-lateral">
+
+            <!-- 1 · Conexión -->
+            <section data-me-paso="1" data-me-titulo="Conexión con el CM" data-me-abierto="sin-sesion">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="me-lbl" for="user">Usuario</label>
+                        <input class="form-control form-control-sm me-mono" id="user" autocomplete="username">
+                    </div>
+                    <div class="col-6">
+                        <label class="me-lbl" for="pass">Contraseña</label>
+                        <input class="form-control form-control-sm me-mono" id="pass" type="password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-me-ink" id="btnLogin" type="button">Iniciar sesión</button>
+                    </div>
+                    <button type="button" class="me-ayuda" data-me-ayuda="Son las mismas credenciales del CM que usan las demás herramientas. Con la sesión vigente se pueden aplicar los cambios." aria-label="Ayuda">?</button>
+                </div>
+            </section>
+
+            <!-- 2 · Líneas -->
+            <section data-me-paso="2" data-me-titulo="Cambios a validar" data-me-abierto="siempre">
+                <div id="entradaArchivo" hidden>
+                    <label class="me-lbl" for="inputArchivo">Desde Excel o CSV (opcional)</label>
+                    <input type="file" id="inputArchivo" class="form-control form-control-sm mb-2"
+                        accept=".xlsx,.xls,.csv,.txt">
+                </div>
+                <label class="me-lbl" for="inputLineas" id="lblEntrada"></label>
+                <textarea id="inputLineas" class="form-control form-control-sm me-mono" rows="5"></textarea>
+                <div class="me-hint" id="infoLineas">0 líneas cargadas.</div>
+                <button class="btn btn-sm btn-me mt-2 w-100" id="btnConsultar" type="button">Validar cambios</button>
+            </section>
+
+            <!-- 3 · Aplicar el cambio (el texto depende de la pestaña) -->
+            <section data-me-paso="3" data-me-titulo="Aplicar el cambio" data-me-abierto="con-sesion">
+                <div id="accionBloqueada" class="alert alert-warning py-2 mb-2" hidden></div>
+                <div id="accionCampos">
+                    <p class="small text-danger">Escribe en producción.</p>
+                    <div id="avisoAccion" class="alert alert-warning py-2 mb-2 small aviso-held"></div>
+
+                    <label class="me-lbl" for="inputNota">Nota (obligatoria)</label>
+                    <textarea id="inputNota" required class="form-control form-control-sm" rows="2"></textarea>
+                    <div class="me-hint">Nota: <span id="vistaNota">—</span></div>
+
+                    <div class="me-hint mt-2" id="resumenAccion">Marca en la tabla los cambios a aplicar.</div>
+                </div>
+            </section>
+
+            <!-- 4 · Registro -->
+            <section data-me-paso="4" data-me-titulo="Registro de la operación" data-me-abierto="nunca">
+                <div id="logConexion" data-me-log></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarLog" type="button">Limpiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnCopiarLog" type="button">Copiar</button>
+                    <button class="btn btn-sm btn-me-line" id="btnBitacora" type="button">Bitácora</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= COLUMNA DERECHA: tabla ================= -->
+        <div class="me-trabajo-datos">
+            <div class="me-barras">
+                <div class="me-filtros">
+                    <div id="fEstado"></div>
+                    <div id="fProceso"></div>
+                    <div id="fSel"></div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkVerOcultas">
+                        <label class="form-check-label small" for="chkVerOcultas">Ver ocultas (<span id="numOcultas">0</span>)</label>
+                    </div>
+                    <button class="btn btn-sm btn-me-line" id="btnLimpiarFiltros" type="button">Limpiar filtros</button>
+                    <div id="fColumnas"></div>
+                    <div class="me-filtros-der">
+                        <label class="visually-hidden" for="separadorCSV">Separador CSV</label>
+                        <select id="separadorCSV" class="form-select form-select-sm" data-me-sep style="width:auto"></select>
+                        <button id="btnCSV" class="btn btn-sm btn-me-line" type="button">CSV</button>
+                        <button id="btnXLSX" class="btn btn-sm btn-me-line" type="button">Excel</button>
+                        <button id="btnJSON" class="btn btn-sm btn-me-line" type="button">JSON</button>
+                    </div>
+                </div>
+                <div class="me-filtros barra-lote">
+                    <button class="btn btn-sm btn-me-line" id="btnMarcarTodo" type="button">Marcar todo</button>
+                    <button class="btn btn-sm btn-me-line" id="btnDesmarcarTodo" type="button">Desmarcar todo</button>
+                    <button class="btn btn-sm btn-me-line" id="btnMarcarVisibles" type="button">Marcar visibles</button>
+                    <button class="btn btn-sm btn-me-line" id="btnDesmarcarVisibles" type="button">Desmarcar visibles</button>
+                    <button class="btn btn-sm btn-me-line" id="btnRestaurarOcultas" type="button">Mostrar todas</button>
+                    <span class="me-hint ms-auto" id="resumenSeleccion"></span>
+                </div>
+                <div class="me-lote" id="barraLote" hidden>
+                    <span data-me-lote-n></span>
+                    <button class="btn btn-sm btn-me-line" id="btnOcultarSel" type="button">Ocultar marcadas</button>
+                    <button class="btn btn-sm btn-me-line" id="btnOcultarNoSel" type="button">Ocultar no marcadas</button>
+                    <div class="me-acciones-escritura"><button class="btn btn-sm btn-me-peligro mt-1" id="btnEjecutar" type="button" disabled></button></div>
+                </div>
+            </div>
+
+            <div class="me-tabla-panel">
+                <table id="tablaLineas" class="table table-sm table-hover table-striped w-100"
+                    style="display:none"></table>
+                <div class="me-hint p-2" id="msgVacio">Carga las líneas y consulta para comenzar.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1 · Shell común -->
+    <script src="../assets/base/catalogo.js"></script>
+    <script src="../assets/base/me-ui.js"></script>
+    <script>
+        MEUI.init({
+            app: "cambio-imsi-linea",
+            sesiones: ["cm"],
+            instrucciones: [
+                "Las pestañas eligen qué se cambia: «Cambio IMSI» (la SIM) o «Cambio de línea (MSISDN)» (el número). Comparten la sesión del CM, y cada una conserva sus filas al ir y volver.",
+                "1 · Conexión: la sesión del CM valida los cambios y dice quién eres. Sin sesión solo se puede validar.",
+                "2 · Pega un renglón por cambio (máximo 100) y presiona «Validar cambios». Cambio IMSI: «línea;imsi_nueva». Cambio de línea: «línea;línea_nueva» con cualquier separador, o súbelo desde un Excel/CSV.",
+                "Cambio IMSI: la validación revisa que la línea esté ACTIVA y que la IMSI nueva exista y esté DISPONIBLE. Si salió de una línea inactivada queda en HELD: hay que liberarla en el BSS antes.",
+                "Cambio de línea: la validación revisa que la línea esté ACTIVA y con SIM, que la línea nueva no sea ya una línea activa de Móvil Éxito y que la cuenta no tenga otro cambio de número pendiente.",
+                "Solo se pueden marcar los renglones que pasaron la validación. Como en el cierre de casos: filtros, marcar/desmarcar lo visible y ocultar/mostrar filas.",
+                "3 · La NOTA es obligatoria y viaja con tu usuario. ESCRIBE EN PRODUCCIÓN: antes de enviar se muestra un resumen para confirmar.",
+                "Después de cada cambio de IMSI se vuelve a consultar la línea para confirmar la SIM nueva y se muestra en qué estado quedó la IMSI anterior. El cambio de línea es una portabilidad: queda «Order Created» (Solicitada) y el número cambia cuando se completa."
+            ]
+        });
+    </script>
+
+    <!-- 2 · Acceso al CM -->
+    <script src="../assets/base/me-api.js"></script>
+
+    <!-- 3 · Operaciones sobre líneas, compartidas con «Bloquear/Inactivar líneas» -->
+    <script src="../assets/compartido/cm-lineas.js"></script>
+
+    <!-- 4 · Reglas de cada pestaña (un motor por pestaña) -->
+    <script src="../assets/herramientas/cambio-imsi-linea/imsi.js"></script>
+    <script src="../assets/herramientas/cambio-imsi-linea/msisdn.js"></script>
+
+    <!-- 5 · Enganche con la interfaz -->
+    <script src="../assets/herramientas/cambio-imsi-linea/cambio-imsi-linea.js"></script>
+</body>
+
+</html>

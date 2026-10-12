@@ -1,6 +1,6 @@
 # Reporte de Suscripciones Prepagadas (SIME ⇄ CM) — Documentación técnica
 
-> **Versión: v9.5.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v9.6.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para **verificar de forma cruzada** las suscripciones prepagadas de **Móvil Éxito** entre dos plataformas: **SIME** (front de tipificación / negocio) y **CM / OBP** (Optiva). Por cada línea (MSISDN) consulta las dos fuentes, compara identificadores y fechas de compra, calcula los periodos del plan, detecta ciclos apilados y muestra todo en una tabla con detalle por línea, exportable a **CSV / Excel / JSON**.
@@ -24,13 +24,13 @@ Herramienta para **verificar de forma cruzada** las suscripciones prepagadas de 
 
 | Archivo | Qué contiene |
 |---|---|
-| `reporte_prepagadas.html` | Solo marcado: KPIs, pasos, filtros, tabla y modal de detalle. |
-| `assets/logica-prepagadas.js` | Reglas de negocio: endpoints de SIME, clasificación de movimientos, catálogo de planes/PLU, ciclos, verificación, tabla y modal. |
-| `assets/me-prepagadas-puente.js` | Enganche con el shell: chips de sesión, alto de la tabla, entrada de líneas, exportaciones y spinners. |
-| `assets/me-api.js` | Keycloak, `auth` y consultas al CM. **Común a todas las herramientas.** |
-| `assets/me-ui.js` / `me-ui.css` | Shell, registro, tablas y exportación. **Común.** |
+| `herramientas/reporte_prepagadas.html` | Solo marcado: KPIs, pasos, filtros, tabla y modal de detalle. |
+| `assets/herramientas/prepagadas/prepagadas.js` | Todo el código de la herramienta, en tres bloques: 1 configuración y constantes (endpoints de SIME, estados, catálogo de planes `PLANES_RESPALDO`, límites) · 2 reglas de negocio (consultas a SIME y BSS, clasificación de movimientos, ciclos, periodos y verificación) · 3 interfaz (carga del archivo, tabla y filtros, modales de alta / recurrencias / cambio de cuenta, exportación, chips de sesión y enganche con MEUI). Va en una IIFE; no expone nombres globales. |
+| `assets/herramientas/prepagadas/prepagadas.css` | Estilos propios: badges de estado, chips de verificación, modales, uso y balance, tabla de movimientos. |
+| `assets/base/me-api.js` | Keycloak, `auth` y consultas al CM. **Común a todas las herramientas.** |
+| `assets/base/me-ui.js` / `me-ui.css` | Shell, registro, tablas y exportación. **Común.** |
 
-Cambiar una consulta del CM se hace en `me-api.js`; cambiar una regla de prepagadas, en `logica-prepagadas.js`. El HTML no contiene JavaScript propio.
+Cambiar una consulta del CM se hace en `me-api.js`; cambiar una regla de prepagadas, en `assets/herramientas/prepagadas/prepagadas.js`. El HTML no contiene JavaScript propio.
 
 ---
 
@@ -98,7 +98,7 @@ Mapas de referencia:
 - `ESTADOS_RECURRENCIA`: `0 → Planificada` (único confirmado).
 - `UNIT_TIPO`: `0` Voz, `1` Datos, `2` SMS, `3` Saldo.
 - `RE_PRIMERA`, `RE_RECURRENCIA`, `RE_COMPRA_PLAN`, `RE_COMPRA`: expresiones **tuneables** que clasifican cada adjustment type.
-- `CANALES`, `TIPOS_SUSCRIPCION`, `PLU_PRIMERA_COMPRA`: catálogos del formulario de alta.
+- `CANALES_FIJOS` y `PLANES_RESPALDO` (cada plan con su PLU y, si está confirmado, su id; de ahí se derivan `TIPOS_SUSCRIPCION`, `TIPO_SUSCRIPCION_ID` y `PLU_PRIMERA_COMPRA`): catálogos del formulario de alta.
 
 ---
 
@@ -117,7 +117,7 @@ Token SIME (`prf`) con botón **Obtener** (usa la sesión de Windows), usuario y
 - **Zona de arrastrar y soltar** para Excel (`.xlsx`) o CSV, con selección de **hoja** y **columna** (se detecta `linea`/`msisdn` sola).
 - **Líneas manuales**: acepta espacio, tabulación, salto de línea, `,`, `;` y `|`; limpia `+57`, guiones y paréntesis. `Enter` lanza la consulta.
 - **Consultas en paralelo** (el campo admite 1–100; el código acota a **1–10**).
-- Barra de progreso con «Consultadas X de Y · última: …».
+- Progreso en el pie (`MEUI.progreso`): «N/M · última: …». Al terminar muestra «Consultado a las HH:MM» y, si alguna línea falló (SIME sin respuesta o error de BSS), el botón **Reintentar fallidas (k)** que reconsulta solo esas filas.
 
 ### Paso 3 · Registro
 
@@ -125,9 +125,9 @@ Log de la ejecución, con las instrucciones de uso impresas al abrir.
 
 ### Filtros y tabla
 
-Filtros multi-selección por **Estado SIME**, **Pestaña**, **Estado CM** y **Verificación**, más mostrar/ocultar columnas, **Ver ocultas** y exportación CSV / Excel / JSON con el separador compartido. Los filtros están **fuera** de la tabla y siempre visibles.
+Filtros multi-selección (`MEUI.filtroMulti`, con contador por valor) por **Estado SIME**, **Pestaña**, **Estado BSS** y **Verificación**, sincronizados con las tarjetas KPI, más mostrar/ocultar columnas, **Ver ocultas** y exportación CSV / Excel / JSON con el separador compartido. Los filtros están **fuera** de la tabla y siempre visibles.
 
-Columnas: Línea, **Cédula**, Estado SIME, Pestaña, ID suscriptor CM, Estado CM, Plan, F. compra SIME, F. compra CM, Verificación, Periodos (barra + cobertura combinada), Próxima ejecución, **Comentario** (la más ancha, es la que más se lee) y Acción. **Clic en la fila abre el detalle**; el botón de acción no.
+Columnas visibles por defecto: Acciones, Línea, IMSI, Estado SIME, Estado BSS, F.C. SIME y F.C. BSS (fecha de compra), Verificación, Periodos (barra + cobertura combinada) y Próxima ejecución. Ocultas por defecto, disponibles en «Columnas»: Cédula, Pestaña, ID suscriptor BSS, Plan y **Comentario**. La exportación conserva todas las columnas con sus nombres completos. **Clic en la fila abre el detalle**; el botón de acción no.
 
 La tabla se esconde mientras no haya datos y aparece con el primer resultado. Su alto se calcula al píxel para que filtros, controles, filas y paginación quepan en pantalla, con scroll horizontal y vertical siempre a la vista.
 
@@ -230,7 +230,7 @@ Valores fijos del proceso (`tipoDocumento: "CC"`, `documento: "0"`, `adicionales
 
 ### Salvaguardas
 
-Si la línea **ya tiene** suscripción en SIME se muestra advertencia de duplicidad y hay que marcar una casilla de confirmación. La validación bloquea el envío listando exactamente qué falta. Tras un alta exitosa sobre la misma línea se vuelve a consultar y se actualiza la fila; si se registró **otra** línea, se avisa que hay que consultarla aparte.
+Si la línea **ya tiene** suscripción en SIME se muestra advertencia de duplicidad y hay que marcar una casilla de confirmación. La validación bloquea el envío listando exactamente qué falta. Tanto el alta como el guardado de una recurrencia piden antes un resumen de confirmación (`MEUI.confirmarEscritura`: operación, entorno, línea y datos); los botones que escriben son rojos y van en su propio grupo. Tras un alta exitosa sobre la misma línea se vuelve a consultar y se actualiza la fila; si se registró **otra** línea, se avisa que hay que consultarla aparte.
 
 ### Editar una recurrencia planificada
 
@@ -266,12 +266,14 @@ Toda suscripción con `suscripcionRecurrenteId` lista sus recurrencias (nº, id,
 
 | Versión | Cambios |
 |---|---|
+| **9.6.0** (refactor interno) | Un solo archivo de código por herramienta en `assets/herramientas/prepagadas/` (une la lógica y el puente: `render`, `pintarSesion` y `obtenerLineas` ya no se reemplazan desde fuera, y se retiran las exportaciones propias que el puente anulaba) y estilos movidos a `prepagadas.css`. Los tres catálogos de planes (lista, ids y PLU) pasan a una sola tabla, `PLANES_RESPALDO`. Sin cambios de comportamiento. |
+| **9.6.0** | Menos densidad: la tabla muestra 10 columnas (Cédula, Pestaña, ID suscriptor BSS, Plan y Comentario quedan en «Columnas») con encabezados cortos. Filtros con `MEUI.filtroMulti` sincronizados con las KPI. Alta en SIME y edición de recurrencias con `confirmarEscritura` y botones de peligro en grupo aparte. Progreso en `MEUI.progreso` con «Reintentar fallidas». Ayudas largas pasan a «?». |
 | **9.5.0** | **IMSI** de la línea en la tabla (con botón de copiar), en el detalle (copiable) y en la exportación; sale de la SIM de la cuenta en el CM (`MEAPI.imsi`). Fix: el menú «Columnas» ocultaba una columna equivocada porque `HEADERS` no seguía el orden de la tabla. |
 | 9.4.0 | **Planes y canales en vivo desde SIME** (`GET GetCanalTipo`, el mismo servicio que llena el desplegable de SIME): id real del tipo de suscripción, canal y PLU de 1.ª compra salen de SIME, y los planes nuevos aparecen solos. Los catálogos fijos (`TIPOS_SUSCRIPCION`, `TIPO_SUSCRIPCION_ID`, `PLU_PRIMERA_COMPRA`, `CANALES_FIJOS`) quedan como respaldo si SIME no responde. El desplegable de planes usa el nombre como valor, no la posición. |
 | 9.3.1 | **Fix alta en SIME: 400 «Object reference not set to an instance of an object»**. El ID tipo de suscripción se calculaba como «posición en el catálogo + 1», y desde los planes «Pague 8 Lleve 12» SIME va corrido en uno: para «Pague 8 Lleve 12 paquete $159.200 - POS» se mandaba 46 en lugar de 47. Nueva tabla `TIPO_SUSCRIPCION_ID` con los ids reales vistos en SIME (captura `agregar recurrencia.har`), que manda sobre la posición; si un plan solo tiene el id por posición, el recálculo lo avisa. `documento: "0"` se mantiene: SIME lo acepta. |
 | 9.3 | **Uso y Balance más específico**: cada bundle muestra ahora **consumido / total** (con el porcentaje) arriba y el **disponible** destacado debajo, en vez de "disponible / total" con el consumo en letra pequeña. Mismo cambio, a la vez, en "Consumos y Paquetes (CM)". |
 | 9.2 | Cambio en la tabla de líneas, para que las acciones aparezcan de primeras. |
-| 9.1 | Migración a la base compartida: el HTML queda solo con marcado, la lógica pasa a `assets/logica-prepagadas.js` y el acceso al CM a `assets/me-api.js`. Nuevo shell (menú lateral, chips de sesión, pie con tiempo abierto), pasos plegables, tabla al alto útil que se oculta sin datos, entrada de líneas con más separadores, exportación con separador `;` por defecto y JSON, y spinner en las acciones lentas. |
+| 9.1 | Migración a la base compartida: el HTML queda solo con marcado, la lógica pasa a `assets/logica-prepagadas.js` y el acceso al CM a `assets/base/me-api.js`. Nuevo shell (menú lateral, chips de sesión, pie con tiempo abierto), pasos plegables, tabla al alto útil que se oculta sin datos, entrada de líneas con más separadores, exportación con separador `;` por defecto y JSON, y spinner en las acciones lentas. |
 | 9.0 | Rediseño de la interfaz sobre el sistema común `me-ui`. |
 | 8.1 | Lanzador `dame click.bat` y tabla con `scrollX`+`scrollY`. |
 | 8.0 | Buscador en el catálogo de planes y edición de recurrencias. |

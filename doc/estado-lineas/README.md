@@ -1,6 +1,6 @@
 # Bloquear/Inactivar líneas — Documentación técnica
 
-> **Versión: v1.1.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
+> **Versión: v1.2.0** · Convención de versionado: *Major.Minor.Patch* · fix/documentación incrementa **Patch**.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 **Bloquea o inactiva líneas en el CM, en masivo.** Se pegan las líneas, se consultan, se marcan en una tabla con casillas —con el mismo manejo de filtros y ocultar/mostrar que «Cierre masivo de casos»— y a las marcadas se les envía la orden de cambio de estado. Después de cada orden la línea se vuelve a consultar, así que la tabla muestra el estado que el CM tiene **de verdad**, no el que se pidió.
@@ -23,9 +23,9 @@
 | Archivo | Qué hace |
 | --- | --- |
 | `herramientas/estado_lineas.html` | Marcado. Sin lógica. |
-| `assets/cm-lineas.js` | **Compartido con «Cambio IMSI Claro\|Tigo»**: resolver la línea, cuenta del CRM, SIM en el inventario, órdenes del CM, seguimiento y la tabla con casillas. Se publica como `window.CMLineas`. |
-| `assets/logica-estado-lineas.js` | Consulta por línea, cambio de estado, exportación. |
-| `assets/me-estado-lineas-puente.js` | Sesión, tabla, filtros, doble confirmación y exportaciones. |
+| `assets/compartido/cm-lineas.js` | **Compartido con «Cambio IMSI y línea Claro\|Tigo»**: resolver la línea, cuenta del CRM, SIM en el inventario, órdenes del CM, seguimiento y la tabla con casillas. Se publica como `window.CMLineas`. |
+| `assets/herramientas/estado-lineas/estado-lineas.js` | Todo el código de la herramienta en un solo archivo, con tres secciones: 1 · configuración y constantes, 2 · reglas de negocio (consulta por línea y cambio de estado), 3 · interfaz (sesión, tabla, filtros, confirmación con resumen y exportaciones). |
+| `assets/herramientas/estado-lineas/estado-lineas.css` | Estilos propios (insignias de estado, filas ocultas, barra de lote). |
 
 Comparte con el resto de la suite `me-ui.js` y `me-api.js`.
 
@@ -99,7 +99,7 @@ Lo que no está confirmado se muestra con su código crudo (`Estado 7 (¿HELD?)`
 
 ### Inactivar deja la IMSI en HELD
 
-Al inactivar una línea, su IMSI pasa a **HELD** en el inventario y **no queda libre sola**. Para volver a usarla —por ejemplo en un «Cambio IMSI Claro|Tigo»— hay que pasarla a disponible **a mano en el BSS**. La herramienta lo avisa al elegir «Inactivar», al terminar la tanda y en el detalle de cada línea inactivada (con el estado en que quedó su IMSI).
+Al inactivar una línea, su IMSI pasa a **HELD** en el inventario y **no queda libre sola**. Para volver a usarla —por ejemplo en un «Cambio IMSI» (de «Cambio IMSI y línea Claro|Tigo»)— hay que pasarla a disponible **a mano en el BSS**. La herramienta lo avisa al elegir «Inactivar», al terminar la tanda y en el detalle de cada línea inactivada (con el estado en que quedó su IMSI).
 
 Bloquear **no** cambia la IMSI: en la captura, la de 3332463394 siguió «En uso» después de bloquearla.
 
@@ -120,7 +120,7 @@ Hasta **200**, separadas por lo que sea (espacio, coma, `;`, salto de línea; se
 Como en «Cierre masivo de casos»:
 
 - **Casilla** por fila y otra en el encabezado que marca/desmarca **lo visible**. Las líneas que no se pueden operar (no existen, error de consulta) tienen la casilla deshabilitada.
-- **Filtros** que se combinan: texto libre, estado en el CM, proceso, selección y «ver ocultas».
+- **Filtros** que se combinan: Buscar de DataTables, estado en el CM, proceso, selección y «ver ocultas».
 - **Ocultar/mostrar** por fila, y en lote: ocultar marcadas, ocultar no marcadas, mostrar todas.
 - Contadores y el resumen «N de M marcadas · K visibles».
 
@@ -128,7 +128,7 @@ Solo se opera lo **marcado y visible**: una fila oculta no se envía aunque est�
 
 ### Paso 3 · Cambio de estado
 
-Estado destino, razón y nota (opcional; siempre viaja con el usuario delante: `jpelaezg. motivo`). El botón dice cuántas líneas cambiarían y descuenta las que **ya están** en ese estado —a esas no se les manda nada—. **Doble confirmación**: el primer clic arma el botón y el segundo ejecuta.
+Estado destino, razón y nota (opcional; siempre viaja con el usuario delante: `jpelaezg. motivo`). El botón dice cuántas líneas cambiarían y descuenta las que **ya están** en ese estado —a esas no se les manda nada—. **Confirmación con resumen**: el modal muestra operación, cantidad, nota, entorno y los primeros destinos antes de enviar.
 
 Las órdenes van **de una en una**: cada una se sigue hasta su estado final antes de mandar la siguiente. Al terminar cada línea:
 
@@ -146,17 +146,25 @@ CSV / Excel / JSON de la tabla, y **Bitácora** (CSV) con cada orden enviada: us
 
 - **Escribe en producción.** Bloquear e inactivar se hacen sobre la línea real.
 - **Inactivar retiene la IMSI (HELD)** y liberarla es manual en el BSS.
-- **Sin lista de usuarios**: cualquiera con sesión del CM vigente puede bloquear o inactivar; la doble confirmación es la guarda contra operaciones por accidente.
+- **Sin lista de usuarios**: cualquiera con sesión del CM vigente puede bloquear o inactivar; la confirmación con resumen es la guarda contra operaciones por accidente.
 - **`REASON` sin catálogo**: solo se conocen los dos valores de las capturas.
 - **Activar no está incluido** hasta confirmarlo con una orden real.
 - **Una orden aceptada no es una orden aplicada**: se sigue hasta `Order Fulfilled`/`Order Failed` (45 s) y, además, se relee la línea.
 
 ---
 
+### Controles y progreso
+
+Los filtros múltiples de estado, proceso y selección están en `.me-filtros`, junto a limpiar filtros, Columnas y exportaciones. El único buscador es **Buscar** de DataTables. Los cuatro controles de selección permanecen visibles; las acciones de ocultar y escribir aparecen en `.me-lote` cuando hay líneas marcadas. La nota es obligatoria.
+
+Consulta/validación y envío muestran progreso **N/M**. «Reintentar fallidas» reutiliza solo las consultas con error. Para escrituras, vuelve a pedir confirmación y solo incluye fallos anteriores a la petición de orden: nunca órdenes creadas ni respuestas inciertas del POST. Si se carga otra tanda, los reintentos de la anterior dejan de aplicar.
+
 ## 8. Historial de cambios
 
 | Versión | Cambios |
 | --- | --- |
+| 1.2.0 (refactor) | Reorganización interna sin subir versión: `logica-estado-lineas.js` y `me-estado-lineas-puente.js` se unen en `assets/herramientas/estado-lineas/estado-lineas.js`; el `<style>` de la página pasa a `estado-lineas.css`; se quita una referencia muerta (`PROCESO.NO_APLICA`). Sin cambios de comportamiento. |
+| **1.2.0** | Filtros múltiples, selección por página o todas las filtradas, barra de lote, confirmación con resumen, progreso N/M y reintentos seguros. |
 | **1.1.0** | Sin lista de usuarios: bloquear e inactivar solo piden sesión del CM vigente. Línea e IMSI copiables en la tabla. |
 | 1.0.1 | La herramienta pasa a llamarse **«Bloquear/Inactivar líneas»** (antes «Estado de líneas») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
-| 1.0.0 | Primera versión. Bloquear e inactivar en masivo con la orden `ChangeSubscriptionState` de la interfaz del CM (verificada contra las capturas), tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, estado real tras cada orden, aviso de HELD al inactivar, bitácora con petición y respuesta. Lógica compartida con «Cambio IMSI Claro\|Tigo» en `cm-lineas.js`. |
+| 1.0.0 | Primera versión. Bloquear e inactivar en masivo con la orden `ChangeSubscriptionState` de la interfaz del CM (verificada contra las capturas), tabla con casillas, filtros y ocultar/mostrar como el cierre de casos, estado real tras cada orden, aviso de HELD al inactivar, bitácora con petición y respuesta. Lógica compartida con «Cambio IMSI y línea Claro\|Tigo» en `cm-lineas.js`. |

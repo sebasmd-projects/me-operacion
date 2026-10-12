@@ -1,0 +1,2124 @@
+/* =====================================================================
+   me-ui.css · Sistema de diseño común — Herramientas Operación Móvil Éxito
+   ---------------------------------------------------------------------
+   Se carga DESPUÉS de Bootstrap 5 y de DataTables (Bootstrap 5).
+   No reemplaza a Bootstrap: solo añade el shell (barra lateral, cabecera,
+   pie), el estilo de paneles/pasos y el comportamiento visual de las
+   tablas de datos.
+
+   Todo el color de marca vive aquí: si cambia la marca, se cambia una vez.
+   ===================================================================== */
+
+:root {
+    /* --- Marca --- */
+    --me-negro: #141414;
+    --me-negro-2: #1F1F1D;
+    --me-amarillo: #FFD500;
+    --me-amarillo-2: #E8C200;
+    --me-papel: #F4F3EF;
+    --me-tinta: #1E1E1C;
+    --me-borde: #E1DFD8;
+    --me-borde-2: #CFCCC2;
+    --me-suave: #66665F;
+
+    /* --- Semáforo de sesión y estados --- */
+    --me-ok: #1D7A46;
+    --me-warn: #C87400;
+    --me-err: #C43025;
+    --me-off: #9A9A94;
+    --me-info: #2C5AA0;
+
+    /* --- Sintaxis de cargas JSON/XML (MEUI.htmlPayload).
+           Pensados para el fondo claro #FAFAF7 de los visores: todos pasan
+           4.5:1 en texto pequeño. Donde ya había un tono del semáforo se
+           reutiliza; solo número, atributo y comentario son nuevos. --- */
+    --me-sx-clave: var(--me-info);
+    --me-sx-cadena: var(--me-ok);
+    --me-sx-num: #9A5200;
+    --me-sx-lit: var(--me-err);
+    --me-sx-tag: var(--me-info);
+    --me-sx-attr: #7B3FA0;
+    --me-sx-com: #66665F;
+
+    /* --- Medidas del shell --- */
+    --me-side-w: 244px;
+    --me-side-mini: 62px;
+    --me-pasos-mini: 52px;
+    --me-top-h: 44px;
+    --me-foot-h: 30px;
+
+    /* Alto disponible para el área de trabajo (contenido) */
+    --me-alto-util: calc(100vh - var(--me-top-h) - var(--me-foot-h));
+
+    /* --- Tipografía --- */
+    --me-sans: 'Archivo', system-ui, -apple-system, "Segoe UI", sans-serif;
+    --me-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* El shell ocupa la ventana: el scroll vive dentro del contenido, nunca en
+   el body. Así cabecera y pie quedan siempre fijos sin position:fixed. */
+html,
+body.me-body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body.me-body {
+    margin: 0;
+    background: var(--me-papel);
+    color: var(--me-tinta);
+    font-family: var(--me-sans);
+    font-size: 14.5px;
+}
+
+.me-mono,
+code.me-mono {
+    font-family: var(--me-mono);
+}
+
+/* =====================================================================
+   1 · Estructura
+===================================================================== */
+.me-app {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+}
+
+.me-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.me-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem 1.15rem 1.25rem;
+    scrollbar-width: thin;
+}
+
+/* =====================================================================
+   2 · Navegación lateral
+===================================================================== */
+.me-side {
+    width: var(--me-side-w);
+    flex: none;
+    background: var(--me-negro);
+    color: #E9E9E4;
+    display: flex;
+    flex-direction: column;
+    transition: none;
+    z-index: 40;
+}
+
+.me-transiciones .me-side { transition: width .18s ease; }
+
+.me-side.mini {
+    width: var(--me-side-mini);
+}
+
+.me-side-brand {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .9rem .8rem;
+    border-bottom: 1px solid #2B2B28;
+    min-height: var(--me-top-h);
+}
+
+.me-side-logo {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: .5rem;
+    background: var(--me-amarillo);
+    color: var(--me-negro);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: .92rem;
+    letter-spacing: -.02em;
+}
+
+.me-side-titulo {
+    line-height: 1.15;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.me-side-titulo b {
+    font-size: .95rem;
+    font-weight: 700;
+}
+
+.me-side-titulo small {
+    display: block;
+    color: #8E8E88;
+    font-size: .7rem;
+}
+
+.me-side-nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: .5rem 0 1rem;
+    scrollbar-width: thin;
+}
+
+.me-nav-grupo {
+    padding: .9rem .95rem .3rem;
+    font-size: .64rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #75756F;
+    white-space: nowrap;
+}
+
+.me-nav-item {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem .95rem;
+    margin: .1rem .45rem;
+    border-radius: .45rem;
+    color: #D6D6D0;
+    text-decoration: none;
+    font-size: .86rem;
+    white-space: nowrap;
+    border-left: 3px solid transparent;
+    transition: background .12s, color .12s;
+}
+
+.me-nav-item i {
+    font-size: 1.05rem;
+    width: 1.15rem;
+    flex: none;
+    text-align: center;
+}
+
+.me-nav-item:hover {
+    background: #262622;
+    color: #fff;
+}
+
+.me-nav-item.activo {
+    background: #2A2A25;
+    color: #fff;
+    border-left-color: var(--me-amarillo);
+}
+
+.me-nav-item.activo i {
+    color: var(--me-amarillo);
+}
+
+.me-side-pie {
+    border-top: 1px solid #2B2B28;
+    padding: .5rem .6rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    justify-content: space-between;
+}
+
+.me-side-toggle {
+    background: transparent;
+    border: 1px solid #33332E;
+    color: #C9C9C3;
+    border-radius: .4rem;
+    width: 34px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+}
+
+.me-side-toggle:hover {
+    border-color: var(--me-amarillo);
+    color: var(--me-amarillo);
+}
+
+.me-side-version {
+    font-family: var(--me-mono);
+    font-size: .7rem;
+    color: #75756F;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Modo compacto: solo iconos, con tooltip nativo */
+.me-side.mini .me-side-titulo,
+.me-side.mini .me-nav-grupo,
+.me-side.mini .me-nav-item span,
+.me-side.mini .me-side-version {
+    display: none;
+}
+
+.me-side.mini .me-nav-item {
+    justify-content: center;
+    padding: .6rem 0;
+    margin: .15rem .4rem;
+}
+
+.me-side.mini .me-side-brand {
+    justify-content: center;
+    padding: .9rem .3rem;
+}
+
+.me-side.mini .me-side-pie {
+    justify-content: center;
+}
+
+/* =====================================================================
+   3 · Cabecera
+===================================================================== */
+.me-top {
+    height: var(--me-top-h);
+    min-height: var(--me-top-h);
+    flex: none;
+    background: #fff;
+    border-bottom: 1px solid var(--me-borde);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 300px) minmax(0, 1fr);
+    position: relative;
+    align-items: center;
+    gap: .4rem;
+    padding: 0 .9rem 0 1.1rem;
+    z-index: 30;
+}
+
+.me-top-titulo {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    white-space: nowrap;
+    overflow: hidden;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.me-top-titulo b {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.me-top-titulo small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--me-suave);
+    font-size: .76rem;
+}
+
+.me-top-derecha {
+    min-width: 0;
+    margin-left: 0;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    justify-content: flex-end;
+}
+
+/* Buscador global: la cabecera equilibra título, búsqueda y sesiones. */
+.me-buscador { position: relative; min-width: 0; }
+.me-buscador-campo {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    padding: .35rem .6rem;
+    background: #fff;
+    color: var(--me-suave);
+}
+.me-buscador-campo:focus-within { outline: 2px solid var(--me-azul, #1769aa); }
+.me-buscador input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-size: .85rem;
+}
+.me-buscador-toggle { display: none; }
+.me-buscador-resultados {
+    position: absolute;
+    top: calc(100% + .4rem);
+    left: 0;
+    right: 0;
+    max-height: min(65vh, 420px);
+    overflow-y: auto;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    background: #fff;
+    box-shadow: 0 5px 20px #0002;
+}
+.me-buscador-resultados a {
+    display: flex;
+    gap: .6rem;
+    padding: .6rem;
+    color: inherit;
+    text-decoration: none;
+}
+.me-buscador-resultados a:hover,
+.me-buscador-resultados [aria-selected="true"] { background: #edf4fc; }
+.me-buscador-resultados b, .me-buscador-resultados small { display: block; }
+.me-buscador-resultados small { color: var(--me-suave); font-size: .75rem; }
+.me-buscador-resultados p { padding: .6rem; margin: 0; }
+.me-buscador-resultados[hidden] { display: none; }
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .me-top { grid-template-columns: auto minmax(0, 1fr) minmax(160px, 300px) minmax(0, 1fr); }
+}
+
+@media (max-width: 767.98px) {
+    .me-top { display: flex; }
+    .me-top-titulo { flex: 1; }
+    .me-buscador { position: static; }
+    .me-buscador-toggle {
+        display: block;
+        border: 1px solid var(--me-borde);
+        border-radius: .5rem;
+        background: #fff;
+        padding: .35rem .55rem;
+    }
+    .me-buscador-campo { display: none; }
+    .me-buscador.abierto .me-buscador-campo {
+        display: flex;
+        position: absolute;
+        top: calc(100% + .2rem);
+        left: .5rem;
+        right: .5rem;
+    }
+    .me-buscador-resultados { top: calc(100% + 3rem); left: .5rem; right: .5rem; }
+}
+
+.me-hamburger {
+    display: none;
+    background: transparent;
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    width: 38px;
+    height: 34px;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--me-tinta);
+}
+
+/* --- Chip de sesión --- */
+.me-sesion {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid var(--me-borde);
+    background: #fff;
+    border-radius: 999px;
+    padding: .22rem .5rem .22rem .55rem;
+    font-size: .78rem;
+    line-height: 1.4;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.me-sesion:hover {
+    border-color: var(--me-negro);
+}
+
+.me-sesion .me-dot {
+    width: .55rem;
+    height: .55rem;
+    border-radius: 50%;
+    flex: none;
+    background: var(--me-off);
+}
+
+.me-sesion[data-estado="ok"] .me-dot {
+    background: var(--me-ok);
+    box-shadow: 0 0 0 3px rgba(29, 122, 70, .16);
+}
+
+.me-sesion[data-estado="warn"] .me-dot {
+    background: var(--me-warn);
+    box-shadow: 0 0 0 3px rgba(200, 116, 0, .18);
+    animation: me-latido 1.1s ease-in-out infinite;
+}
+
+.me-sesion[data-estado="err"] .me-dot {
+    background: var(--me-err);
+    box-shadow: 0 0 0 3px rgba(196, 48, 37, .16);
+}
+
+/* Sesión OPCIONAL y sin iniciar: el chip se ve, pero apagado, para que no
+   parezca un error ni una tarea pendiente. En cuanto se inicia (ok / warn /
+   err) vuelve al aspecto normal, porque entonces su estado SÍ importa. */
+.me-sesion[data-me-opcional="1"][data-estado="off"] {
+    opacity: .55;
+}
+
+.me-sesion[data-me-opcional="1"][data-estado="off"]:hover {
+    opacity: 1;
+}
+
+.me-sesion .me-sesion-quien {
+    font-weight: 600;
+}
+
+.me-sesion .me-sesion-reloj {
+    font-family: var(--me-mono);
+    font-size: .72rem;
+    color: var(--me-suave);
+}
+
+.me-sesion[data-estado="warn"] .me-sesion-reloj {
+    color: var(--me-warn);
+}
+
+.me-sesion[data-estado="err"] .me-sesion-reloj {
+    color: var(--me-err);
+}
+
+@keyframes me-latido {
+
+    0%,
+    100% {
+        opacity: 1
+    }
+
+    50% {
+        opacity: .35
+    }
+}
+
+/* =====================================================================
+   4 · Pie
+===================================================================== */
+.me-foot {
+    min-height: var(--me-foot-h);
+    flex: none;
+    background: #fff;
+    border-top: 1px solid var(--me-borde);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: 0 .9rem;
+    font-size: .72rem;
+    color: var(--me-suave);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.me-foot b {
+    color: var(--me-tinta);
+    font-weight: 600;
+}
+
+.me-foot .me-foot-der {
+    margin-left: auto;
+    display: flex;
+    gap: .4rem;
+    font-family: var(--me-mono);
+}
+
+/* Enlace a la documentación de la propia herramienta (abre modal XL) */
+.me-foot-doc {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--me-info);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+}
+
+.me-foot-doc:hover {
+    color: var(--me-tinta);
+}
+
+/* =====================================================================
+   MARKDOWN (modal de documentación, común a portada y herramientas)
+===================================================================== */
+.markdown {
+    line-height: 1.65;
+}
+
+.markdown> :first-child {
+    margin-top: 0;
+}
+
+.markdown h1 {
+    font-size: 1.55rem;
+}
+
+.markdown h2 {
+    font-size: 1.2rem;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--me-borde);
+}
+
+.markdown h3 {
+    font-size: 1.02rem;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+    margin: 1.4rem 0 .7rem;
+}
+
+.markdown table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: collapse;
+    font-size: .85rem;
+}
+
+.markdown th,
+.markdown td {
+    padding: .5rem;
+    border: 1px solid var(--me-borde);
+    text-align: left;
+}
+
+.markdown th {
+    background: #F4F4F0;
+}
+
+.markdown code {
+    padding: .12rem .3rem;
+    border-radius: .25rem;
+    background: #EEEEEA;
+    font-family: var(--me-mono);
+    font-size: .85em;
+}
+
+.markdown pre {
+    margin: 1rem 0;
+    padding: .9rem;
+    overflow: auto;
+    border-radius: .45rem;
+    background: #17171A;
+    color: #DDDDD6;
+}
+
+.markdown pre code {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+}
+
+.markdown blockquote {
+    margin: 1rem 0;
+    padding: .6rem .9rem;
+    border-left: 4px solid var(--me-amarillo);
+    background: #FAFAF5;
+}
+
+.markdown img {
+    max-width: 100%;
+}
+
+/* =====================================================================
+   5 · Paneles y pasos plegables
+===================================================================== */
+.me-panel {
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .55rem;
+}
+
+.me-panel>.me-panel-cuerpo {
+    padding: 1rem;
+}
+
+.me-paso {
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .55rem;
+    margin-bottom: .6rem;
+    overflow: hidden;
+}
+
+.me-paso-cab {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    width: 100%;
+    background: #fff;
+    border: 0;
+    padding: .7rem .85rem;
+    cursor: pointer;
+    text-align: left;
+    font-weight: 600;
+    font-size: .92rem;
+    color: var(--me-tinta);
+}
+
+.me-paso-cab:hover {
+    background: #FBFAF6;
+}
+
+.me-paso-n {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    border-radius: 50%;
+    background: var(--me-negro);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.me-paso.abierto .me-paso-n {
+    background: var(--me-amarillo);
+    color: var(--me-negro);
+}
+
+.me-paso-resumen {
+    margin-left: auto;
+    font-weight: 400;
+    font-size: .74rem;
+    color: var(--me-suave);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 45%;
+}
+
+.me-paso-flecha {
+    flex: none;
+    color: var(--me-suave);
+    transition: transform .18s ease;
+}
+
+.me-paso.abierto .me-paso-flecha {
+    transform: rotate(180deg);
+}
+
+.me-paso-cuerpo {
+    display: none;
+    padding: .2rem .85rem 1rem;
+    border-top: 1px solid var(--me-borde);
+}
+
+.me-paso.abierto .me-paso-cuerpo {
+    display: block;
+}
+
+/* Etiquetas menudas reutilizables */
+.me-lbl {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--me-suave);
+    font-weight: 600;
+    margin-bottom: .15rem;
+    display: block;
+}
+
+.me-hint {
+    font-size: .72rem;
+    color: var(--me-suave);
+}
+
+/* =====================================================================
+   6 · Botones
+===================================================================== */
+.btn-me {
+    background: var(--me-amarillo);
+    border: 1px solid var(--me-amarillo);
+    color: var(--me-negro);
+    font-weight: 600;
+}
+
+.btn-me:hover,
+.btn-me:focus {
+    background: var(--me-amarillo-2);
+    border-color: var(--me-amarillo-2);
+    color: var(--me-negro);
+}
+
+.btn-me-ink {
+    background: var(--me-negro);
+    border: 1px solid var(--me-negro);
+    color: #fff;
+}
+
+.btn-me-ink:hover {
+    background: #000;
+    color: #fff;
+}
+
+.btn-me-line {
+    background: #fff;
+    border: 1px solid var(--me-borde-2);
+    color: var(--me-tinta);
+}
+
+.btn-me-line:hover {
+    border-color: var(--me-negro);
+    background: #FBFAF6;
+    color: var(--me-tinta);
+}
+
+/* Retroalimentación de acción: spinner dentro del propio botón */
+.me-spin {
+    display: inline-block;
+    width: .85em;
+    height: .85em;
+    margin-right: .4em;
+    vertical-align: -.1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: me-giro .7s linear infinite;
+}
+
+@keyframes me-giro {
+    to {
+        transform: rotate(360deg)
+    }
+}
+
+button[data-me-ocupado] {
+    cursor: progress;
+    opacity: .85;
+}
+
+/* =====================================================================
+   7 · Tarjetas KPI (filtros rápidos)
+===================================================================== */
+.me-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: .4rem;
+    margin-bottom: .45rem;
+}
+
+.me-kpi {
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-left: 4px solid var(--me-off);
+    border-radius: .5rem;
+    padding: .3rem .55rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    column-gap: .45rem;
+    cursor: pointer;
+    transition: box-shadow .12s, transform .12s;
+}
+
+.me-kpi:hover {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
+    transform: translateY(-1px);
+}
+
+.me-kpi.activo,
+.me-kpi.kpi-activo {
+    box-shadow: inset 0 0 0 2px var(--me-negro);
+}
+
+.me-kpi .n {
+    font-family: var(--me-mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.me-kpi .lbl {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--me-suave);
+    margin-top: .2rem;
+}
+
+.me-kpi .lbl small {
+    display: block;
+    font-size: .62rem;
+    text-transform: none;
+    letter-spacing: .02em;
+    color: var(--me-suave);
+}
+
+.me-kpi.ok {
+    border-left-color: var(--me-ok);
+}
+
+.me-kpi.ok .n {
+    color: var(--me-ok);
+}
+
+.me-kpi.neutro {
+    border-left-color: var(--me-off);
+}
+
+.me-kpi.neutro .n {
+    color: var(--me-off);
+}
+
+.me-kpi.warn {
+    border-left-color: var(--me-warn);
+}
+
+.me-kpi.warn .n {
+    color: var(--me-warn);
+}
+
+.me-kpi.err {
+    border-left-color: var(--me-err);
+}
+
+.me-kpi.err .n {
+    color: var(--me-err);
+}
+
+/* =====================================================================
+   8 · Área de trabajo: acciones + tabla, siempre a la vista
+   En pantallas grandes ocupa TODO el alto útil (≈95vh) y la tabla es la
+   única que hace scroll interno.
+===================================================================== */
+.me-trabajo {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: .4rem;
+    align-items: start;
+}
+
+.me-trabajo.sin-lateral {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* La columna de pasos no se desplaza: arriba va el botón «Contraer» (fijo,
+   fuera del scroll) y debajo .me-trabajo-pasos, que es lo único que se
+   desplaza. Así el botón nunca queda encima de un paso ni se pierde. */
+.me-trabajo>.me-trabajo-lateral {
+    max-height: calc(var(--me-alto-util) - 2rem);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: sticky;
+    top: 0;
+    z-index: 7;
+}
+
+.me-trabajo-pasos {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding-right: .15rem;
+    scrollbar-width: thin;
+}
+
+/* --- Botón para contraer/expandir la columna de pasos --- */
+.me-pasos-toggle {
+    flex: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    justify-content: flex-end;
+    background: none;
+    border: 0;
+    padding: .1rem .15rem .35rem;
+    font-size: .72rem;
+    color: var(--me-suave);
+    cursor: pointer;
+}
+
+.me-pasos-toggle:hover {
+    color: var(--me-tinta);
+}
+
+/* El riel solo existe donde hay dos columnas (>= 1200px).
+   Por debajo se contrae el contenido de pasos en vertical. */
+@media (min-width: 1200px) {
+
+    /* Columna de pasos contraída en X: queda un riel con solo el número
+       del paso, y la tabla se queda con el resto del ancho. */
+    .me-trabajo.pasos-mini {
+        grid-template-columns: var(--me-pasos-mini) minmax(0, 1fr);
+    }
+
+    .me-trabajo.pasos-mini .me-pasos-toggle {
+        justify-content: center;
+        padding-inline: 0;
+    }
+
+    .me-trabajo.pasos-mini .me-pasos-toggle span {
+        display: none;
+    }
+
+    /* En modo riel solo sobrevive el número; el resto de la cabecera y el
+       cuerpo del paso se ocultan (aunque el paso esté "abierto" en Y). */
+    .me-trabajo.pasos-mini .me-trabajo-pasos {
+        padding-right: 0;
+    }
+
+    .me-trabajo.pasos-mini .me-paso {
+        border-radius: .5rem;
+    }
+
+    .me-trabajo.pasos-mini .me-paso-cab {
+        justify-content: center;
+        padding: .5rem .25rem;
+    }
+
+    .me-trabajo.pasos-mini .me-paso-tit,
+    .me-trabajo.pasos-mini .me-paso-resumen,
+    .me-trabajo.pasos-mini .me-paso-flecha,
+    .me-trabajo.pasos-mini .me-paso.abierto .me-paso-cuerpo {
+        display: none;
+    }
+
+    /* Con el riel contraído, el número indica de qué paso se trata y el
+       title del botón da el nombre completo al pasar el mouse. */
+    .me-trabajo.pasos-mini .me-paso-n {
+        width: 1.7rem;
+        height: 1.7rem;
+        font-size: .8rem;
+    }
+}
+
+.me-trabajo>.me-trabajo-datos {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+}
+
+@media (max-width: 1199.98px) {
+    .me-trabajo {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .me-trabajo>.me-trabajo-lateral {
+        max-height: min(40vh, calc(var(--me-alto-util) - 2rem));
+        background: var(--me-papel);
+    }
+
+    .me-trabajo.pasos-mini .me-trabajo-pasos {
+        display: none;
+    }
+}
+
+/* El flex reparte el alto real, incluidas las pestañas y los avisos.
+   Solo las páginas con tablas usan este layout: Inicio y formularios
+   conservan su scroll. :has también cubre paneles montados como HLR/HSS. */
+@media (min-width: 1200px) {
+    .me-content:has(.me-trabajo .me-tabla-panel) {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .me-content:has(.me-trabajo .me-tabla-panel)>* {
+        flex: none;
+    }
+
+    .me-content:has(.me-trabajo .me-tabla-panel)>.me-trabajo,
+    .me-content>:has(.me-trabajo .me-tabla-panel) {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .me-content>:has(.me-trabajo .me-tabla-panel) {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .me-content>:has(.me-trabajo .me-tabla-panel)>:not(.me-trabajo) {
+        flex: none;
+    }
+
+    .me-trabajo:has(.me-tabla-panel) {
+        flex: 1;
+        min-height: 0;
+        align-items: stretch;
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .me-trabajo:has(.me-tabla-panel)>.me-trabajo-lateral {
+        max-height: 100%;
+    }
+
+    .me-trabajo-datos>* {
+        flex: none;
+    }
+
+    .me-trabajo-datos>.tab-content,
+    .me-trabajo-datos>.tab-content>.tab-pane.active {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .me-trabajo-datos>.tab-content { overflow: hidden; }
+
+    .me-trabajo-datos>.tab-content>.tab-pane.active { overflow: hidden; }
+
+    .me-trabajo-datos>.tab-content>.tab-pane>* {
+        flex: none;
+    }
+
+    .me-trabajo-datos .me-tabla-panel,
+    .me-trabajo-datos>.tab-content>.tab-pane.active>.me-tabla-panel {
+        flex: 1;
+        min-height: 0;
+    }
+}
+
+/* Un solo bloque en flujo normal: las barras pueden compartir fila o
+   envolver a la siguiente sin competir por la misma posición sticky. */
+.me-barras {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: .4rem;
+    flex: none;
+}
+
+.me-barras>.me-filtros,
+.me-barras>.me-lote {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 !important;
+}
+
+/* Barra de filtros: independiente de la tabla, siempre visible arriba */
+.me-filtros {
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .55rem;
+    padding: .5rem .6rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    align-items: center;
+}
+
+.me-filtros .me-filtros-der {
+    margin-left: auto;
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* =====================================================================
+   9 · Tablas (DataTables 2.x + Bootstrap 5)
+===================================================================== */
+.me-tabla-panel {
+    border-radius: .55rem;
+    padding: .5rem .55rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Contenedor de DataTables en columna: cabecera de controles fija,
+   cuerpo con scroll y pie de paginación fijo. */
+.me-tabla-panel .dt-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    width: 100%;
+}
+
+.me-tabla-panel .dt-container>.dt-layout-row:first-child {
+    background: #fff;
+    margin: 0;
+    padding: .25rem .15rem .4rem;
+    align-items: center;
+    box-shadow: inset 0 -1px 0 var(--me-borde);
+    flex: none;
+}
+
+.me-tabla-panel .dt-container>.dt-layout-row:last-child {
+    background: #fff;
+    margin: 0;
+    padding: .3rem .15rem;
+    box-shadow: inset 0 1px 0 var(--me-borde);
+    flex: none;
+}
+
+.me-tabla-panel .dt-container>.dt-layout-row.dt-layout-table {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+}
+
+.me-tabla-panel .dt-layout-table>.dt-layout-cell {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+
+.me-tabla-panel .dt-scroll {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.me-tabla-panel .dt-scroll-head,
+.me-tabla-panel .dt-scroll-foot {
+    background: #fff;
+    flex: none;
+}
+
+.me-tabla-panel .dt-scroll-body {
+    flex: 1;
+    min-height: 0;
+    border-bottom: 1px solid var(--me-borde);
+    overscroll-behavior-x: contain;
+    scrollbar-width: auto;
+}
+
+/* Las barras de scroll se usan mucho: que se vean SIEMPRE y sean cómodas */
+.dt-scroll-body::-webkit-scrollbar {
+    height: 13px;
+    width: 13px;
+}
+
+.dt-scroll-body::-webkit-scrollbar-track {
+    background: #F1F0EA;
+}
+
+.dt-scroll-body::-webkit-scrollbar-thumb {
+    background: #C1BFB6;
+    border-radius: 7px;
+    border: 2px solid #F1F0EA;
+}
+
+.dt-scroll-body::-webkit-scrollbar-thumb:hover {
+    background: var(--me-negro);
+}
+
+.dt-scroll-body {
+    scrollbar-color: #C1BFB6 #F1F0EA;
+}
+
+/* Buscar / Mostrar N: siempre visibles y sin colapsar en móvil */
+.dt-container .dt-search,
+.dt-container .dt-length {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .8rem;
+    margin: 0;
+}
+
+.dt-container .dt-search input,
+.dt-container .dt-length select {
+    height: 31px;
+    font-size: .82rem;
+}
+
+.dt-container .dt-info {
+    font-size: .78rem;
+    color: var(--me-suave);
+}
+
+.dt-container .dt-paging .page-link {
+    padding: .2rem .55rem;
+    font-size: .82rem;
+}
+
+.dt-container .dt-paging .active>.page-link {
+    background: var(--me-negro);
+    border-color: var(--me-negro);
+    color: #fff;
+}
+
+table.dataTable {
+    font-size: 13.5px;
+}
+
+table.dataTable thead th {
+    font-size: 13.5px;
+    white-space: nowrap;
+    background: #FAFAF7;
+}
+
+table.dataTable td {
+    vertical-align: middle;
+}
+
+table.dataTable tbody tr.seleccionable {
+    cursor: pointer;
+}
+
+/* Columna de comentarios: es la que más se lee, se lleva el ancho.
+   El resto de columnas quedan compactas para que quepan ≥4 datos. */
+td.col-comentario,
+td.me-col-larga {
+    min-width: 460px;
+    max-width: 620px;
+    white-space: normal;
+}
+
+td.col-comentario ul {
+    margin: 0;
+    padding-left: 1.05rem;
+}
+
+td.col-comentario li {
+    margin-bottom: .15rem;
+}
+
+td.col-comentario li:last-child {
+    margin-bottom: 0;
+}
+
+.me-txt-corto {
+    display: inline-block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+tr.me-fila-oculta {
+    opacity: .45;
+}
+
+tr.me-fila-oculta td:first-child {
+    text-decoration: line-through;
+}
+
+/* =====================================================================
+   10 · Consola de registro (log transaccional)
+===================================================================== */
+.me-log {
+    background: #17171A;
+    color: #DDDDD6;
+    border-radius: .45rem;
+    padding: .55rem .7rem;
+    font-family: var(--me-mono);
+    font-size: 11.8px;
+    line-height: 1.62;
+    height: 210px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-width: thin;
+}
+
+.me-log .l-hora {
+    color: #6F6F68;
+}
+
+.me-log .l-ok {
+    color: #7EE0A2;
+}
+
+.me-log .l-err {
+    color: #FF8C82;
+}
+
+.me-log .l-warn {
+    color: #FFD27D;
+}
+
+.me-log .l-info {
+    color: #9BD3FF;
+}
+
+.me-log .l-guia {
+    color: #E9E9E4;
+}
+
+.me-log .l-guia b {
+    color: var(--me-amarillo);
+}
+
+/* =====================================================================
+   11 · Avisos flotantes
+===================================================================== */
+.me-toasts {
+    position: fixed;
+    right: .9rem;
+    bottom: calc(var(--me-foot-h) + .7rem);
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    max-width: 340px;
+}
+
+.me-toast {
+    background: var(--me-negro);
+    color: #fff;
+    border-left: 4px solid var(--me-amarillo);
+    border-radius: .4rem;
+    padding: .5rem .7rem;
+    font-size: .8rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .22);
+    animation: me-entra .18s ease;
+}
+
+.me-toast.ok {
+    border-left-color: var(--me-ok);
+}
+
+.me-toast.err {
+    border-left-color: var(--me-err);
+}
+
+.me-toast.warn {
+    border-left-color: var(--me-warn);
+}
+
+@keyframes me-entra {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
+/* =====================================================================
+   11.1 · Botón "copiar" (título de modales, fichas de detalle)
+===================================================================== */
+.btn-copy {
+    border: none;
+    background: #EBEAE4;
+    color: #333;
+    border-radius: .35rem;
+    padding: 0 .35rem;
+    font-size: .82rem;
+    line-height: 1.6;
+    cursor: pointer;
+}
+
+.btn-copy:hover {
+    background: #DDDBD2;
+}
+
+.btn-copy.copiado {
+    background: var(--me-ok, #198754);
+    color: #fff;
+}
+
+.modal-header .btn-copy {
+    background: rgba(255, 255, 255, .18);
+    color: inherit;
+}
+
+.modal-header .btn-copy:hover {
+    background: rgba(255, 255, 255, .35);
+}
+
+/* =====================================================================
+   11.2 · Sintaxis pintada de cargas JSON/XML (MEUI.htmlPayload)
+===================================================================== */
+.me-sx-clave { color: var(--me-sx-clave); }
+.me-sx-cadena { color: var(--me-sx-cadena); }
+.me-sx-num { color: var(--me-sx-num); }
+.me-sx-lit { color: var(--me-sx-lit); font-weight: 600; }
+.me-sx-tag { color: var(--me-sx-tag); }
+.me-sx-attr { color: var(--me-sx-attr); }
+.me-sx-com { color: var(--me-sx-com); font-style: italic; }
+
+/* =====================================================================
+   12 · Menú de sesión
+===================================================================== */
+.me-menu-sesion {
+    position: fixed;
+    z-index: 1090;
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+    padding: .5rem;
+    min-width: 250px;
+    font-size: .82rem;
+}
+
+.me-menu-sesion h6 {
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--me-suave);
+    margin: .1rem .25rem .4rem;
+}
+
+.me-menu-sesion .dato {
+    display: flex;
+    justify-content: space-between;
+    gap: .4rem;
+    padding: .15rem .25rem;
+    font-family: var(--me-mono);
+    font-size: .76rem;
+}
+
+.me-menu-sesion .dato span:first-child {
+    color: var(--me-suave);
+    font-family: var(--me-sans);
+}
+
+.me-menu-sesion .acciones {
+    display: flex;
+    gap: .4rem;
+    margin-top: .5rem;
+}
+
+.me-menu-sesion .acciones .btn {
+    flex: 1;
+    font-size: .78rem;
+}
+
+/* =====================================================================
+   13 · Responsive
+===================================================================== */
+.me-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .38);
+    z-index: 35;
+}
+
+@media (max-width: 991.98px) {
+    .me-hamburger {
+        display: grid;
+        place-items: center;
+    }
+
+    .me-side {
+        position: fixed;
+        inset: 0 auto 0 0;
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+        width: var(--me-side-w);
+        box-shadow: 0 0 30px rgba(0, 0, 0, .35);
+    }
+
+    .me-side.abierta {
+        transform: none;
+    }
+
+    .me-side.mini {
+        width: var(--me-side-w);
+    }
+
+    .me-side.mini .me-side-titulo,
+    .me-side.mini .me-nav-grupo,
+    .me-side.mini .me-nav-item span,
+    .me-side.mini .me-side-version {
+        display: initial;
+    }
+
+    .me-side.mini .me-nav-item {
+        justify-content: flex-start;
+        padding: .55rem .95rem;
+    }
+
+    .me-backdrop.visible {
+        display: block;
+    }
+
+    .me-top-titulo small,
+    .me-top-separador {
+        display: none;
+    }
+
+    .me-content {
+        padding: .75rem;
+    }
+
+    .me-foot .me-foot-der span:not(:last-child) {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation-duration: .01ms !important;
+    }
+}
+
+/* Controles compartidos: filtros, lote y estados de consulta. */
+.me-lote {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .4rem .6rem;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    background: #fffbea;
+    animation: me-aparecer .18s ease-out;
+}
+.me-filtros[hidden], .me-lote[hidden], #meProgreso[hidden], #meProgreso [hidden] { display: none !important; }
+@keyframes me-aparecer { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .me-lote { animation: none; } }
+.dt-container .dt-search { justify-content: flex-end; align-self: start; }
+.dt-container .dt-search input { width: 220px; max-width: 100%; }
+.me-filtro-multi .dropdown-menu { max-height: 320px; overflow: auto; min-width: 200px; }
+.me-filtro-multi label { padding: .2rem; cursor: pointer; }
+.me-filtro-multi .activo { background: var(--me-negro); color: #fff; }
+.me-estado-tabla { display: flex; align-items: center; gap: .5rem; padding: .65rem; }
+
+/* Detalle amplio, sin perder el scroll del cuerpo del modal. */
+.modal-dialog.me-modal-detalle { width: 90vw; max-width: 90vw; height: 90vh; margin: 5vh auto; }
+.me-modal-detalle .modal-content { height: 100%; max-height: 100%; }
+.me-modal-detalle .modal-body { overflow: auto; }
+
+/* El centro ocupa su propia columna y no depende del ancho de los extremos. */
+.me-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); overflow: visible; }
+.me-foot-izq { display: flex; align-items: center; gap: .4rem; min-width: 0; overflow: hidden; }
+.me-foot-izq b { overflow: hidden; text-overflow: ellipsis; }
+.me-foot-centro { grid-column: 2; text-align: center; padding: .2rem .4rem; max-width: 40vw; white-space: normal; }
+.me-foot .me-foot-der { grid-column: 3; justify-self: end; }
+.me-foot-centro .progress { height: 4px; }
+.me-foot-centro .progress-bar { background: var(--me-negro); }
+.me-foot-centro #meSello { font-size: .65rem; }
+.me-foot-centro button { font-size: .68rem; padding: .1rem .3rem; }
+
+/* Escrituras: acción peligrosa separada y confirmación explícita. */
+.btn-me-peligro { background: var(--me-err); border-color: var(--me-err); color: #fff; }
+.btn-me-peligro:hover, .btn-me-peligro:active { background: #98251d; border-color: #98251d; color: #fff; }
+.me-acciones-escritura { margin-left: auto; border-left: 1px solid var(--me-borde); padding-left: .65rem; }
+.me-confirmar-escritura .modal-header { background: #fce9e7; color: var(--me-err); }
+.me-ayuda {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.05rem; height: 1.05rem; padding: 0; border-radius: 50%;
+    border: 1px solid var(--me-suave); color: var(--me-suave); background: #fff;
+    font-size: .7rem; vertical-align: middle;
+}
+
+/* Navegación por teclado y acceso directo al contenido. */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, .me-kpi:focus-visible, .me-nav-item:focus-visible,
+tr[role="button"]:focus-visible, tr[tabindex]:focus-visible, tr[onclick]:focus-visible {
+    outline: 2px solid #1a56db !important;
+    outline-offset: 2px;
+}
+.me-saltar { position: fixed; top: -100px; left: .5rem; z-index: 2000; padding: .5rem; background: #fff; color: var(--me-negro); }
+.me-saltar:focus { top: .5rem; }
+
+/* =====================================================================
+   14 · Componentes compartidos
+   Las variantes conservan los colores, dimensiones y estados originales.
+   :where limita cada diferencia a su página sin aumentar especificidad.
+===================================================================== */
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"]) #barraFiltros .dropdown-menu {
+    max-height: 280px;
+    overflow: auto;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) #barraFiltros .dropdown-menu {
+    min-width: 220px;
+}
+
+:where(body[data-me-herramienta="portabilidad-tigo"]) #barraFiltros .dropdown-menu {
+    min-width: 240px;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) #mdUso .btn-copy,
+:where(body[data-me-herramienta="prepagadas"]) .tbl-datos .btn-copy {
+    background: #EBEAE4;
+    color: #333;
+}
+
+:where(body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"]) .aviso-fila {
+    color: var(--me-warn);
+    cursor: help;
+}
+
+:where(body[data-me-herramienta="hlr-hss"]) .aviso-fila {
+    font-weight: 700;
+}
+
+.aviso-held {
+    border-left: 4px solid var(--me-warn);
+}
+
+.badge-estado {
+    font-size: .7rem;
+    font-weight: 600;
+}
+
+:where(body[data-me-herramienta="cambio-imsi-linea"], body[data-me-herramienta="consumos"], body[data-me-herramienta="estado-lineas"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prefactura"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .badge-estado {
+    border-radius: .35rem;
+}
+
+:where(body[data-me-herramienta="cambio-imsi-linea"], body[data-me-herramienta="consumos"], body[data-me-herramienta="estado-lineas"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .badge-estado {
+    letter-spacing: .03em;
+    padding: .3em .55em;
+}
+
+:where(body[data-me-herramienta="cambio-imsi-linea"], body[data-me-herramienta="consumos"], body[data-me-herramienta="estado-lineas"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prefactura"], body[data-me-herramienta="titularidad"]) .badge-estado {
+    white-space: nowrap;
+}
+
+:where(body[data-me-herramienta="prefactura"]) .badge-estado {
+    padding: .25em .5em;
+}
+
+.badge-estado.err {
+    background: #FBE2DF;
+    color: var(--me-err);
+}
+
+.badge-estado.info {
+    background: #E2E9F2;
+    color: var(--me-info);
+}
+
+.badge-estado.neutro {
+    background: #F0F0EC;
+    color: var(--me-suave);
+}
+
+.badge-estado.off {
+    background: #ECECEA;
+    color: var(--me-off);
+}
+
+.badge-estado.ok {
+    background: #E2F2E8;
+    color: var(--me-ok);
+}
+
+.badge-estado.warn {
+    background: #FBEED8;
+    color: var(--me-warn);
+}
+
+.barra-lote {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    align-items: center;
+    margin-bottom: .5rem;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) .btn-copy {
+    background: rgba(255, 255, 255, .18);
+    color: inherit;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) .btn-copy.copiado {
+    background: #198754;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) .btn-copy:hover {
+    background: rgba(255, 255, 255, .35);
+}
+
+.celda-detalle {
+    max-width: 26rem;
+    font-size: .75rem;
+    white-space: normal;
+}
+
+:where(body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="portabilidad-tigo"]) .chip-bloqueo {
+    display: inline-flex;
+    align-items: center;
+    gap: .3em;
+    font-size: .74rem;
+    border: 1px solid var(--me-borde);
+    border-radius: 999px;
+    padding: .18em .6em;
+    background: #fff;
+    white-space: nowrap;
+    color: var(--me-suave);
+}
+
+:where(body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="portabilidad-tigo"]) .chip-bloqueo.activo {
+    border-color: #EAC4BF;
+    background: #FBE2DF;
+    color: var(--me-err);
+    font-weight: 600;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .dl-grid {
+    display: grid;
+    gap: .25rem .9rem;
+    font-size: .82rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .dl-grid {
+    grid-template-columns: 210px 1fr;
+}
+
+:where(body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="portabilidad-tigo"]) .dl-grid {
+    grid-template-columns: 260px 1fr;
+}
+
+:where(body[data-me-herramienta="plu"], body[data-me-herramienta="titularidad"]) .dl-grid {
+    grid-template-columns: 190px 1fr;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .dl-grid dd {
+    font-family: var(--me-mono);
+    margin: 0;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"]) .dl-grid dd {
+    word-break: break-all;
+}
+
+:where(body[data-me-herramienta="titularidad"]) .dl-grid dd {
+    word-break: break-word;
+}
+
+.dl-grid dt {
+    color: var(--me-suave);
+    font-weight: 500;
+}
+
+.dropzone {
+    border: 2px dashed var(--me-borde-2);
+    border-radius: .5rem;
+    background: #FCFBF8;
+    padding: 1.1rem .8rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+
+.dropzone .icon {
+    font-size: 1.4rem;
+}
+
+.dropzone p {
+    margin: 0;
+    font-size: .8rem;
+    color: #5C5C57;
+}
+
+.dropzone:hover,
+.dropzone.drag {
+    border-color: var(--me-negro);
+    background: #FFFBE6;
+}
+
+.file-info {
+    font-family: var(--me-mono);
+    font-size: .74rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"]) .form-check-input:checked {
+    background-color: var(--me-negro);
+    border-color: var(--me-negro);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .lbl-mini {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--me-suave);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .lbl-mini .der {
+    text-transform: none;
+    letter-spacing: 0;
+    color: #9a9a94;
+}
+
+.me-tabs {
+    border-bottom: 1px solid var(--me-borde);
+    gap: .2rem;
+}
+
+.me-tabs .nav-link {
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: .45rem .45rem 0 0;
+    color: var(--me-suave);
+    font-weight: 600;
+    font-size: .86rem;
+    padding: .4rem .9rem;
+}
+
+.me-tabs .nav-link.active {
+    background: #fff;
+    border-color: var(--me-borde);
+    color: var(--me-tinta);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .modal-header {
+    background: var(--me-negro);
+    color: #fff;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .modal-header .modal-title {
+    font-weight: 800;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="plu"], body[data-me-herramienta="prepagadas"], body[data-me-herramienta="titularidad"]) .modal-header .modal-title span {
+    color: var(--me-amarillo);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .tx-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem .9rem;
+    font-size: .72rem;
+    color: #5C5C57;
+    margin: .35rem 0 .5rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .tx-legend .sw {
+    display: inline-block;
+    width: .85em;
+    height: .85em;
+    border-radius: 3px;
+    border: 1px solid var(--me-borde);
+    vertical-align: -1px;
+    margin-right: .3em;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: .6rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-grupo {
+    grid-column: 1/-1;
+    font-weight: 700;
+    font-size: .82rem;
+    margin: .4rem 0 -.15rem;
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-grupo .uso-tot {
+    font-weight: 400;
+    color: var(--me-suave);
+    font-size: .76rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item {
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    padding: .6rem .7rem;
+    background: #fff;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .badge-venc {
+    color: #dc3545;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .bar {
+    height: 7px;
+    border-radius: 4px;
+    background: #EBEAE4;
+    overflow: hidden;
+    margin: .4rem 0 .25rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .bar .fill {
+    height: 100%;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .fill.lvl-hi {
+    background: #dc3545;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .fill.lvl-mid {
+    background: #fd7e14;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .fill.lvl-ok {
+    background: #198754;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-disp {
+    font-size: .78rem;
+    font-family: var(--me-mono);
+    margin-bottom: .15rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-disp strong {
+    font-weight: 700;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-lbl {
+    font-size: .62rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #9a9a94;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-name {
+    font-size: .82rem;
+    font-weight: 600;
+    display: block;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-sub {
+    font-size: .7rem;
+    color: var(--me-suave);
+    font-family: var(--me-mono);
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-val {
+    font-family: var(--me-mono);
+    font-size: .82rem;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-val .lim {
+    color: var(--me-suave);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item .uso-val .rem {
+    font-weight: 700;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) .uso-item.vencido {
+    opacity: .6;
+}
+
+:where(body[data-me-herramienta="hlr-hss"], body[data-me-herramienta="portabilidad-tigo"], body[data-me-herramienta="prepagadas"]) pre.json {
+    background: #141414;
+    color: #E8E8E3;
+    border-radius: .5rem;
+    padding: 1rem;
+    font-size: .73rem;
+    overflow: auto;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) pre.json {
+    max-height: 40vh;
+}
+
+td.col-accion {
+    white-space: nowrap;
+    text-align: center;
+}
+
+:where(body[data-me-herramienta="cambio-imsi-linea"], body[data-me-herramienta="estado-lineas"], body[data-me-herramienta="titularidad"]) tr.fila-oculta {
+    opacity: .45;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) tr.fila-oculta {
+    opacity: .5;
+}
+
+:where(body[data-me-herramienta="cambio-imsi-linea"], body[data-me-herramienta="estado-lineas"], body[data-me-herramienta="titularidad"]) tr.fila-oculta td {
+    text-decoration: line-through;
+    text-decoration-color: rgba(0, 0, 0, .25);
+}
+
+:where(body[data-me-herramienta="casos"]) tr.fila-oculta td {
+    opacity: .5;
+}
+
+:where(body[data-me-herramienta="prepagadas"]) tr.fila-oculta td.col-comentario,
+:where(body[data-me-herramienta="prepagadas"]) tr.fila-oculta td:first-child {
+    text-decoration: line-through;
+    text-decoration-color: rgba(0, 0, 0, .25);
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) tr.tx-compra {
+    --bs-table-bg: #ffeede;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) tr.tx-compraPlan {
+    --bs-table-bg: #ffe8a3;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) tr.tx-otro {
+    --bs-table-bg: #f8f9fa;
+    color: #6c757d;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) tr.tx-primera {
+    --bs-table-bg: #fff3cd;
+}
+
+:where(body[data-me-herramienta="consumos"], body[data-me-herramienta="prepagadas"]) tr.tx-recurrencia {
+    --bs-table-bg: #d1e7dd;
+}
+
+/* Copiar: botón compacto antes del dato, siempre en la misma línea. */
+.me-copiable { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; }
+.me-copiable > .btn-copy { flex: none; margin: 0; padding: 0 .2rem; line-height: 1.2; }
+.me-top-separador { color: var(--me-suave); flex: none; }
+.me-archivo-nombre { display: block; overflow-wrap: anywhere; color: var(--me-suave); }
+.dropzone:focus-visible { outline: 2px solid var(--me-azul); outline-offset: 2px; }
+
+/* Escritorio: cada ancestro del área de trabajo cede el alto disponible.
+   Esto cubre panelMontado de HLR, pestañas y herramientas de formulario. */
+@media (min-width: 1200px) {
+    .me-content:has(.me-trabajo),
+    .me-content :has(.me-trabajo) {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+    .me-content:has(.me-trabajo)>*,
+    .me-content :has(.me-trabajo)>* { flex: none; }
+    .me-content:has(.me-trabajo)>:has(.me-trabajo),
+    .me-content :has(.me-trabajo)>:has(.me-trabajo),
+    .me-content .me-trabajo {
+        flex: 1;
+        min-height: 0;
+    }
+    .me-content .me-trabajo {
+        grid-template-rows: minmax(0, 1fr);
+        align-items: stretch;
+    }
+    .me-trabajo>.me-trabajo-lateral { max-height: 100%; }
+    .me-trabajo>.me-trabajo-datos { overflow: hidden; }
+    .me-trabajo-datos>.panel-salida {
+        height: auto;
+        min-height: 0;
+        flex: 1;
+    }
+}
+
+[data-me-dropzone] input[type="file"] { display: none !important; }
+.me-top-derecha .me-sesion { min-width: 0; }
+.me-top-derecha .me-sesion-quien {
+    max-width: 7rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

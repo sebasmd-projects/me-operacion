@@ -86,6 +86,9 @@
     directamente esta carpeta (sin pasar por una descarga) tambien queda
     al dia.
 
+    La version de la base tambien vive en assets\base\catalogo.js
+    (const VERSION_BASE); el empaquetador la reescribe igual a scripts\VERSION.
+
     Nota para pruebas: si solo quieres ver que dame click.bat SI detecta y
     aplica una actualizacion sin preparar contenido nuevo de verdad, sube
     a cPanel un version.json con un numero mayor apuntando al MISMO .zip
@@ -352,6 +355,24 @@ if ($faltantes) {
 # ---------- 3. VERSION nuevo (se incluye en el .zip) ----------
 Set-Content -Path $versionLocalPath -Value $versionNueva.ToString() -NoNewline
 Write-Host ("  OK  scripts\VERSION actualizado a {0}" -f $versionNueva) -ForegroundColor Green
+
+# El catalogo (assets\base\catalogo.js) trae la misma version de la base en la
+# linea 'const VERSION_BASE = "X.Y.Z";'. Se reescribe aqui para que el paquete
+# lleve las dos iguales. Se lee y escribe como UTF-8 sin BOM, sin tocar los
+# finales de linea del resto del archivo.
+$catalogoPath = Join-Path $raiz 'assets\base\catalogo.js'
+if (-not (Test-Path $catalogoPath)) { throw "Falta assets\base\catalogo.js (catalogo de herramientas)." }
+$utf8SinBom = New-Object System.Text.UTF8Encoding($false)
+$catalogoTxt = [System.IO.File]::ReadAllText($catalogoPath, $utf8SinBom)
+$patronVersionBase = 'const VERSION_BASE = "[^"]*";'
+if ($catalogoTxt -notmatch $patronVersionBase) {
+    throw "assets\base\catalogo.js no tiene la linea 'const VERSION_BASE = ""X.Y.Z"";'."
+}
+$catalogoNuevo = [regex]::Replace($catalogoTxt, $patronVersionBase, ('const VERSION_BASE = "{0}";' -f $versionNueva))
+if ($catalogoNuevo -ne $catalogoTxt) {
+    [System.IO.File]::WriteAllText($catalogoPath, $catalogoNuevo, $utf8SinBom)
+}
+Write-Host ("  OK  assets\base\catalogo.js con la version {0}" -f $versionNueva) -ForegroundColor Green
 
 # ---------- 3b. Firma Authenticode (opcional) ----------
 # Se firma ANTES de armar el paquete, para que el .ps1 firmado sea el que

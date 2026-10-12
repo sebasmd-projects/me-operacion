@@ -1,6 +1,6 @@
 # Bloqueos SIM x Titularidad — Documentación técnica
 
-> **Versión: v1.2.0** · Convención: `Major.Minor.Patch`.
+> **Versión: v1.3.0** · Convención: `Major.Minor.Patch`.
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Junta en una sola tabla las tres cosas que hacen falta para resolver, en la
@@ -25,11 +25,11 @@ escala. El objetivo es que no tenga que escalarla.
 | Archivo | Qué contiene |
 |---|---|
 | `herramientas/titularidad.html` | Solo marcado: tarjetas, pasos, filtros, tabla y modal. |
-| `assets/logica-titularidad.js` | Reglas: modelo de fila, carga, enriquecimiento, filtros, tabla y exportación. |
-| `assets/me-titularidad-puente.js` | Enganche con el shell. Es el único puente con **dos sesiones**. |
-| `assets/genesis-api.js` | Sesión de Genesis, paginación de `FechaExpedicion`, rango de fechas (`tramosDeRango`) y tope de registros. |
-| `assets/hlr-consulta.js` | Tigo, Claro y la conclusión de ubicación; en **cascada** por defecto, con `ambos` para consultar las dos (compartido). |
-| `assets/cm-lineas.js` | Resolver la línea y su cuenta en el CM (ya existía). |
+| `assets/herramientas/titularidad/titularidad.js` | Un solo archivo con tres partes: configuración (`CONFIG`), reglas (modelo de fila, carga, enriquecimiento, filtros, tabla y exportación) e interfaz (enganche con el shell; tiene **dos sesiones**, Genesis y CM). |
+| `assets/herramientas/titularidad/titularidad.css` | Estilos propios (antes incrustados en el HTML). |
+| `assets/compartido/genesis-api.js` | Sesión de Genesis, paginación de `FechaExpedicion`, rango de fechas (`tramosDeRango`) y tope de registros. |
+| `assets/compartido/hlr-consulta.js` | Tigo, Claro y la conclusión de ubicación; en **cascada** por defecto, con `ambos` para consultar las dos (compartido). |
+| `assets/compartido/cm-lineas.js` | Resolver la línea y su cuenta en el CM (ya existía). |
 
 ---
 
@@ -154,13 +154,13 @@ siguen ese orden:
 
 | Botón | Qué trae | Cuánto cuesta |
 |---|---|---|
-| **Cargar los últimos 2.000** (por defecto) | Los N registros **más nuevos**, sin fechas. N sale de `GENESIS.CONFIG.topeRegistros`. | 4 peticiones: en segundos hay qué mirar. |
+| **Cargar los últimos 500** (por defecto) | Los N registros **más nuevos**, sin fechas. N sale de `GENESIS.CONFIG.topeRegistros`. | 1 petición: en segundos hay qué mirar. |
 | **Cargar rango** | Un rango «Desde / Hasta», **sin tope**. | Un mes completo es **1** consulta; el aviso bajo las fechas dice cuántos tramos y peticiones son **antes** de lanzar. |
 | **Traer todo el log, sin rango ni tope…** | Todo (más de 200.000 registros). | Miles de peticiones y de 5 a 10 minutos. |
 
 Los dos campos de fecha arrancan con **el mes en curso** (del día 1 al último
 día, en hora de Bogotá), pero solo como **sugerencia visible**: «Cargar los
-últimos 2.000» no las usa. Si lo hiciera, quien solo quiere ver lo último
+últimos 500» no las usa. Si lo hiciera, quien solo quiere ver lo último
 esperaría un mes de datos, y quien dejó las fechas sin mirar cargaría algo que
 no pidió. Por eso son dos botones y no uno que adivine.
 
@@ -169,24 +169,23 @@ un aviso de cuánto cuesta y una casilla de confirmación que se vuelve a
 desmarcar tras cada uso. Que el que lo elija sepa lo que elige.
 
 **Una carga con tope no es la carga completa y se dice así**, no solo en el
-registro: al llegar al tope el registro dice «2.000 registros (los más nuevos)
+registro: al llegar al tope el registro dice «500 registros (los más nuevos)
 de 208.249. No es la carga completa: elige un rango de fechas para ver más», y
-queda una nota fija, resaltada, bajo los botones. Llegar al tope tampoco es
+queda una nota fija de **una línea**, resaltada, bajo los botones. Llegar al tope tampoco es
 «cancelar»: `completo` sigue en `true` y lo que lo delata es `topeAlcanzado`.
 
 Mientras carga:
 
 - el botón muestra **spinner** y queda deshabilitado;
-- la **barra de progreso** avanza con `fraccion` (0 a 1) de `GENESIS.cargarTodo`.
-  Con rango, `total` **crece** mientras se avanza (no se sabe lo que tiene un
+- el progreso va en la **barra del pie** (`MEUI.progreso`). Con rango, `total` **crece** mientras se avanza (no se sabe lo que tiene un
   tramo sin preguntarle), así que `leidos/total` no es monótono y la barra
   retrocedería: medido con tramos de varias páginas, retrocede. Con tope, la
   barra se mide contra `min(tope, total)`: con la fórmula de `fraccion`
   (`leidos/tope`) una tabla de 249 registros terminaría en el 12 %;
 - el texto dice **lo que es verdad en cada modo**: con rango, «Genesis · día
   12/03/2026 (tramo 3 de 8) · 1.230 registros · página 2 de 9» (nunca «X de Y»
-  sobre un total que va creciendo); con tope, «X de N registros (los más
-  nuevos)»; sin rango ni tope, «X de Y registros (página a de b)»;
+  sobre un total que va creciendo; se usa `paso`); con tope, «X/N · registros
+  más nuevos»; sin rango ni tope, «X/Y · registros»;
 - **la tabla se va llenando**, no espera al final.
 
 Los mensajes de fin de carga también cambian según el modo, porque `total`
@@ -249,8 +248,8 @@ filtrarlo cuesta **7 ms**, ordenarlo **26 ms** y sacar una página de 50,
 
 Por eso el filtrado, el orden y la paginación los hace esta herramienta
 (`fuenteDatos`, `ordenadas`, `filaPasaFiltros`) y a DataTables solo le llega
-la página que se está viendo. El buscador propio de la tabla se **suma** al de
-la barra de filtros, no compite con él.
+la página que se está viendo. El **único buscador de texto** es el «Buscar» de
+la tabla (arriba a la derecha); la barra de filtros ya no tiene uno propio.
 
 Las vistas intermedias (lo filtrado, y lo filtrado ya ordenado) se memorizan y
 se invalidan en `render()`, que es por donde pasa todo cambio: así paginar u
@@ -265,12 +264,17 @@ ordenar no vuelve a filtrar 208.000 filas para nada.
 > `--allow-file-access-from-files`, así que técnicamente se podría (IndexedDB);
 > simplemente no hace falta.
 
-Columnas, de izquierda a derecha: casilla · **Línea** · **Operación** ·
-**Resultado** · **Fecha** · HLR/HSS · Estado línea (CM) · Claro · Tigo ·
-Titular (CM) · Documento · Cuenta (BAN) · Canal · Usuario · Descripción · ID ·
-y al final el botón **Ocultar/Mostrar** de cada fila (como en «Estado de
-líneas»). Lo primero es lo que se mira al empezar una llamada de «me
-bloquearon la SIM».
+Columnas visibles por defecto, de izquierda a derecha: casilla · **Acciones**
+(el botón **Ocultar/Mostrar** de cada fila, como en «Estado de líneas») ·
+**Línea** · **Operación** · **Resultado** · **Fecha** · HLR/HSS · Estado CM ·
+IMSI · ID. Claro, Tigo, Titular (CM), Documento, Cuenta (BAN), Canal, Usuario y
+Descripción quedan ocultas y se activan desde el menú **Columnas** de la barra
+de filtros; la exportación lleva todas.
+
+**Filtros:** Operación, Resultado, Operador, Canal y Marcadas van juntos en una
+sola barra, todos con `MEUI.filtroMulti` (varios valores a la vez), seguidos de
+«Ver ocultas», «Mostrar todas», «Limpiar filtros» y «Columnas». La tabla y los
+filtros están siempre a la vista, también sin datos.
 
 **Orden por defecto: de más nuevo a más viejo, por Fecha** (no por `id`). Está
 declarado en DataTables y además es el respaldo de `ordenadas()`: si la tabla
@@ -300,12 +304,16 @@ largos, `1.0` o claves repetidas llegan intactos.
 ### Selección y consultas (de 1 a n)
 
 La **casilla de la cabecera** marca solo **la página que se ve** (queda «a
-medias» si lo están algunas). Marcar más son dos acciones en texto, con su
-cuenta a la vista:
+medias» si lo están algunas). Marcar más son dos acciones en texto, siempre a
+la vista junto a «Desmarcar todo». Lo que se hace con lo marcado (Ocultar
+marcadas, Ocultar no marcadas, Consultar CM, Consultar HLR/HSS y «Consultar en
+ambos») vive en la barra `.me-lote`, que solo aparece cuando hay algo marcado.
+Al terminar una consulta, si hubo fallidas, el pie ofrece «Reintentar
+fallidas» (solo esas líneas):
 
 - **Seleccionar todos (N)**: todo lo que pasa los filtros (N = cuántas filas
   son; no cuenta las ocultas). Suma a lo que ya estaba marcado.
-- **Seleccionar primeros 2.000**: las primeras filas **en el orden en que se
+- **Seleccionar primeros 500**: las primeras filas **en el orden en que se
   ven**, hasta el tope de consultas (`CONFIG.maxSeleccion`). **Reemplaza** la
   selección anterior: el sentido es «justo estas», y sumarlas a otras marcas
   podía volver a pasarse del tope.
@@ -313,8 +321,8 @@ cuenta a la vista:
 «Desmarcar todo» desmarca de verdad todo (antes solo lo filtrado, aunque el
 botón dijera «todo»).
 
-El tope (2.000) es de **consultas**, en líneas únicas, no de marcado: se puede
-marcar todo, pero «Consultar» se niega y manda a «Seleccionar primeros 2.000».
+El tope (500) es de **consultas**, en líneas únicas, no de marcado: se puede
+marcar todo, pero «Consultar» se niega y manda a «Seleccionar primeros 500».
 No es una limitación técnica: marcar cinco mil filas y mandarlas a consultar es
 casi siempre un clic por accidente.
 
@@ -322,8 +330,8 @@ casi siempre un clic por accidente.
 
 Mismo lenguaje que en «Bloquear/Inactivar líneas» y «Cierre masivo de casos»
 (`CMLineas.tablaSeleccionable`): botón **Ocultar/Mostrar** en cada fila, **Ocultar
-marcadas**, **Ocultar no marcadas**, **Mostrar todas** y la casilla **Ver
-ocultas (N)**, con la clase `fila-oculta` (atenuada y tachada).
+marcadas**, **Ocultar no marcadas** (en la barra de lote), **Mostrar todas** y la casilla **Ver
+ocultas (N)** (con los filtros), con la clase `fila-oculta` (atenuada y tachada).
 
 Una fila oculta **no se exporta ni entra en las consultas**, ni siquiera cuando
 «Ver ocultas» la está mostrando: ocultar es «esto no me interesa», no «escóndelo
@@ -334,7 +342,7 @@ un rato». Tampoco cuenta en las tarjetas ni en «Seleccionar todos». «Limpiar
 y el resultado se copia a todas sus filas: en la captura, 249 registros son
 solo 151 líneas únicas.
 
-Hay un tope de **2.000 líneas** por tanda. No es una limitación técnica: marcar
+Hay un tope de **500 líneas** por tanda. No es una limitación técnica: marcar
 cinco mil filas y mandarlas a consultar es casi siempre un clic por accidente.
 
 ### «En batch»: qué significa aquí
@@ -392,14 +400,14 @@ programa dos temporizadores con `columns.adjust()` + `ajustarTablas()`),
 `ajustarTablas()` otra vez al final, y reescribir el `innerHTML` de cuatro
 `<select>`. Ahora, en régimen normal, no hace ninguno:
 
-- `mostrarSiHayDatos` solo cuando la tabla pasa de vacía a con datos (o al
-  revés). «Hay datos» es que haya filas **cargadas**, no que la página tenga
-  filas: un filtro sin coincidencias ya no oculta la tabla y su buscador.
+- El aviso de «sin datos» solo cambia cuando la tabla pasa de vacía a con
+  datos (o al revés). La tabla y los filtros no se ocultan nunca: un filtro sin
+  coincidencias no los esconde.
 - Las opciones de los filtros salen de los datos y se acumulan **al cargar**
   (repintar no recorre 208.000 filas para recalcularlas); si no hay un valor
-  nuevo no se toca el DOM; si lo hay, se **insertan** solo las `<option>` que
-  faltan (la elegida no se mueve); si el `<select>` tiene el foco, se espera a
-  que lo suelte. El de operador es fijo y se escribe una sola vez.
+  nuevo no se toca el DOM; si lo hay, el `filtroMulti` se vuelve a crear
+  conservando lo elegido; si está abierto, se espera a que se cierre. Operador
+  y Marcadas son fijos y se crean una sola vez.
 - `ajustarTablas` no se llama: el alto del panel y los anchos no dependen de
   cuántas filas llegaron, y la tabla ya se re-mide cuando aparece, al cambiar
   el tamaño de la ventana y al abrir o cerrar un paso (eso lo hace `me-ui`).
@@ -449,8 +457,8 @@ en el Edge del analista.
 - **El catálogo de `resultado` es una interpretación**, no un catálogo
   publicado. Un valor nuevo aparece como «Resultado N».
 - **`hlr-consulta.js` es una TERCERA copia** de las reglas de Claro/Tigo
-  (las otras dos son `logica-hlr-cruzado.js` y `logica-hlr-hss-ambos.js`, que
-  ya eran copias entre sí). El texto se copió sin cambiar una línea, pero si
+  (las otras son los motores de HLR/HSS en `assets/herramientas/hlr-hss/`:
+  `ambos.js`, `claro.js` y `tigo.js`). El texto se copió sin cambiar una línea, pero si
   se cambia una regla hay que cambiarla en las tres. Lo sano sería que las tres
   usaran este archivo.
 - **La descarga completa son miles de peticiones seguidas.** Es lenta, no
@@ -466,7 +474,7 @@ en el Edge del analista.
 - **El titular viene de la cuenta de facturación**, que da nombre pero **no
   documento**. Comparar el documento de Genesis contra el del titular en el CM
   sería el paso natural siguiente; esa resolución (subir por la cadena de
-  cuentas) ya existe en `logica-consumos.js` y no se portó aquí para no dejar
+  cuentas) ya existe en la herramienta Consumos y no se portó aquí para no dejar
   una cuarta copia de la misma lógica sin poder probarla.
 
 ---
@@ -475,7 +483,9 @@ en el Edge del analista.
 
 | Versión | Cambios |
 |---|---|
-| **1.2.0** | Columna **IMSI** (la del HLR/HSS, copiable) y línea copiable en la tabla. |
+| 1.3.0 (refactor) | Refactor interno, sin cambios de comportamiento: lógica y enganche se unen en `assets/herramientas/titularidad/titularidad.js`, el CSS sale del HTML a `titularidad.css`, y se elimina código sin uso (`vivas`, `indexar`). |
+| **1.3.0** | Migración a la base de UI nueva: filtros juntos con `MEUI.filtroMulti` (sin buscador propio; queda el «Buscar» de la tabla), tabla y filtros siempre visibles, columnas por defecto Acciones · Línea · Operación · Resultado · Fecha · HLR/HSS · Estado CM · IMSI · ID con menú «Columnas», barra de lote para las acciones sobre lo marcado, progreso en el pie (`MEUI.progreso`) con «Reintentar fallidas», ayudas «?» en lugar de textos largos, y tope de 500 registros (carga y selección). |
+| 1.2.0 | Columna **IMSI** (la del HLR/HSS, copiable) y línea copiable en la tabla. |
 | 1.1.1 | La herramienta pasa a llamarse **«Bloqueos SIM x Titularidad»** (antes «Titularidad · Bloqueos de SIM») en el menú, la portada, la página y la documentación. Sin cambios de funcionamiento. |
-| 1.1.0 | Carga por defecto de «los últimos N» (tope de `GENESIS.CONFIG`), rango de fechas sin tope con aviso de tramos antes de lanzar y «Traer todo» aparte y con confirmación; barra de progreso por `fraccion`; mensajes de fin de carga ciertos en los tres modos. Columnas Línea · Operación · Resultado · Fecha primero y orden por defecto de más nuevo a más viejo. La casilla de la cabecera marca solo la página; «Seleccionar todos (N)» y «Seleccionar primeros 2.000». Mostrar/Ocultar filas (no se exportan ni se consultan). Filtro por operador. Casilla «Consultar en ambos HLR/HSS» (el HLR/HSS va en cascada por defecto) y tarjeta «HLR no concluyente». Menos recálculos de layout por repintado. Detalle de fila buscado dentro de su día. |
+| 1.1.0 | Carga por defecto de «los últimos N» (tope de `GENESIS.CONFIG`), rango de fechas sin tope con aviso de tramos antes de lanzar y «Traer todo» aparte y con confirmación; barra de progreso por `fraccion`; mensajes de fin de carga ciertos en los tres modos. Columnas Línea · Operación · Resultado · Fecha primero y orden por defecto de más nuevo a más viejo. La casilla de la cabecera marca solo la página; «Seleccionar todos (N)» y «Seleccionar primeros 500». Mostrar/Ocultar filas (no se exportan ni se consultan). Filtro por operador. Casilla «Consultar en ambos HLR/HSS» (el HLR/HSS va en cascada por defecto) y tarjeta «HLR no concluyente». Menos recálculos de layout por repintado. Detalle de fila buscado dentro de su día. |
 | **1.0.0** | Versión inicial. Carga completa del log de Genesis, enriquecimiento bajo demanda con CM y HLR/HSS sobre las líneas marcadas, filtros, detalle con el SOAP crudo y exportación. |

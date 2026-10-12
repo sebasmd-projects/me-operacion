@@ -1,8 +1,10 @@
 # Base compartida y lanzador `dame click.bat` — Documentación técnica
 
-> **Versión: v3.2.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v4.0.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+>
+> **Dónde vive cada versión (una sola vez):** la de la **base** (esta documentación, el shell, el lanzador) está en `scripts\VERSION` y en `ME_CATALOGO.version` de `assets/base/catalogo.js`, que el empaquetador mantiene iguales; la de **cada herramienta** está únicamente en su entrada del catálogo (`version`). El HTML ya no la repite en `MEUI.init`; el **historial del README** de la herramienta sí menciona cada versión (una fila por cambio), y al subirla se tocan solo esos dos sitios: el catálogo y el historial.
 
-Las herramientas de operación son archivos HTML independientes, pero **comparten una base**: el mismo marco visual, la misma sesión y el mismo acceso al CM. Esa base son tres archivos (`me-ui.css`, `me-ui.js`, `me-api.js`) más el lanzador `dame click.bat` + `scripts\lanzador.ps1`, que deja la sesión lista antes de que aparezca la primera página.
+Las herramientas de operación son archivos HTML independientes, pero **comparten una base**: el mismo marco visual, la misma sesión y el mismo acceso al CM. Esa base son cinco archivos en `assets/base/` (`me-ui.css`, `me-ui.js`, `me-api.js`, `catalogo.js`, `dependencias.js`) más el lanzador `dame click.bat` + `scripts\lanzador.ps1`, que deja la sesión lista antes de que aparezca la primera página.
 
 > **En la raíz del proyecto solo quedan tres archivos «externos»**: `index.html`, `dame click.bat` y `actualizar.bat`. Todo lo demás vive ordenado en subcarpetas — **todo `.ps1` en `scripts\`** (incluido el empaquetador, que nunca se distribuye), toda la documentación en `doc\`. Ver el árbol completo en §2.
 
@@ -16,7 +18,7 @@ Las herramientas de operación son archivos HTML independientes, pero **comparte
 > **instalar una actualización quedó en `actualizar.bat`, aparte y
 > siempre a mano** — ver §7.
 
-> Cambiar una URL del CM, una cabecera o el manejo del token se hace **una vez** en `me-api.js`. Cambiar un color, el alto de las tablas o el formato de exportación se hace **una vez** en `me-ui`.
+> Cambiar una URL del CM, una cabecera o el manejo del token se hace **una vez** en `me-api.js`. Cambiar un color, el alto de las tablas o el formato de exportación se hace **una vez** en `me-ui`. Agregar o renombrar una herramienta se hace **una vez** en `catalogo.js`. Cambiar la versión de una librería se hace **una vez** en `dependencias.js`.
 
 ---
 
@@ -42,30 +44,72 @@ scripts\                      TODO archivo .ps1 del proyecto vive aquí
   VERSION                        número de versión de esta copia
 
 assets\
-  me-ui.css                 sistema de diseño: color, shell, pasos, tablas, log
-  me-ui.js                  shell (lateral/cabecera/pie), sesión compartida,
-                            registro, defaults y alto de DataTables,
-                            lectura de líneas/Excel y exportación
-  me-api.js                 endpoints, cabeceras, objeto auth y llamadas al CM
-  logica-<herramienta>.js    reglas de negocio propias de cada herramienta
-  me-<herramienta>-puente.js enganche entre esa lógica y el shell
+  base\                     la base: la usan todas las herramientas
+    me-ui.css                 sistema de diseño: color, shell, pasos, tablas, log
+    me-ui.js                  shell (lateral/cabecera/pie), sesión compartida,
+                              registro, defaults y alto de DataTables,
+                              lectura de líneas/Excel y exportación
+    me-api.js                 endpoints, cabeceras, objeto auth y llamadas al CM
+    catalogo.js               catálogo ÚNICO de herramientas (window.ME_CATALOGO)
+    dependencias.js           registro ÚNICO de librerías de CDN (versión y URLs)
+  compartido\               módulos que usan varias herramientas, sin ser la base
+    cm-lineas.js              operaciones de línea del CM (Bloquear/Inactivar, Cambio IMSI y línea, Titularidad)
+    hlr-consulta.js           motor de ubicación Claro + Tigo (Titularidad)
+    tulio-plu.js              Tulio RecargaPaquete (Aplicar PLU y Consumos)
+    genesis-api.js            sesión y paginación de Genesis
+    genesis-bookmarklet.js    código del marcador que lleva el token de Genesis
+  herramientas/<id>/        una carpeta por herramienta, incluida inicio
+    <id>.js                 configuración, reglas de negocio e interfaz (lógica y puente unidos)
+    <id>.css                estilos exclusivos, fuera del HTML
+    motores adicionales     solo cuando la herramienta los necesita
 ```
 
-Orden de carga, idéntico en todas las páginas:
+Cada herramienta (y la portada) trae en su `<head>` el registro de librerías y, al final, el catálogo y el shell. Orden de carga, idéntico en todas las páginas (en `index.html`, en la raíz, sin el `../`):
 
 ```html
-<script src="assets/me-ui.js"></script>
-<script> MEUI.init({ app, version, titulo, sesiones, instrucciones }); </script>
-<script src="assets/me-api.js"></script>
-<script src="assets/logica-<herramienta>.js"></script>
-<script src="assets/me-<herramienta>-puente.js"></script>
+<head>
+  <script src="../assets/base/dependencias.js" data-me-deps="datatables xlsx"></script>
+  <link rel="stylesheet" href="../assets/base/me-ui.css">
+  <link rel="stylesheet" href="../assets/herramientas/prepagadas/prepagadas.css">
+</head>
+...
+<script src="../assets/base/catalogo.js"></script>
+<script src="../assets/base/me-ui.js"></script>
+<script> MEUI.init({ app: "prepagadas", sesiones: ["sime", "cm"], instrucciones: [...] }); </script>
+<script src="../assets/base/me-api.js"></script>
+<script src="../assets/compartido/<módulo>.js"></script>     <!-- solo los que use -->
+<script src="../assets/herramientas/prepagadas/prepagadas.js"></script>
 ```
 
-El orden importa: `MEUI.init()` va **antes** de la lógica porque mueve el contenido dentro del shell y porque consume los parámetros que deja el lanzador en la URL.
+El orden importa: `dependencias.js` va primero en el `<head>` y antes de `me-ui.css`, para que las librerías estén cargadas y el CSS propio pise al de Bootstrap; `MEUI.init()` va **antes** de la lógica porque mueve el contenido dentro del shell y porque consume los parámetros que deja el lanzador en la URL. En `MEUI.init` solo quedan lo propio de la página (`app`, `sesiones`, `sesionesOpcionales`, `instrucciones`…): el **título, la descripción, la versión y la documentación se toman del catálogo** por el `app`. Lo que la página pase aparte tiene prioridad sobre el catálogo.
+
+Cada herramienta vive en `assets/herramientas/<id>/`: su JS une configuración, reglas de negocio e interfaz; su CSS se enlaza después de la base. Inicio sigue la misma regla (`assets/herramientas/inicio/inicio.js` e `inicio.css`). HLR/HSS, Cambio IMSI y línea y otras herramientas con motores adicionales conservan esos archivos en su propia carpeta, listados en `codigo.archivos` en orden de carga.
+
+**Dónde va cada estilo:** si se usa en dos o más herramientas, va a «Componentes compartidos» de `assets/base/me-ui.css`; si solo lo usa una, va a su `<id>.css`. No se incrusta CSS en el HTML ni se copia un componente compartido. Los colores equivalentes usan `.badge-estado`; las diferencias necesarias de tamaño o estado se definen una sola vez en la base, con variantes por `body[data-me-herramienta]` y `:where` para conservar la especificidad. El atributo del body coincide con el `app` del catálogo.
+
+### El catálogo (`assets/base/catalogo.js`)
+
+Define `window.ME_CATALOGO` con:
+
+| Campo | Qué es |
+|---|---|
+| `version` | Versión de la base. Igual a `scripts\VERSION`: el empaquetador la reescribe en este archivo. |
+| `grupos` | Los grupos del menú lateral, en orden (`Inicio`, `Consultas`, `Operaciones`, `HLR/HSS`, `Utilidades`). |
+| `herramientas` | Una entrada por página, **en el orden de las tarjetas y del Backlog de Inicio**. |
+| `base` | La base compartida: no es una página, pero sus archivos van en el Backlog y en las descargas. |
+| `buscar(id)` | La entrada con ese `id`. |
+
+Cada herramienta lleva `id`, `nombre` (título de la página, de la tarjeta y del Backlog), `menu` (etiqueta más corta del menú, opcional), `grupo` y `orden` (posición dentro del grupo; sin `grupo` no sale en el menú), `icono`, `resumen` (la línea bajo el título), `descripcion` (la tarjeta), `estado`, `version`, `html`, `doc`, `codigo` (`descripcion` y `archivos` `{ ruta, tipo }`, además del HTML), `docDescripcion` y, si la página existe pero no debe salir en Inicio, `enInicio: false`. Todas las rutas son relativas a la **raíz** del proyecto; `me-ui.js` las traduce según la página que las use. La prueba de la suite comprueba que cada ruta del catálogo exista.
+
+### Las dependencias (`assets/base/dependencias.js`)
+
+Es un registro de librerías: para cada una, `nombre`, `version`, `requiere` (otras librerías que van antes: DataTables arrastra a jQuery), `css` y `js` (con `{v}` donde va la versión). Cada página declara lo que usa en `data-me-deps` (`datatables`, `xlsx`, `tomselect`, `jszip`, `jspdf`, `lamejs`, `chartjs`, `marked`) y el script escribe los `<link>` y `<script>` con `document.write`. Bootstrap, Bootstrap Icons y las fuentes se cargan **siempre**. Se usa `document.write` y no `createElement` porque las herramientas son scripts clásicos que se abren sobre `file://`, no hay paso de construcción y los `<script>` escritos durante el análisis del HTML se descargan y ejecutan **en orden y de forma síncrona**, antes de los scripts de la página; con `createElement` el orden no está garantizado y `import`/`fetch` los bloquea `file://`. `jspdf` se marca `defer` para no retrasar el primer pintado de la página (pesa unos 350 KB).
 
 ---
 
 ## 3. Herramientas de terceros
+
+Las versiones de esta tabla viven en `assets/base/dependencias.js`; aquí se resumen.
 
 | Librería | Versión | Para qué se usa |
 |---|---|---|
@@ -75,7 +119,8 @@ El orden importa: `MEUI.init()` va **antes** de la lógica porque mueve el conte
 | **jQuery** | 3.7.1 | Dependencia de DataTables. |
 | **SheetJS (xlsx)** | 0.18.5 | Leer `.xlsx`/`.csv` y exportar a `.xlsx`. |
 | **Tom Select** | 2.4.3 | Selects con búsqueda y etiquetas editables. |
-| **marked** | última | Renderiza los README en el inicio. |
+| **marked** | 12.0.2 | Renderiza los README en el inicio y en el modal de documentación. |
+| **JSZip** · **jsPDF** · **lamejs** · **Chart.js** | 3.10.1 · 2.5.1 · 1.2.1 · 4.4.1 | ZIP de filiales y de audios · PDF del rechazo · MP3 · gráficas de Consumos. Solo las páginas que los declaran. |
 | **Archivo / IBM Plex Mono** | — | Tipografías (Google Fonts). |
 
 | Servicio | Para qué se usa |
@@ -83,10 +128,10 @@ El orden importa: `MEUI.init()` va **antes** de la lógica porque mueve el conte
 | **Keycloak** (`optiva`) | Autenticación OpenID Connect del CM: *direct grant* y *refresh token*. |
 | **API Gateway OBP** | Todas las consultas y órdenes al CM de todas las herramientas. |
 | **SIME / SIME Web** | Solo lo usa el reporte de prepagadas (token `prf` por NTLM). |
-| **Tulio** | Solo Aplicar PLU (`client_credentials` + `RecargaPaquete`); la autenticación vive en `logica-plu.js`, no en `me-api.js`. |
-| **QDN Claro / HLR Tigo** | Motores de HLR/HSS y validadores; cada uno con su propia autenticación en su `logica-*.js`. |
+| **Tulio** | Aplicar PLU y Consumos (`client_credentials` + `RecargaPaquete`); la autenticación vive en `assets/compartido/tulio-plu.js`, no en `me-api.js`. |
+| **QDN Claro / HLR Tigo** | Motores de HLR/HSS y validadores; cada uno con su propia autenticación en su carpeta de `assets/herramientas/`. |
 
-CDNs usados: jsdelivr, datatables.net, code.jquery.com, cdnjs. Todos externos (ver §9).
+CDNs usados: jsdelivr, datatables.net, code.jquery.com, cdnjs y Google Fonts. Todos externos (ver §9).
 
 ---
 
@@ -127,29 +172,42 @@ Cabeceras que agrega `MEAPI.cabeceras()` a cada llamada: `Accept`, `Cache-Contro
 
 ### Shell (lo que ve el analista en todas las herramientas)
 
-- **Menú lateral** con las páginas registradas en `APPS`, contraíble a solo iconos (la flecha cambia de sentido) y recordado entre archivos. Bajo 992 px se convierte en menú deslizante con botón hamburguesa. Las rutas de `APPS` están escritas desde `herramientas/`; `rutaNav()` las traduce cuando quien pinta el menú es la portada, que vive en la raíz.
+- **Menú lateral** armado desde `ME_CATALOGO` (grupos, `orden`, `menu`/`nombre` e `icono`), contraíble a solo iconos (la flecha cambia de sentido) y recordado entre archivos. Bajo 992 px se convierte en menú deslizante con botón hamburguesa. Las rutas del catálogo son relativas a la raíz; `rutaDesdeRaiz()` les antepone `../` cuando quien pinta el menú es una herramienta (carpeta `herramientas/`).
 - **Cabecera**: título, descripción y un **chip por sesión** (SIME y/o CM) con semáforo: verde activa, naranja por expirar, rojo expirada, gris sin sesión. Muestra el usuario y los segundos que faltan. Al hacer clic se abre un menú con *iniciar sesión*, *cerrar* y *olvidar credenciales*.
 - **Pie** con el título, la versión, la fecha de apertura (la que pasa el lanzador) y el tiempo que lleva abierta.
 - **Pasos plegables** (`data-me-paso`): se abren solos según haya sesión o no (`sin-sesion` / `con-sesion` / `siempre` / `nunca`), y muestran un resumen gris a la derecha.
 - **Registro** con las instrucciones de uso impresas al abrir, más cada evento con hora y color. Captura además cualquier error de JavaScript de la página, así que no hace falta abrir la consola.
 - **Avisos flotantes** y **spinner dentro del botón** para toda acción que tarde.
 
+### Buscador global
+
+La cabecera permite buscar herramientas con `/` o `Ctrl+K`. Busca sin distinguir
+mayúsculas ni tildes y separa los términos por espacios, `/`, `|` y comas: basta
+que coincida cualquiera. Prioriza nombre, después contexto y finalmente
+descripción o resumen; los empates conservan el orden del catálogo.
+
+Las palabras se agregan **solo en `contexto: [...]` de cada herramienta en
+`assets/base/catalogo.js`**: sistemas que consulta, operadores, datos y acciones
+que realiza. Por ejemplo, el contexto HLR/HSS permite encontrar también
+Portabilidad Tigo y Titularidad. `ME_CATALOGO.buscar(texto)` devuelve un arreglo
+ordenado de herramientas; `ME_CATALOGO.obtener(id)` recupera una por su id.
+La consulta vacía devuelve todas las herramientas visibles en Inicio.
+
+En Inicio filtra tarjetas y Backlog. En las demás páginas muestra enlaces con
+icono, nombre y resumen: flechas para elegir, Enter para abrir y Escape para
+cerrar. En móvil la lupa despliega el campo.
+
 ### Dar de alta una herramienta nueva
 
-Una herramienta se registra en **dos sitios distintos**, y hay que tocar los dos
-o queda a medias: si falta el primero no aparece en el menú lateral y **no se
-puede llegar a ella navegando**; si falta el segundo no sale en la portada.
+Una herramienta se registra en **un solo sitio**: un objeto nuevo en `herramientas` de `assets/base/catalogo.js`. De ahí salen el menú lateral, la tarjeta y el Backlog de la portada, y el título, la descripción, la versión y la documentación que `MEUI.init` muestra en la página.
 
-| Dónde | Qué se agrega | Para qué |
-| --- | --- | --- |
-| `assets/me-ui.js` → `APPS` | `{ id, titulo, icono, url }` dentro del grupo que corresponda | El **menú lateral**, que es el mismo en todas las páginas |
-| `assets/logica-inicio.js` → `PROYECTOS` | La tarjeta con sus entregables y rutas | La **portada**: descarga de código y documentación |
+1. Crea `herramientas/<nombre>.html` y copia el `<head>` de otra: `dependencias.js` con las librerías que use en `data-me-deps`, y después `me-ui.css`. Al final del `<body>`: `catalogo.js`, `me-ui.js`, `MEUI.init({ app: "<id>", sesiones, instrucciones })`, `me-api.js`, los módulos de `assets/compartido/` que use, los motores adicionales que necesite y `assets/herramientas/<id>/<id>.js`. Crea en esa misma carpeta `<id>.css` y enlázalo después de la base.
+2. Crea `doc/<carpeta>/README.md` con su historial (la versión inicial va en la primera fila).
+3. Agrega la entrada al catálogo: `id` (el mismo `app` de la página), `nombre`, `grupo` y `orden` en el menú, `icono`, `resumen`, `descripcion`, `contexto` (sistemas, operadores, datos y acciones reales; alimenta el buscador global), `estado`, `version`, `html`, `doc`, `codigo.archivos` y `docDescripcion`. Su posición en el arreglo es su posición en Inicio.
+4. Si necesita una librería que no está en `dependencias.js`, agrégala ahí una vez (nombre, versión, URLs) y decláralo en `data-me-deps`.
+5. Corre la prueba: comprueba que cada ruta del catálogo exista, que el HTML y el catálogo coincidan y que la página cargue sin errores.
 
-El `id` debe ser el mismo en los dos sitios y coincidir con el `app` que la
-página pasa a `MEUI.init()`; es lo que marca el elemento activo del menú.
-
-El lanzador `dame click.bat` no hace falta tocarlo: abre solo dos páginas de
-entrada y desde ahí se navega con el menú.
+No hay que tocar `me-ui.js`, `assets/herramientas/inicio/inicio.js` ni `dame click.bat` (que abre solo dos páginas de entrada; desde ahí se navega con el menú).
 
 ### Sesión compartida
 
@@ -159,7 +217,9 @@ Si el navegador bloquea el almacenamiento (Edge lo hace en `file://` con la prev
 
 ### Tablas
 
-`MEUI.tabla()` aplica los mismos defaults: idioma en español, `scrollX`, orden y búsqueda, y un `lengthMenu` con valores pequeños para revisar línea por línea. `MEUI.registrarTabla()` calcula **al píxel** el alto del cuerpo para que filtros, controles, filas y paginación quepan en pantalla sin scroll de página, y lo rehace al cambiar el tamaño de la ventana, al plegar un paso o al contraer el menú. `MEUI.mostrarSiHayDatos()` esconde la tabla mientras no haya datos y la muestra al llegar el primer resultado.
+`MEUI.tabla()` aplica los mismos defaults: idioma en español, `scrollX`, orden y búsqueda, y un `lengthMenu` con valores pequeños para revisar línea por línea. En escritorio (≥1200px), el área de trabajo con tablas ocupa el alto disponible mediante flex: las barras y controles conservan su alto y solo el cuerpo de DataTables se desplaza. `MEUI.registrarTabla()` ajusta los anchos; el alto lo reparte CSS, también dentro de pestañas. Los paneles `data-me-alto="fijo"` conservan su alto explícito y las pantallas menores usan un cuerpo de tabla de 42vh. `MEUI.mostrarSiHayDatos()` esconde la tabla mientras no haya datos y la muestra al llegar el primer resultado.
+
+**Convención de barras:** filtros, selección y lote de una misma tabla son hijos de un único `<div class="me-barras">`, antes de `.me-tabla-panel`, tanto en `.me-trabajo-datos` como dentro de una pestaña. La selección usa `.me-filtros`. Las barras comparten filas cuando caben y hacen wrap cuando falta ancho; ninguna barra ni control de DataTables es sticky. En escritorio permanecen visibles porque solo se desplazan las filas. En pantallas menores la columna de pasos es sticky, con su propio scroll y el botón de contraer siempre accesible. La base observa tamaños con `ResizeObserver` y cambios de visibilidad/marcado con `MutationObserver`: filtros, lote, estados, avisos y paneles montados disparan un reajuste con debounce de 120ms, sin código por herramienta ni observar el interior de DataTables.
 
 ### Entrada y salida de datos
 
@@ -187,11 +247,8 @@ dame click.bat
    me-api.js ── auth ────> token del CM, renovación y re-auth en 401
                                   │
                                   v
-   logica-<herramienta>.js ─────> reglas de negocio (consultas propias)
-                                  │
-                                  v
-   me-<herramienta>-puente.js ──> conecta ambas: chips, pasos, tablas,
-                                  spinners y exportaciones
+   herramientas/<id>/<id>.js ──> configuración, reglas e interfaz:
+                                  chips, pasos, tablas, spinners y exportaciones
 ```
 
 ---
@@ -299,7 +356,7 @@ Qué entra en el paquete (lista fija, no "todo lo que haya en la carpeta"): `ind
 
 ```js
 // --- me-ui.js ---
-MEUI.init({ app, version, titulo, descripcion, sesiones, instrucciones, apps })
+MEUI.init({ app, sesiones, sesionesOpcionales, instrucciones })   // titulo, descripcion, version y doc salen del catálogo
 MEUI.log(mensaje, "ok|err|warn|info") / MEUI.limpiarLog() / MEUI.toast(msg, nivel)
 MEUI.ocupado(btn, texto) / MEUI.libre(btn) / MEUI.conSpinner(btn, texto, fn)
 MEUI.autoSpinner("#btn", texto) / MEUI.enterEjecuta(input, boton)
@@ -333,8 +390,10 @@ Módulos compartidos fuera de la base, por página:
 
 | Objeto | Archivo | Lo usan |
 |---|---|---|
-| `window.MEPAQ` | `logica-paquetes-carga.js` | Consumos (carga de paquetes). |
-| `window.CMLineas` | `cm-lineas.js` | Bloquear/Inactivar líneas, Cambio IMSI Claro\|Tigo y Cambio MSISDN Claro\|Tigo (resolver línea, cuenta exacta, SIM, órdenes y tabla con casillas). |
+| `window.ME_CATALOGO` | `base/catalogo.js` | Menú, Inicio y `MEUI.init` (§2). |
+| `window.ME_DEPENDENCIAS` | `base/dependencias.js` | `me-ui.js` (URL de `marked`). |
+| `window.MEPAQ` | `assets/herramientas/consumos/paquetes.js` | Consumos (carga de paquetes). |
+| `window.CMLineas` | `compartido/cm-lineas.js` | Bloquear/Inactivar líneas y Cambio IMSI y línea Claro\|Tigo (resolver línea, cuenta exacta, SIM, órdenes y tabla con casillas). |
 
 ---
 
@@ -351,15 +410,27 @@ Módulos compartidos fuera de la base, por página:
 
 ---
 
+### Componentes y criterios comunes
+
+- **Copiar:** `MEUI.copiable(valor, nombre)` devuelve `.me-copiable` con el botón compacto a la izquierda y el dato en la misma línea. Se usa para línea/MSISDN, línea nueva, IMSI, ICCID, cuenta/BAN, SubscriptionID, documento y caso/ticket. En cabeceras estáticas, envolver botón y dato con esa clase, en ese orden, conservando `data-copy-target` y el id del dato. Los payloads conservan su botón para copiar el contenido completo. `MEUI.esIdentificacion(nombre)` centraliza el criterio para etiquetas variables de los detalles del CM y HLR.
+- **Acciones primero:** las tablas principales colocan «Acciones» antes de los datos; cuando hay selección, el orden es casilla, Acciones y datos. Cabecera, menú y exportación se derivan de las definiciones de columnas; los índices se resuelven desde ellas, no mediante desplazamientos manuales. Las tablas de cálculo o informes sin acciones conservan sus columnas de datos.
+- **Archivo:** `MEUI.zonaArchivo(contenedor, { accept, texto, alElegir(archivo, archivos) })` prepara el input existente dentro de `[data-me-dropzone]`. Incluye clic, Enter/Espacio, arrastrar/soltar, estado de arrastre y nombre(s) seleccionado(s); respeta `multiple` y `accept`. Sin callback, mantiene los listeners `change` del input. `MEUI.init` prepara todos los inputs de archivo, y las pestañas dinámicas llaman al componente al montar. Devuelve `{ el, limpiar() }`; volver a llamarlo actualiza las opciones sin duplicar eventos. El componente no lee ni transforma el archivo: eso corresponde a cada herramienta.
+- **Cabecera:** una línea de 44 px con título en negrita, separador `|`, descripción gris truncada, buscador global centrado y sesiones a la derecha. Se conservan la búsqueda del catálogo, los atajos `/` y Ctrl/Cmd+K, navegación por flechas, Enter y Escape y el filtro de tarjetas de Inicio. En móvil, la lupa despliega el campo.
+- **Layout de escritorio:** desde 1200 px el área de trabajo ocupa el alto disponible, incluidos sus ancestros y pestañas; el cuerpo de la tabla y los pasos tienen su propio scroll. «Contraer» permanece fuera del scroll de los pasos. Un estado vacío se retira al dibujarse filas reales. El estado recordado del lateral y de los pasos se aplica antes del primer pintado, y las transiciones del lateral se habilitan tras ese pintado.
+
 ## 10. Historial de cambios
 
 | Versión | Cambios |
 |---|---|
-| **3.2.0** | Base compartida: al llegar resultados (una tabla pasa de vacía a tener filas) se **contraen el menú y la columna de pasos** para dejarle el ancho a los datos; no se guarda y no se repite con cada filtro (`MEUI.enfocarDatos`). `MEUI.copiable(valor, nombre)`: valor con botón de copiar. `MEAPI.imsi(cardPackageID)`: IMSI de la línea desde la SIM del CM, con caché. El botón de copiar ya no dispara el clic de la fila (no abre el detalle). |
+| **4.0.0** | **Ronda 4 · Base común:** copiar a la izquierda con `MEUI.copiable`, Acciones primero e índices derivados, corrección del alto en pestañas y del estado vacío con filas, cabecera de 44 px con buscador global, lateral y pasos sin parpadeo inicial y componente único `MEUI.zonaArchivo` para todos los inputs de archivo. |
+| **4.0.0** | **Corrección de barras y scroll:** convención `.me-barras` para filtros, selección y lote, sin sticky superpuestos; layout flex de escritorio con scroll exclusivo en el cuerpo de DataTables, incluidas pestañas; pasos y botón siempre accesibles y reajuste automático con observadores y debounce al aparecer barras, estados o avisos. |
+| **4.0.0** | **Una sola fuente de verdad y carpetas de la base.** `assets/base/catalogo.js` es el catálogo único de herramientas (id, nombre, grupo, icono, descripción, HTML, doc, versión, estado y archivos): de él salen el menú lateral, las tarjetas y el Backlog de Inicio y el título, la descripción, la versión y el README de cada página; `APPS` y `PROYECTOS` desaparecen y `MEUI.init` conserva solo lo propio de la página. `assets/base/dependencias.js` registra las librerías de CDN (versión y URLs) y cada HTML declara lo que usa con `data-me-deps`; cambiar una versión ya no obliga a tocar 18 archivos. La base queda en `assets/base/` (`me-ui.js`, `me-ui.css`, `me-api.js`, `catalogo.js`, `dependencias.js`) y lo compartido en `assets/compartido/` (`cm-lineas.js`, `hlr-consulta.js`, `tulio-plu.js`, `genesis-api.js`, `genesis-bookmarklet.js`). Inicio muestra «Exportar casos · Tipificación» de última. `empaquetar-release.ps1` mantiene `ME_CATALOGO.version` igual a `scripts\VERSION`. Resume además el trabajo de UX de esta tanda: tarjetas KPI compactas, filtros y lote fijos arriba de la tabla, barra de progreso en el pie, confirmación antes de escribir en producción, ayudas «?» en los controles, modal de detalle de 90vw × 90vh, accesibilidad, Inicio en cuadrícula de tarjetas y la unión de Cambio IMSI y Cambio de línea en una sola herramienta con pestañas. **Consolidación:** una carpeta por herramienta en `assets/herramientas/<id>/`, lógica y puente unidos y CSS fuera del HTML (incluida Inicio); componentes compartidos en `assets/base/me-ui.css`; eliminación de Validador QDN, QDN Tigo y Validador HLR cruzado y de su código, reemplazadas por HLR/HSS, cuya documentación integra el detalle técnico e historial de los tres motores. |
+| 3.3.0 | El menú de herramientas **recuerda su posición de scroll** entre archivos: al abrir otra herramienta queda donde estaba (si no hay posición guardada, se centra en la herramienta abierta). El botón «Contraer» de la columna de pasos queda **fijo arriba, fuera del scroll**: los pasos van en su propio contenedor con scroll (`.me-trabajo-pasos`), así el botón no se desplaza ni tapa ningún paso. |
+| 3.2.0 | Base compartida: al llegar resultados (una tabla pasa de vacía a tener filas) se **contraen el menú y la columna de pasos** para dejarle el ancho a los datos; no se guarda y no se repite con cada filtro (`MEUI.enfocarDatos`). `MEUI.copiable(valor, nombre)`: valor con botón de copiar. `MEAPI.imsi(cardPackageID)`: IMSI de la línea desde la SIM del CM, con caché. El botón de copiar ya no dispara el clic de la fila (no abre el detalle). |
 | 3.1.0 | **Aviso de versión nueva en la página**: cuando `dame click.bat` encuentra una versión publicada mayor, la pasa en la URL (`nv`, `va`) y `MEUI` muestra un modal «Nueva versión X» con «Actual Y → Nueva X», una sola vez, al abrir. Al navegar entre herramientas no se repite. Solo acepta números de versión (`X.Y.Z`). |
 | 3.0.0 | **Releases desde la carpeta de red de la compañía** (`\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release`), única fuente en lugar de `https://sebasmd.com/me/operacion/`. `empaquetar-release` publica ahí solo (`.zip` primero, hash de la copia verificado, `version.json` al final; no reutiliza una versión ya publicada salvo `-Forzar`; sin acceso deja todo en `release\`), con `-SinPublicar`, `-Destino` y `-Puente` (recuerda subir la 3.0.0 también a sebasmd.com para las copias 2.x). `dame click.bat` lee `version.json` de la carpeta con tope de 6 s (runspace aparte, para no quedar colgado 20-60 s sin VPN). `actualizar.bat` copia el `.zip` a `%TEMP%`, rechaza nombres de `.zip` que no sean un archivo suelto y exige `sha256`. Ambos aceptan `/origen:"<carpeta>"`. Fix: el mensaje de hash que no coincide mostraba `Esperado: {0}` sin el valor. |
 | 2.4.1 | Documentación: el texto deja de hablar de «cuatro herramientas»; se agregan Tulio, QDN Claro y HLR Tigo a los servicios; la API de `me-ui.js` incluye `montarTogglePasos`, `copiarTexto`, `abrirDoc`, el evento `me:sesion-cambio`, Esc con modales anidados, los alias de la columna de línea y los módulos `MEPAQ`/`CMLineas`; y el riesgo de la auto-actualización se corrige: sí hay verificación SHA-256, aunque no protege de una publicación maliciosa. |
-| 2.4 | Reordenamiento de archivos: en la raíz del proyecto solo quedan `index.html`, `dame click.bat` y `actualizar.bat`; **todo `.ps1` se mueve a `scripts\`** (`lanzador.ps1`, `actualizar.ps1` y también `empaquetar-release.ps1`/`.bat`, que nunca se distribuye), y `VERSION` se mueve a `scripts\VERSION`. `dame click.bat`/`actualizar.bat` pasan a invocar `scripts\lanzador.ps1` / `scripts\actualizar.ps1`. `lanzador.ps1` y `actualizar.ps1` limpian solos, la primera vez que los ven, los restos de `lanzador.ps1`/`actualizar.ps1`/`VERSION` sueltos en la raíz que deja una actualización desde una versión anterior a esta (robocopy sin `/MIR` no los borra solo). `actualizar.ps1` ahora muestra la versión publicada además de la local al decir "ya estás al día". Se corrige además un bug real: `version.json` se generaba con BOM (`Set-Content -Encoding UTF8` en Windows PowerShell 5.1 siempre lo agrega), lo que hacía que `Invoke-RestMethod` devolviera un objeto vacío sin avisar de ningún error — la versión publicada se leía como "0.0". Se corrigió en el origen, en `empaquetar-release.ps1`, que escribe UTF-8 sin BOM. El lanzador y el actualizador también leen los bytes explícitamente como UTF-8 y normalizan Unicode para tolerar encabezados HTTP incompletos o alterados por un proxy. `GETTINGSTARTED.md` y el `README.md` general se mueven a `doc\`. Guía de instalación y mapa del proyecto: `doc/GETTINGSTARTED.md` y `doc/README.md`. Se retira el servidor local experimental (`server\`, `doc/servidor-local` y el modo dual de `assets/me-api.js`): la prueba real en un equipo de analista quedó bloqueada por el antivirus/EDR, el mismo problema que se buscaba evitar. Queda como riesgo abierto sin solución (ver §9). |
+| 2.4 | Reordenamiento de archivos: en la raíz del proyecto solo quedan `index.html`, `dame click.bat` y `actualizar.bat`; **todo `.ps1` se mueve a `scripts\`** (`lanzador.ps1`, `actualizar.ps1` y también `empaquetar-release.ps1`/`.bat`, que nunca se distribuye), y `VERSION` se mueve a `scripts\VERSION`. `dame click.bat`/`actualizar.bat` pasan a invocar `scripts\lanzador.ps1` / `scripts\actualizar.ps1`. `lanzador.ps1` y `actualizar.ps1` limpian solos, la primera vez que los ven, los restos de `lanzador.ps1`/`actualizar.ps1`/`VERSION` sueltos en la raíz que deja una actualización desde una versión anterior a esta (robocopy sin `/MIR` no los borra solo). `actualizar.ps1` ahora muestra la versión publicada además de la local al decir "ya estás al día". Se corrige además un bug real: `version.json` se generaba con BOM (`Set-Content -Encoding UTF8` en Windows PowerShell 5.1 siempre lo agrega), lo que hacía que `Invoke-RestMethod` devolviera un objeto vacío sin avisar de ningún error — la versión publicada se leía como "0.0". Se corrigió en el origen, en `empaquetar-release.ps1`, que escribe UTF-8 sin BOM. El lanzador y el actualizador también leen los bytes explícitamente como UTF-8 y normalizan Unicode para tolerar encabezados HTTP incompletos o alterados por un proxy. `GETTINGSTARTED.md` y el `README.md` general se mueven a `doc\`. Guía de instalación y mapa del proyecto: `doc/GETTINGSTARTED.md` y `doc/README.md`. Se retira el servidor local experimental (`server\`, `doc/servidor-local` y el modo dual de `assets/base/me-api.js`): la prueba real en un equipo de analista quedó bloqueada por el antivirus/EDR, el mismo problema que se buscaba evitar. Queda como riesgo abierto sin solución (ver §9). |
 | 2.3 | `dame click.bat` pasa a ser un lanzador delgado: la lógica real se movió a `lanzador.ps1` (invocado como archivo, no como bloque embebido con `Invoke-Expression` — patrón que varios antivirus bloqueaban justo al encontrar versión nueva). Instalar una actualización se separó en `actualizar.bat`/`actualizar.ps1`, aparte y siempre a mano (antes se aplicaba sola y se relanzaba en silencio, otro patrón vigilado por antivirus); `actualizar.ps1` además verifica el SHA-256 del `.zip` contra `version.json` antes de aplicar. `empaquetar-release.ps1` gana firma Authenticode opcional (`-CertThumbprint` / `-CertPfx`) para `lanzador.ps1`/`actualizar.ps1` (los `.bat` no se pueden firmar) y genera el `sha256` en `version.json`. Se agrega `server/` (experimental, no conectado al lanzador): sirve las herramientas por `http://localhost` con proxy hacia el CM/Keycloak, como camino para eventualmente quitar `--disable-web-security` — ver `doc/servidor-local/README.md`. |
 | 2.2 | Auto-actualización: `dame click.bat` revisa `https://sebasmd.com/me/operacion/version.json` antes de todo lo demás y, si hay una versión nueva, la descarga, la aplica y se relanza solo (flag `/sinupdate` para omitirlo). Versión tipo `1.0`/`1.1` (comparada como `[version]`, no como número entero). Se agregan `empaquetar-release.ps1` + `empaquetar-release.bat` (este último para no chocar con la `ExecutionPolicy` del equipo) para armar el `.zip` + `version.json` que hay que subir, y el archivo `VERSION` en la raíz del proyecto. |
 | 2.1 | El lanzador abre **una sola pestaña** (el reporte de líneas prepagadas) y la ventana de Edge sale **maximizada**. El cierre masivo de casos deja de abrirse por defecto: se pide con `/solo-casos`. |

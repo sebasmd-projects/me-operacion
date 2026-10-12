@@ -1,0 +1,169 @@
+/* prepagadas.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Chip de verificación SIME ⇄ CM */
+.chip-verif {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    font-family: var(--me-mono);
+    font-size: .7rem;
+    border: 1px solid var(--me-borde);
+    border-radius: 999px;
+    padding: .18em .6em;
+    background: #fff;
+    white-space: nowrap;
+}
+
+.chip-verif .dot {
+    width: .5em;
+    height: .5em;
+    border-radius: 50%;
+}
+
+.chip-verif.ok {
+    border-color: #BFE0CC;
+}
+
+.chip-verif.ok .dot {
+    background: var(--me-ok);
+}
+
+.chip-verif.fail {
+    border-color: #EAC4BF;
+}
+
+.chip-verif.fail .dot {
+    background: var(--me-err);
+}
+
+.chip-verif.na {
+    color: #8B8B86;
+}
+
+.chip-verif.na .dot {
+    background: #C9C9C4;
+}
+
+/* Barra de periodos */
+.periodos {
+    min-width: 128px;
+}
+
+.periodos .bar {
+    height: 6px;
+    border-radius: 3px;
+    background: #EBEAE4;
+    overflow: hidden;
+}
+
+.periodos .fill {
+    height: 100%;
+    background: var(--me-negro);
+}
+
+.periodos small {
+    font-family: var(--me-mono);
+    font-size: .68rem;
+    color: var(--me-suave);
+}
+
+/* Movimientos CM */
+
+tr.tx-actual {
+    box-shadow: inset 3px 0 0 var(--me-negro);
+}
+
+/* Tablas legibles de respuesta cruda */
+table.tbl-datos {
+    width: 100%;
+    font-size: .77rem;
+    border-collapse: collapse;
+}
+
+table.tbl-datos th,
+table.tbl-datos td {
+    border: 1px solid var(--me-borde);
+    padding: .3rem .5rem;
+    vertical-align: top;
+}
+
+table.tbl-datos th {
+    text-align: left;
+    background: #FAFAF7;
+    color: var(--me-suave);
+    font-weight: 600;
+    white-space: nowrap;
+    width: 230px;
+}
+
+table.tbl-datos td {
+    font-family: var(--me-mono);
+    word-break: break-word;
+}
+
+table.tbl-ciclos {
+    width: 100%;
+    font-size: .78rem;
+}
+
+tr.ciclo-vencido {
+    color: #9a9a95;
+}
+
+.ficha-cliente,
+.crear-fijos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem .6rem;
+    font-size: .76rem;
+}
+
+.ficha-cliente .dato,
+.crear-fijos .fijo {
+    border: 1px solid var(--me-borde);
+    background: #FAFAF7;
+    border-radius: .35rem;
+    padding: .2rem .5rem;
+    font-family: var(--me-mono);
+}
+
+.ficha-cliente .dato b,
+.crear-fijos .fijo b {
+    color: var(--me-suave);
+    font-weight: 500;
+}
+
+.crear-fijos .fijo.calc {
+    background: #FFFBE6;
+    border-color: #E8D98A;
+}
+
+#crRecalc {
+    font-size: .72rem;
+    color: var(--me-ok);
+    min-height: 1rem;
+}
+
+tr.rec-editando {
+    box-shadow: inset 3px 0 0 var(--me-negro);
+}
+
+td.rec-detalles {
+    font-size: .7rem;
+    color: var(--me-suave);
+    max-width: 260px;
+}
+
+details.raw-json>summary {
+    cursor: pointer;
+    font-size: .78rem;
+    color: var(--me-suave);
+}
+
+#barraFiltros .dropdown-item {
+    cursor: pointer;
+}
+
+/* Contenedor de cada filtroMulti: no añade caja, el desplegable queda en la barra */
+.fm-host {
+    display: contents;
+}

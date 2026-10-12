@@ -1,9 +1,9 @@
 # Cierre masivo de casos (CM) — Documentación técnica
 
-> **Versión: v3.3** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v3.4** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
-Herramienta para **trabajar por lotes** los casos del CM a partir de un Excel de la operación. Por cada número de caso busca su ticket en el CM, trae el título y el estado actuales y, según lo que traiga la columna **Favorable**, lo cierra con el resultado o se limita a agregarle la nota. Trae **modo simulación encendido por defecto**: hace todo menos el `PATCH`.
+Herramienta para **trabajar por lotes** los casos del CM a partir de un Excel de la operación. Por cada número de caso busca su ticket en el CM, trae el título y el estado actuales y, según lo que traiga la columna **Favorable**, lo cierra con el resultado o se limita a agregarle la nota. Cada envío requiere revisar y aceptar el resumen de cierres y notas.
 
 > Todo corre en el navegador del analista. No hay backend propio: la página habla directamente con Keycloak y con el API gateway del CM.
 
@@ -20,7 +20,7 @@ La columna **Favorable** decide **qué se hace** con el ticket, no solo si se ha
 | vacía o no reconocida | **con** nota | **solo nota** | *no se toca* | *no se toca* (se reenvía el mismo) |
 | vacía o no reconocida | sin nota | **ninguna** | — | — (la fila queda *omitida*) |
 
-Quien decide es `accionDe(fila)` en `assets/logica-casos.js`, y de ahí cuelga todo lo demás: el título calculado, el cuerpo del `PATCH`, la habilitación de los botones, el informe y la exportación.
+Quien decide es `accionDe(fila)` en `assets/herramientas/casos/casos.js`, y de ahí cuelga todo lo demás: el título calculado, el cuerpo del `PATCH`, la habilitación de los botones, el informe y la exportación.
 
 Dos consecuencias que conviene tener presentes:
 
@@ -43,10 +43,10 @@ Dos consecuencias que conviene tener presentes:
 
 | Archivo | Qué contiene |
 |---|---|
-| `reporte_casos_masivos.html` | Solo marcado: KPIs, pasos, pestañas, tablas y modal de detalle. |
-| `assets/logica-casos.js` | Reglas de negocio: lectura del Excel, mapeo de columnas, `accionDe()`, armado del título, búsqueda del ticket y `PATCH`. |
-| `assets/me-casos-puente.js` | Enganche con el shell: sesión, pestañas, habilitación de botones y spinners. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
+| `herramientas/reporte_casos_masivos.html` | Solo marcado: KPIs, pasos, pestañas, tablas y modal de detalle. |
+| `assets/herramientas/casos/casos.js` | Todo el código de la herramienta, en tres bloques: 1 configuración y constantes · 2 reglas de negocio (lectura del Excel, `accionDe()`, armado del título, búsqueda del ticket y `PATCH`) · 3 interfaz (mapeo, tablas, filtros, edición, exportación, sesión, pestañas y spinners). Va en una IIFE; no expone nombres globales. |
+| `assets/herramientas/casos/casos.css` | Estilos propios: celdas editables, zona de carga, vista previa, pestañas y tabla de la regla. |
+| `assets/base/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 
@@ -118,7 +118,7 @@ Tres reglas **no** son configurables, porque son la salvaguarda del proceso:
 
 ### Paso 4 · Ejecución y progreso
 
-**Buscar tickets** y **Cerrar casos**, separados a propósito, más **Pausar**, **Cancelar** y **Reintentar los que fallaron**. Barra de progreso con estimación de tiempo restante y contador de marcadas.
+**Buscar tickets** y **Cerrar casos**, separados a propósito, más **Pausar**, **Cancelar** y **Reintentar los que fallaron**. Progreso común N/M en el pie, con reintento exclusivo de las consultas fallidas. Las acciones sobre marcadas están en la barra de lote, visible solo con selección.
 
 | Botón | Se habilita cuando |
 |---|---|
@@ -128,13 +128,13 @@ Tres reglas **no** son configurables, porque son la salvaguarda del proceso:
 
 El `title` de «Cerrar casos» dice cuántas van a cerrarse y cuántas solo recibirán la nota. Los tres se bloquean mientras corre una tanda.
 
-### Simulación
+### Revisión y confirmación
 
-Arranca **encendida**: hace todo menos el `PATCH`, y deja el cuerpo que se habría enviado disponible en el botón **Ver** de cada fila (estados *simulado* y *nota simulada*). Al apagarla aparece un aviso permanente y el envío pide confirmación explícita, con el desglose de cierres y notas.
+**Ver** muestra el cuerpo del PATCH antes de enviar (la fecha se calcula al enviarlo). Cada tanda pide confirmación con cierres, notas, usuario, entorno y primeros casos con sus notas. El envío real está separado en una zona de peligro de la barra de lote.
 
 ### Pestaña · Casos y edición
 
-Filtros por estado del proceso, **acción**, estado del archivo, resultado, selección y texto libre; mostrar/ocultar columnas; marcar y ocultar filas en lote. En la tabla se editan **resultado**, **título nuevo** y **nota de cierre**:
+Filtros múltiples por estado del proceso, **acción**, estado del archivo, resultado y selección; búsqueda de texto desde DataTables; mostrar/ocultar columnas; marcar y ocultar filas en lote. **Marcar todo** abarca todas las páginas filtradas; **Desmarcar todo** limpia toda la selección; **Marcar visibles** y **Desmarcar visibles** afectan solo la página actual. Las KPI se sincronizan con el filtro de estado. En la tabla se editan **resultado**, **título nuevo** y **nota de cierre**:
 
 - cambiar el resultado a «— solo nota —» bloquea el título y descarta la edición manual;
 - la nota vacía en una fila que sí se cierra se marca en rojo;
@@ -168,8 +168,7 @@ Paso 1 (sesión)  ->  Paso 2 (Excel + mapeo)  ->  filas de trabajo
                                                  |          |
                                          PATCH troubleTicket/{id}
                                                       |
-                          estado: cerrado / nota agregada / simulado /
-                                  nota simulada / omitido / error
+                          estado: cerrado / nota agregada / omitido / error
                                                       v
                                     informe  ->  CSV / Excel / JSON
 ```
@@ -187,7 +186,7 @@ Paso 1 (sesión)  ->  Paso 2 (Excel + mapeo)  ->  filas de trabajo
 5. **Enviar.** `construirPatch()` parte del ticket leído (o de lo que devolvió la búsqueda) y luego:
    - **cierre** → `name` = título nuevo, `status` = estado final, `note` nueva;
    - **solo nota** → `name` = el del CM, `status` = el que ya tenía, `note` nueva. Si el estado no se pudo leer, la fila se **omite** en vez de arriesgarse a moverlo.
-6. **Resultado.** Cada fila queda como *cerrado*, *nota agregada*, *simulado*, *nota simulada*, *omitido* (sin ticket, sin nota, sin nada que enviar o sin estado confiable) o *error*, con el HTTP y el mensaje del API, y con el cuerpo enviado y la respuesta guardados para el botón **Ver**.
+6. **Resultado.** Cada fila queda como *cerrado*, *nota agregada*, *omitido* (sin ticket, sin nota, sin nada que enviar o sin estado confiable) o *error*, con el HTTP y el mensaje del API, y con el cuerpo enviado y la respuesta guardados para el botón **Ver**.
 
 ### Concurrencia
 
@@ -203,7 +202,7 @@ Todo vive en memoria del navegador: las filas de trabajo (incluidos el ticket cr
 
 ## 10. Riesgos
 
-- **Nada de esto se deshace desde la herramienta.** El `PATCH` es definitivo, tanto el cierre como la nota; revertirlo hay que hacerlo en el CM. De ahí la simulación encendida por defecto y la confirmación al apagarla.
+- **Nada de esto se deshace desde la herramienta.** El `PATCH` es definitivo, tanto el cierre como la nota; revertirlo hay que hacerlo en el CM. Cada envío requiere confirmar el resumen.
 - **La nota también se envía sin resultado.** Una fila con nota y sin favorable **sí** toca el ticket: agrega una nota visible para el cliente interno. No es una fila inerte.
 - **Valores no reconocidos en Favorable** caen en «solo nota», no en error. Si la operación usa otras palabras para sí/no, hay que agregarlas a `normalizarFavorable()` o revisar la columna «Favorable (archivo)» antes de enviar.
 - **Transporte HTTP plano** hacia el CM y Keycloak; el token queda en memoria del navegador.
@@ -219,10 +218,12 @@ Todo vive en memoria del navegador: las filas de trabajo (incluidos el ticket cr
 
 | Versión | Cambios |
 |---|---|
-| **3.3** | MSISDN e IMSI copiables en la tabla. |
+| **3.4** (refactor interno) | Un solo archivo de código por herramienta en `assets/herramientas/casos/` (une la lógica y el puente) y estilos movidos a `casos.css`. Las constantes de proceso y paginación quedan al comienzo, y las dos tablas comparten el menú de columnas. Sin cambios de comportamiento. |
+| **3.4** | Confirmación MEUI para envíos reales, vista previa del PATCH, filtros múltiples, selección por página o global, barra de lote, progreso y estados comunes, ayudas y accesibilidad. |
+| 3.3 | | MSISDN e IMSI copiables en la tabla. |
 | 3.1 – 3.2 | La página ya estaba en 3.2 cuando se creó el repositorio y esos cambios no quedaron anotados aquí. Se alinea el encabezado de este documento con la versión de la página. |
-| 3.0 | La columna «Favorable» decide la acción: `Sí` cierra como favorable, `No` como desfavorable y la casilla vacía con nota **solo agrega la nota**, sin tocar el título ni el estado; sin nota ni resultado la fila queda omitida. Nueva función `accionDe()`, columna y filtros de **Acción**, KPI **Solo con nota**, estados *anotando* / *nota agregada* / *nota simulada*, título de solo lectura en modo nota, nota obligatoria marcada en rojo, confirmación con desglose y columnas nuevas en informe y exportación. |
+| 3.0 | La columna «Favorable» decide la acción: `Sí` cierra como favorable, `No` como desfavorable y la casilla vacía con nota **solo agrega la nota**, sin tocar el título ni el estado; sin nota ni resultado la fila queda omitida. Nueva función `accionDe()`, columna y filtros de **Acción**, KPI **Solo con nota**, estados *anotando* / *nota agregada*, título de solo lectura en modo nota, nota obligatoria marcada en rojo, confirmación con desglose y columnas nuevas en informe y exportación. |
 | 2.1 | `/case/search` acepta el arreglo plano y el envoltorio antiguo (`normalizarBusqueda`); la respuesta cruda queda en el detalle. |
 | 2.0 | Migración a la base compartida: HTML solo con marcado, lógica en `assets/logica-casos.js` y acceso al CM en `me-api.js`. Se elimina el botón «Buscar y cerrar» y el encadenamiento del reintento; los botones se habilitan solo cuando corresponde; las reglas de salvaguarda dejan de ser configurables; zona de arrastrar y soltar; KPIs que filtran; tabla de trabajo e informe en pestañas; exportación con separador `;` por defecto. |
 | 1.1 | Informe con filtros propios, alcance de exportación y detección de casos ya cerrados. |
-| 1.0 | Versión inicial: carga del Excel, mapeo de columnas, búsqueda de tickets y cierre por lotes con simulación. |
+| 1.0 | Versión inicial: carga del Excel, mapeo de columnas, búsqueda de tickets y cierre por lotes. |

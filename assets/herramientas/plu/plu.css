@@ -1,0 +1,354 @@
+/* plu.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* ---------- Cuadro «cuánto se sumó» ----------
+   Los tres valores van uno debajo del otro en un solo cuadro:
+   Total, Valor anterior y el agregado/nuevo, que es el que se
+   resalta porque es el dato que se está verificando. */
+
+.plu-cambios {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: .6rem;
+}
+
+.plu-cambio {
+    border: 1px solid var(--me-borde);
+    border-left: 4px solid var(--me-borde-2);
+    border-radius: .5rem;
+    padding: .6rem .7rem;
+    background: #fff;
+}
+
+.plu-cambio.es-nuevo {
+    border-left-color: var(--me-ok);
+}
+
+.plu-cambio.es-suma {
+    border-left-color: var(--me-info);
+}
+
+.plu-cambio-cab {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem;
+    margin-bottom: .45rem;
+}
+
+.plu-cambio-nom {
+    font-weight: 700;
+    font-size: .82rem;
+}
+
+.plu-cambio-id,
+.plu-cambio-cat {
+    font-size: .7rem;
+    color: var(--me-suave);
+}
+
+.plu-badge {
+    font-size: .64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-radius: .35rem;
+    padding: .2em .45em;
+}
+
+.plu-badge.nuevo {
+    background: #E2F2E8;
+    color: var(--me-ok);
+}
+
+.plu-badge.suma {
+    background: #E2E9F2;
+    color: var(--me-info);
+}
+
+.plu-cifras {
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+    overflow: hidden;
+}
+
+.plu-cifra {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .3rem .55rem;
+}
+
+.plu-cifra+.plu-cifra {
+    border-top: 1px solid var(--me-borde);
+}
+
+.plu-cifra-lbl {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--me-suave);
+}
+
+.plu-cifra-val {
+    font-size: .84rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* El valor agregado/nuevo: es lo que se viene a comprobar. */
+
+.plu-cifra.destacada {
+    background: #FFFBE6;
+    border-top: 1px solid var(--me-amarillo);
+}
+
+.plu-cifra.destacada .plu-cifra-lbl {
+    color: #8A6D1F;
+    font-weight: 700;
+}
+
+.plu-cifra.destacada .plu-cifra-val {
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.plu-cambio-pie {
+    font-size: .7rem;
+    color: var(--me-suave);
+    font-family: var(--me-mono);
+    margin-top: .4rem;
+}
+
+.plu-promo {
+    color: var(--me-warn);
+}
+
+.plu-paso {
+    font-family: var(--me-mono);
+    font-size: .78rem;
+}
+
+/* Cuentas de la línea: cuando hay más de una se muestran TODAS,
+   porque elegir la equivocada es lo que rompe la operación. */
+
+.cuentas-linea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.cuenta-chip {
+    border: 1px solid var(--me-borde);
+    border-radius: 999px;
+    padding: .15rem .55rem;
+    font-family: var(--me-mono);
+    font-size: .72rem;
+    background: #fff;
+}
+
+.cuenta-chip.usada {
+    border-color: var(--me-negro);
+    font-weight: 700;
+}
+
+/* ---------- Filas de PLU de la secuencia ---------- */
+
+.seq-cab,
+.seq-fila {
+    display: grid;
+    grid-template-columns: 1fr 5.5rem 1fr 1.75rem;
+    gap: .25rem;
+    align-items: center;
+}
+
+.seq-cab {
+    font-size: .62rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--me-suave);
+    margin-bottom: .15rem;
+}
+
+.seq-fila+.seq-fila {
+    margin-top: .25rem;
+}
+
+.seq-fila input.is-invalid {
+    background-image: none;
+}
+
+/* Separador entre el pegado masivo y el formulario fila a fila */
+
+.seq-o {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: .6rem 0 .35rem;
+    color: var(--me-suave);
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.seq-o::before,
+.seq-o::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--me-borde);
+}
+
+.seq-previa {
+    max-height: 190px;
+    overflow: auto;
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+}
+
+.seq-previa table {
+    font-size: .76rem;
+    margin: 0;
+}
+
+.seq-previa thead th {
+    position: sticky;
+    top: 0;
+    background: #F7F6F1;
+}
+
+.seq-previa td {
+    font-family: var(--me-mono);
+}
+
+.seq-previa tr.mala td {
+    color: var(--me-err);
+}
+
+.seq-quitar {
+    border: 1px solid var(--me-borde);
+    background: #fff;
+    color: var(--me-suave);
+    border-radius: .3rem;
+    line-height: 1;
+    padding: .2rem 0;
+    font-weight: 700;
+}
+
+.seq-quitar:hover {
+    background: #ECECEA;
+    color: var(--me-err);
+}
+
+/* Resultado de la secuencia, un renglón por PLU */
+
+.seq-resultado {
+    border-top: 1px solid var(--me-borde);
+}
+
+.seq-item {
+    border-bottom: 1px solid var(--me-borde);
+    padding: .5rem 0;
+}
+
+.seq-item-cab {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4rem;
+    font-size: .82rem;
+}
+
+.seq-item-plu {
+    font-family: var(--me-mono);
+    font-weight: 700;
+}
+
+.seq-item-paso {
+    font-family: var(--me-mono);
+    font-size: .72rem;
+    color: var(--me-suave);
+}
+
+.seq-estado {
+    font-size: .64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-radius: .35rem;
+    padding: .2em .45em;
+    white-space: nowrap;
+}
+
+.seq-estado.espera {
+    background: #F0F0EC;
+    color: var(--me-suave);
+}
+
+.seq-estado.corriendo {
+    background: #E2E9F2;
+    color: var(--me-info);
+}
+
+.seq-estado.ok {
+    background: #E2F2E8;
+    color: var(--me-ok);
+}
+
+.seq-estado.aviso {
+    background: #FBEED8;
+    color: var(--me-warn);
+}
+
+.seq-estado.error {
+    background: #FBE2DF;
+    color: var(--me-err);
+}
+
+.seq-estado.cancelado {
+    background: #ECECEA;
+    color: var(--me-off);
+}
+
+/* Bolsillos de cada PLU, plegados por defecto */
+
+details.seq-paquetes {
+    margin-top: .4rem;
+}
+
+details.seq-paquetes>summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    font-size: .76rem;
+}
+
+details.seq-paquetes>summary::-webkit-details-marker {
+    display: none;
+}
+
+details.seq-paquetes>summary::before {
+    content: "▸";
+    display: inline-block;
+    transition: transform .15s;
+    color: var(--me-suave);
+}
+
+details.seq-paquetes[open]>summary::before {
+    transform: rotate(90deg);
+}
+
+.seq-paquetes-n {
+    font-weight: 700;
+}
+
+.seq-paquetes-res {
+    font-family: var(--me-mono);
+    color: var(--me-suave);
+}
+
+.seq-paquetes-alerta {
+    color: var(--me-err);
+    font-weight: 600;
+}

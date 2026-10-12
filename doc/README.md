@@ -22,14 +22,13 @@ GitHub ni permisos de administrador.
 | **Exportar casos · Tipificación** | Descarga masiva de casos del CRM por rango de fechas y estados. | [reporte-tipificacion](reporte-tipificacion/README.md) |
 | **Bloqueos SIM x Titularidad** | Log de comprobación de titularidad (Genesis) cruzado con el CM y con el HLR/HSS, para resolver el bloqueo de SIM en la llamada. | [titularidad](titularidad/README.md) |
 | **Ajustes y paquetes** | Consulta y exportación de ajustes de dinero y de paquetes, con catálogos editables. | [reporte-ajustes](reporte-ajustes/README.md) · [análisis: recarga de paquetes](reporte-ajustes/recarga-de-paquetes-cm.md) |
-| **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueos, conciliación y, para usuarios autorizados, aprovisionar/desaprovisionar) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) · motores: [validador-qdn](validador-qdn/README.md) · [consulta-qdn-tigo](consulta-qdn-tigo/README.md) · [hlr-cruzado](hlr-cruzado/README.md) |
+| **HLR/HSS · Claro y Tigo** | Tres pestañas en una: Tigo (solo lectura), Claro (lectura + opera la línea: bloqueos, conciliación y, para usuarios autorizados, aprovisionar/desaprovisionar) y Ambos (cruce Claro ⇄ Tigo). | [hlr-hss](hlr-hss/README.md) · motores: [Claro](hlr-hss/README.md#claro) · [Tigo](hlr-hss/README.md#tigo) · [Ambos](hlr-hss/README.md#ambos) |
 | **Validador Portabilidad · Tigo** | Igual motor que la pestaña Tigo de arriba, con el marco de negocio de portabilidad (Creada / Sin perfil / Residuo) y estado ME (CM) opcional. | [portabilidad-tigo](portabilidad-tigo/README.md) |
 | **Generar archivo de rechazo** | Arma el PDF de un rechazo de portabilidad (FC / LS / LD); reemplaza las tres macros de Excel. | [generar-rechazo](generar-rechazo/README.md) |
 | **Bolsillos, Paquetes, Consumos · CM** | Datos de línea, paquetes, movimientos e histórico de consumo, con gráficas y exportación. Además **carga paquetes** en el CM desde el detalle de la línea. | [reporte-consumos](reporte-consumos/README.md) |
 | **Aplicar PLU de paquete** | Aplica un PLU en Tulio sobre una línea, en secuencia (consultar → agregar → eliminar), y verifica en el CM cuánto se sumó a cada paquete; evidencia en Excel y CSV. | [aplicar-plu](aplicar-plu/README.md) |
 | **Bloquear/Inactivar líneas** | Bloquea o inactiva líneas en el CM, en masivo, con tabla de casillas; avisa que inactivar deja la IMSI en HELD. | [estado-lineas](estado-lineas/README.md) |
-| **Cambio IMSI Claro\|Tigo** | Cambia la SIM de líneas en el CM, en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. | [cambio-imsi](cambio-imsi/README.md) |
-| **Cambio MSISDN Claro\|Tigo** | Cambia el número de líneas en el CM, en masivo, desde `línea;línea_nueva` (texto o Excel): valida y envía la orden de portabilidad del CM, que queda pendiente hasta completarse. | [cambio-msisdn](cambio-msisdn/README.md) |
+| **Cambio IMSI y línea Claro\|Tigo** | Dos pestañas con una sola sesión del CM. Cambio IMSI: cambia la SIM de líneas en masivo, desde `línea;imsi_nueva`, validando que la IMSI nueva esté disponible. Cambio de línea (MSISDN): cambia el número, desde `línea;línea_nueva` (texto o Excel), enviando la orden de portabilidad del CM, que queda pendiente hasta completarse. | [cambio-imsi-linea](cambio-imsi-linea/README.md) |
 | **Pre-factura** | Pre-factura mensual del Plan Corporativo: corte del 15, valores e impuestos por línea, resumen por empresa y un archivo por filial. Todo local, sin servicios. | [prefactura](prefactura/README.md) |
 | **Convertir audio a MP3** | Convierte localmente uno o varios audios OGG, M4A u otros formatos compatibles y genera archivos `mp3-*.mp3`. | [audio-mp3](audio-mp3/README.md) |
 
@@ -42,7 +41,8 @@ en particular:
 | --- | --- | --- |
 | `dame click.bat` / `scripts\lanzador.ps1` | Abre las herramientas con la sesión de SIME y las credenciales del CM ya listas. | [lanzador](lanzador/README.md) |
 | `actualizar.bat` / `scripts\actualizar.ps1` | Instala una versión nueva cuando el lanzador avisa que hay una (paso aparte, siempre a mano). | [lanzador § Aviso de versión nueva](lanzador/README.md#aviso-de-versión-nueva-e-instalarla-aparte-actualizarbat) |
-| `assets/me-ui.*`, `assets/me-api.js` | Diseño, shell, sesión, tablas, exportación y llamadas al CM que usan todas las herramientas. | [lanzador](lanzador/README.md) |
+| `assets/base/me-ui.*`, `assets/base/me-api.js` | Diseño, shell, sesión, tablas, exportación y llamadas al CM que usan todas las herramientas. | [lanzador](lanzador/README.md) |
+| `assets/base/catalogo.js`, `assets/base/dependencias.js` | El catálogo único de herramientas (menú, Inicio, título y versión de cada página) y el registro único de librerías de CDN. | [lanzador § 2](lanzador/README.md#2-arquitectura-y-archivos) |
 
 ---
 
@@ -65,18 +65,21 @@ me-operacion/
 │   └─ VERSION                      número de versión de esta copia
 │
 ├─ herramientas/                un .html por herramienta (solo marcado)
-├─ assets/                      lógica de negocio + base común (me-ui, me-api)
+├─ assets/
+│   ├─ base/                    la base: me-ui.js/.css, me-api.js, catalogo.js (herramientas), dependencias.js (librerías)
+│   ├─ compartido/              módulos de varias herramientas (cm-lineas, hlr-consulta, tulio-plu, genesis-*)
+│   └─ herramientas/<id>/     <id>.js (reglas e interfaz), <id>.css y motores adicionales
 ├─ doc/                         este archivo + un README.md por herramienta + lanzador
 └─ release/                     salida de empaquetar-release.ps1 (no se versiona a mano)
 ```
 
-Cada herramienta sigue el mismo patrón de tres capas — el porqué está en
+Cada herramienta sigue el mismo patrón de marcado, código y estilos — el porqué está en
 [lanzador/README.md](lanzador/README.md):
 
 ```txt
 herramientas/<algo>.html        marcado, sin lógica
-assets/logica-<algo>.js         reglas de negocio (consultas, validaciones, formato)
-assets/me-<algo>-puente.js      enganche entre esa lógica y el shell común
+assets/herramientas/<id>/<id>.js   configuración, reglas de negocio e interfaz
+assets/herramientas/<id>/<id>.css  estilos exclusivos; lo compartido va a base/me-ui.css
 ```
 
 ---
@@ -112,8 +115,9 @@ un cambio mayor o incompatible, **Minor** (`Y`) una funcionalidad compatible y
 se reinician Minor y Patch; al incrementar Minor se reinicia Patch. Las
 versiones históricas de uno o dos componentes se interpretan con ceros a la
 derecha (`2.2` equivale a `2.2.0`). El número de la suite vive en
-`scripts\VERSION`; cada herramienta muestra además su propia versión mediante
-`MEUI.init()`. `scripts\empaquetar-release.ps1` permite elegir el tipo de
+`scripts\VERSION` y en `assets/base/catalogo.js`; cada herramienta tiene además su
+propia versión, que vive solo en su entrada del catálogo (y se menciona en el
+historial de su README). `scripts\empaquetar-release.ps1` permite elegir el tipo de
 incremento al armar una release — ver
 [lanzador](lanzador/README.md) para el detalle completo del
 mecanismo de publicación y actualización.

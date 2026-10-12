@@ -1,6 +1,6 @@
 # Ajustes y paquetes (CM) — Documentación técnica
 
-> **Versión: v2.1.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
+> **Versión: v2.2.0** · Convención: `Major.Minor.Patch` (*major* · *minor* · *fix/documentación*).
 > Base compartida: ver `doc/lanzador/README.md`.
 
 Herramienta para consultar y exportar los **ajustes** que se hacen en el CM (Optiva): tanto los de **dinero** (créditos y débitos de saldo) como los de **paquetes** (bundles). Traduce los códigos del API a descripciones legibles mediante catálogos editables, resuelve el número de la línea a partir de la cuenta y exporta a **CSV / Excel / JSON**.
@@ -28,10 +28,10 @@ Herramienta para consultar y exportar los **ajustes** que se hacen en el CM (Opt
 
 | Archivo | Qué contiene |
 |---|---|
-| `export_ajustes.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
-| `assets/logica-ajustes.js` | Reglas de negocio: consulta de ajustes, catálogos, columnas, resolución del número y exportación. |
-| `assets/me-ajustes-puente.js` | Enganche con el shell: sesión, pestañas y fechas por defecto. |
-| `assets/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
+| `herramientas/export_ajustes.html` | Solo marcado: KPIs, pasos, pestañas y tablas. |
+| `assets/herramientas/ajustes/ajustes.js` | Todo el código de la herramienta, en tres bloques: 1 configuración y constantes · 2 reglas de negocio (consulta, catálogos, número y titular, columnas) · 3 interfaz (tablas, exportación, sesión, pestañas y arranque). Va en una IIFE; lo único global es `addCatalogRow`, que usa el HTML. |
+| `assets/herramientas/ajustes/ajustes.css` | Estilos propios: etiquetas de estado, pestañas y editor de catálogos. |
+| `assets/base/me-api.js` · `me-ui.js` · `me-ui.css` | Base común a todas las herramientas. |
 
 ---
 
@@ -194,6 +194,8 @@ Todo vive en memoria: los registros crudos de cada pestaña, la caché de númer
 
 | Versión | Cambios |
 |---|---|
+| **2.2.0** (refactor interno) | Un solo archivo de código por herramienta en `assets/herramientas/ajustes/` (une la lógica y el puente) y estilos movidos a `ajustes.css`. Las columnas comunes de dinero y paquetes se definen una vez; las dos descargas y las tres exportaciones comparten una función. Sin cambios de comportamiento. |
+| **2.2.0** | Progreso de páginas y cuentas; estados de tablas con reintento; exportaciones en barra común. Ayudas «?» y accesibilidad. |
 | **2.1.0** | Ajustes y Paquetes resuelven la identificación del titular subiendo por la cadena de cuentas. La columna **CC** queda al comienzo de ambas tablas, se incluye en CSV/Excel/JSON y trae botón de copia rápida. La opción de enriquecimiento ahora controla conjuntamente número y CC. |
 | 2.0 | Migración a la base compartida: HTML solo con marcado, lógica en `assets/logica-ajustes.js` y acceso al CM en `me-api.js`. Se retira la barra propia con el medidor de token (ahora es el chip de la cabecera); las dos tablas pasan a pestañas al alto útil; se agrega exportación JSON y el selector de separador compartido; nuevo KPI con la suma de los ajustes de dinero; las fechas arrancan en el mes en curso; al guardar los catálogos se reinterpretan los registros ya descargados; botón para restaurar los catálogos de fábrica. Se corrigió una columna «Categoría (mapeo)» duplicada. |
 | 1.1 | Editor de catálogos, resolución del número por cuenta y exportación CSV / XLSX con formato numérico. |

@@ -1,0 +1,436 @@
+/* consumos.css · Estilos propios. Componentes compartidos en assets/base/me-ui.css. */
+/* Paquetes (uso y balance) — mismo lenguaje visual que Prepagadas */
+
+.uso-celda-disp {
+    font-size: .72rem;
+    font-family: var(--me-mono);
+    color: var(--me-suave);
+}
+
+.uso-nota {
+    font-size: .68rem;
+    color: var(--me-suave);
+}
+
+/* Histórico de consumo */
+
+.hist-tipo-btn.active {
+    background: var(--me-negro);
+    color: #fff;
+    border-color: var(--me-negro);
+}
+
+#tablaHistorico tr.shown td {
+    box-shadow: inset 0 -1px 0 var(--me-borde);
+}
+
+#tablaHistorico tr.child td {
+    background: #FAFAF7;
+    padding: .7rem .9rem;
+}
+
+/* Movimientos (compras, paquetes, recurrencias) */
+
+tr.tx-vigente {
+    box-shadow: inset 3px 0 0 var(--me-negro);
+}
+
+.chip-vigencia {
+    display: inline-block;
+    font-size: .66rem;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: .1em .55em;
+    white-space: nowrap;
+}
+
+.chip-vigencia.mes {
+    background: #E2E9F2;
+    color: var(--me-info);
+}
+
+.chip-vigencia.vigente {
+    background: var(--me-negro);
+    color: #fff;
+}
+
+.cdr-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: .4rem;
+    margin: .5rem 0;
+}
+
+.cdr-kpi {
+    border: 1px solid var(--me-borde);
+    border-radius: .4rem;
+    padding: .3rem .55rem;
+    background: #fff;
+}
+
+.cdr-kpi .n {
+    font-size: 1rem;
+    font-weight: 800;
+    font-family: var(--me-mono);
+    display: block;
+}
+
+.cdr-kpi .lbl {
+    font-size: .62rem;
+    color: var(--me-suave);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.cdr-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.cdr-chart-wrap {
+    position: relative;
+    height: 230px;
+    border: 1px solid var(--me-borde);
+    border-radius: .5rem;
+    padding: .6rem;
+    background: #fff;
+}
+
+#menuColumnas label {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   Cargar paquete — única parte de esta herramienta que ESCRIBE en
+   el CM. Se separa visualmente a propósito: fondo cálido y borde
+   marcado, para que nunca se confunda con lo que solo consulta.
+--------------------------------------------------------------- */
+
+.carga-cab {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.carga-panel {
+    border: 1px solid #E8D98A;
+    border-left: 3px solid var(--me-amarillo-2);
+    border-radius: .5rem;
+    background: #FFFDF4;
+    padding: .8rem .9rem;
+    margin-top: .6rem;
+}
+
+.carga-steps {
+    display: flex;
+    gap: .35rem;
+    list-style: none;
+    margin: 0 0 .7rem;
+    padding: 0;
+    flex-wrap: wrap;
+}
+
+.carga-steps li {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .74rem;
+    font-weight: 600;
+    color: var(--me-suave);
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: 999px;
+    padding: .2rem .7rem .2rem .25rem;
+}
+
+.carga-steps li span {
+    display: inline-grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: #ECEAE2;
+    color: var(--me-suave);
+    font-family: var(--me-mono);
+    font-size: .7rem;
+}
+
+.carga-steps li.activo {
+    color: var(--me-tinta);
+    border-color: var(--me-negro);
+}
+
+.carga-steps li.activo span {
+    background: var(--me-negro);
+    color: var(--me-amarillo);
+}
+
+.carga-steps li.hecho span {
+    background: var(--me-ok);
+    color: #fff;
+}
+
+.carga-estado {
+    font-size: .76rem;
+    color: var(--me-suave);
+    min-height: 1.1rem;
+}
+
+.carga-estado.err {
+    color: var(--me-err);
+    font-weight: 600;
+}
+
+.carga-lista {
+    max-height: 230px;
+    overflow: auto;
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    background: #fff;
+    margin-top: .5rem;
+}
+
+.carga-item {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    border-bottom: 1px solid var(--me-borde);
+    background: transparent;
+    padding: .4rem .6rem;
+    font-size: .8rem;
+}
+
+.carga-item:last-child {
+    border-bottom: 0;
+}
+
+.carga-item:hover {
+    background: #FFFBE6;
+}
+
+.carga-item.elegido {
+    background: #FFF6CC;
+}
+
+.carga-item-n {
+    flex: 1 1 auto;
+    font-weight: 600;
+}
+
+.carga-item-tags {
+    display: flex;
+    gap: .25rem;
+    flex-wrap: wrap;
+}
+
+.carga-item-marca {
+    width: 1.2rem;
+    text-align: center;
+    font-weight: 800;
+    color: var(--me-suave);
+}
+
+.carga-item.elegido .carga-item-marca {
+    color: var(--me-ok);
+}
+
+.carga-tag {
+    font-family: var(--me-mono);
+    font-size: .64rem;
+    border-radius: .3rem;
+    padding: .1em .4em;
+    background: #F0F0EC;
+    color: var(--me-suave);
+    white-space: nowrap;
+}
+
+.carga-tag.precio {
+    background: #FBEED8;
+    color: var(--me-warn);
+    font-weight: 700;
+}
+
+.carga-tag.ya {
+    background: #E2E9F2;
+    color: var(--me-info);
+}
+
+.carga-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: .5rem;
+    min-height: 1.6rem;
+}
+
+.carga-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    background: var(--me-negro);
+    color: #fff;
+    border-radius: 999px;
+    padding: .15rem .3rem .15rem .6rem;
+    font-size: .74rem;
+}
+
+.carga-chip small {
+    font-family: var(--me-mono);
+    color: var(--me-amarillo);
+}
+
+.carga-chip-x {
+    border: 0;
+    background: rgba(255, 255, 255, .15);
+    color: #fff;
+    border-radius: 50%;
+    width: 1.05rem;
+    height: 1.05rem;
+    line-height: 1;
+    font-size: .62rem;
+}
+
+.carga-chip-x:hover {
+    background: var(--me-err);
+}
+
+.carga-vacio {
+    font-size: .74rem;
+    color: var(--me-suave);
+    padding: .4rem .6rem;
+}
+
+.carga-linea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .2rem 1.1rem;
+    font-size: .74rem;
+    color: var(--me-suave);
+    margin-bottom: .5rem;
+}
+
+.carga-tabla-wrap {
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    overflow: auto;
+    background: #fff;
+    max-height: 240px;
+}
+
+.carga-tabla {
+    font-size: .78rem;
+    margin: 0;
+}
+
+.carga-tabla tr.nochange {
+    color: var(--me-suave);
+}
+
+.carga-acc {
+    font-family: var(--me-mono);
+    font-size: .64rem;
+    font-weight: 700;
+    border-radius: .3rem;
+    padding: .1em .4em;
+}
+
+.carga-acc.add {
+    background: #E2F2E8;
+    color: var(--me-ok);
+}
+
+.carga-acc.nc {
+    background: #F0F0EC;
+    color: var(--me-suave);
+}
+
+.carga-alerta {
+    border-radius: .45rem;
+    padding: .45rem .65rem;
+    font-size: .77rem;
+    margin-top: .6rem;
+}
+
+.carga-alerta.warn {
+    background: #FFF4D6;
+    border: 1px solid #E8D98A;
+    color: #7A5B00;
+}
+
+.carga-alerta.err {
+    background: #FBE2DF;
+    border: 1px solid #F0B9B2;
+    color: var(--me-err);
+}
+
+.carga-alerta.ok {
+    background: #E2F2E8;
+    border: 1px solid #B6DCC5;
+    color: var(--me-ok);
+}
+
+.carga-json summary {
+    font-size: .74rem;
+    color: var(--me-suave);
+    cursor: pointer;
+}
+
+.carga-json pre {
+    max-height: 200px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid var(--me-borde);
+    border-radius: .45rem;
+    padding: .5rem .6rem;
+    font-size: .7rem;
+    margin: .4rem 0 0;
+}
+
+.carga-tl {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    font-size: .78rem;
+    padding: .18rem 0;
+}
+
+.carga-tl .ic {
+    width: 1.1rem;
+    text-align: center;
+    font-weight: 800;
+    color: var(--me-off);
+}
+
+.carga-tl .dt {
+    font-family: var(--me-mono);
+    font-size: .7rem;
+    color: var(--me-suave);
+}
+
+.carga-tl.curso .ic {
+    color: var(--me-info);
+}
+
+.carga-tl.ok .ic {
+    color: var(--me-ok);
+}
+
+.carga-tl.err .ic {
+    color: var(--me-err);
+}
+
+.carga-tl.pendiente .ic {
+    color: var(--me-warn);
+}
+
+.carga-tl.espera {
+    opacity: .55;
+}

@@ -183,7 +183,7 @@ aquí no se alcanza. Hacen falta dos cosas de una pasada de verdad:
 
 ### Mantenimiento
 
-El código vive en `assets/genesis-bookmarklet.js` como una **función normal**,
+El código vive en `assets/compartido/genesis-bookmarklet.js` como una **función normal**,
 legible y editable. La URL `javascript:` se genera de ella con `toString()`,
 así que no hay una segunda copia que se quede atrás. Las cuatro reglas al
 editarla están en la cabecera del archivo (solo comentarios de bloque, sin

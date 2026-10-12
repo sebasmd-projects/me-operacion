@@ -1,6 +1,6 @@
 # Contexto de continuidad para Codex
 
-> Última actualización: 2026-09-30 · Zona horaria del proyecto: America/Bogota.
+> Última actualización: 2026-10-12 · Zona horaria del proyecto: America/Bogota.
 >
 > Leer este archivo antes de modificar la suite. La documentación funcional
 > detallada vive en `doc/`; este archivo resume arquitectura, conexiones,
@@ -17,7 +17,7 @@ Optiva/CM, Tulio, QDN Claro y HLR Tigo.
 - El lanzador abre Edge con la configuración necesaria para los servicios
   internos; no asumir que abrir un HTML con doble clic tendrá el mismo CORS.
 - No hay build de Node ni dependencias instalables. Las librerías visuales se
-  cargan desde CDN.
+  cargan desde CDN; sus versiones y URLs viven en `assets/base/dependencias.js`.
 - El código está en Git (`github.com/sebasmd-projects/me-operacion`, rama
   `master`). **El repositorio es público**: ver §7 antes de subir cualquier
   cosa. La distribución a los analistas NO usa Git: va por ZIP + `version.json`
@@ -43,55 +43,47 @@ scripts/
   VERSION                          versión global publicada
 herramientas/*.html                marcado; evitar poner reglas de negocio aquí
 assets/
-  me-ui.js / me-ui.css             shell, pasos, tablas, exportación, copiar
-  me-api.js                        Keycloak y acceso común al CM
-  logica-<modulo>.js               reglas, consultas y transformación
-  logica-paquetes-carga.js         carga de paquetes en el CM desde Consumos (window.MEPAQ)
-  logica-qdn-operaciones.js        operaciones de red QDN Claro (bloqueos, conciliación, provisión)
-  cm-lineas.js                     órdenes de línea del CM compartidas (window.CMLineas)
-  me-<modulo>-puente.js            eventos entre shell, HTML y lógica
+  base/                            la base común (la usan todas las páginas)
+    me-ui.js / me-ui.css             shell, pasos, tablas, exportación, copiar
+    me-api.js                        Keycloak y acceso común al CM
+    catalogo.js                      catálogo ÚNICO de herramientas (window.ME_CATALOGO):
+                                     menú, tarjetas/Backlog de Inicio, título, versión, doc
+    dependencias.js                  registro ÚNICO de librerías de CDN (data-me-deps)
+  compartido/                      módulos que usan varias herramientas
+    cm-lineas.js                     órdenes de línea del CM (window.CMLineas)
+    hlr-consulta.js                  ubicación Claro + Tigo
+    tulio-plu.js                     Tulio RecargaPaquete (window.TulioPLU)
+    genesis-api.js / genesis-bookmarklet.js   sesión y marcador de Genesis
+  herramientas/<id>/             código y estilos propios de cada herramienta
+    <id>.js / <id>.css             configuración, reglas e interfaz; CSS fuera del HTML
+    motores adicionales           cuando la herramienta usa varias pestañas o motores
 doc/<modulo>/README.md             documentación e historial
 release/                           artefactos que se suben al servidor
 ```
 
-Regla arquitectónica: conservar la separación **HTML = marcado**, **lógica =
-`logica-*.js`**, **integración visual = `me-*-puente.js`**, **servicios comunes =
-`me-api.js`/`me-ui.js`**. Los archivos que comparten página con otra lógica
-(`logica-paquetes-carga.js`, `cm-lineas.js`) son IIFE y exponen un solo objeto
-global: no declarar funciones sueltas de nivel superior, porque los scripts
-clásicos comparten el ámbito global y un nombre repetido pisa al otro (ya pasó
-con `celdaUso`).
+Regla arquitectónica: **HTML = marcado**, **herramienta = configuración, reglas e interfaz en `assets/herramientas/<id>/`**, **base = shell, acceso al CM y componentes visuales compartidos**, **compartido = servicios usados por varias herramientas**. Los scripts clásicos que conviven en una página usan IIFE y API global pequeña para evitar colisiones. Los estilos usados por dos o más herramientas viven en «Componentes compartidos» de `assets/base/me-ui.css`; las diferencias visuales conservadas usan `data-me-herramienta` en el body, con `:where` para mantener la especificidad. Lo exclusivo queda en el CSS de la herramienta.
 
 ## 3. Herramientas principales
 
 | App (`id`) | Entrada | Lógica principal | Propósito | ¿Escribe? |
 |---|---|---|---|---|
-| Inicio | `index.html` | `logica-inicio.js` | Catálogo y descarga de herramientas. | No |
-| Prepagadas (`prepagadas`) | `reporte_prepagadas.html` | `logica-prepagadas.js` | Cruce SIME ⇄ CM; alta de suscripción y edición de recurrencias en SIME. | Sí, SIME |
-| Consumos (`consumos`) | `reporte_consumos.html` | `logica-consumos.js` + `logica-paquetes-carga.js` | Línea, titular, paquetes, movimientos y CDR; **carga de paquetes** en el CM. | Sí, CM |
-| Ajustes/Paquetes (`ajustes`) | `export_ajustes.html` | `logica-ajustes.js` | Ajustes de dinero y paquetes del CM. | No |
-| Titularidad (`titularidad`) | `titularidad.html` | `logica-titularidad.js` | Log de titularidad de **Genesis** cruzado con CM y HLR/HSS. Única que habla con Genesis. | No |
-| Tipificación (`tipificacion`) | `export_tipificacion.html` | `logica-tipificacion.js` | Exportación de casos. | No |
-| Casos masivos (`casos`) | `reporte_casos_masivos.html` | `logica-casos.js` | Cierre/anotación masiva (con simulación). | Sí, CM |
-| Rechazos (`rechazo`) | `generar_rechazo.html` | `logica-rechazo.js` | PDF de rechazo de portabilidad. | No |
-| Aplicar PLU (`plu`) | `aplicar_plu.html` | `logica-plu.js` + `tulio-plu.js` | PLU en Tulio (`RecargaPaquete`) + verificación y borrado de bolsillos en el CM. | Sí, Tulio + CM |
-| Bloquear/Inactivar líneas (`estado-lineas`) | `estado_lineas.html` | `logica-estado-lineas.js` + `cm-lineas.js` | Bloquear/inactivar líneas en masivo. | Sí, CM |
-| Cambio IMSI Claro\|Tigo (`cambio-imsi`) | `cambio_imsi.html` | `logica-cambio-imsi.js` + `cm-lineas.js` | Cambio de SIM en masivo (`línea;imsi_nueva`). | Sí, CM |
-| Cambio MSISDN Claro\|Tigo (`cambio-msisdn`) | `cambio_msisdn.html` | `logica-cambio-msisdn.js` + `cm-lineas.js` | Cambio de número en masivo (`línea;línea_nueva`, texto o Excel): orden de portabilidad `PortInExistingSubscription`, queda pendiente. | Sí, CM |
-| Pre-factura (`prefactura`) | `prefactura.html` | `logica-prefactura.js` (`window.Prefactura`) | Pre-factura del Plan Corporativo desde su Excel: corte, impuestos, resumen y archivo por filial. Local. | No |
-| HLR/HSS (`hlr-hss`) | `hlr_hss.html` | `logica-hlr-hss-{claro,tigo,ambos}.js` | Consulta por operador y cruce; pestaña Claro opera la línea. | Sí, red Claro |
-| Portabilidad Tigo (`portabilidad-tigo`) | `validador_portabilidad_tigo.html` | `logica-portabilidad-tigo.js` | HLR Tigo con marco de portabilidad. | No |
-| Audio a MP3 (`audio-mp3`) | `convertir_audio_mp3.html` | `logica-audio-mp3.js` | Conversión local a `mp3-*.mp3`. | No |
+| Inicio | `index.html` | `assets/herramientas/inicio/inicio.js` | Catálogo y descarga de herramientas. | No |
+| Prepagadas (`prepagadas`) | `reporte_prepagadas.html` | `assets/herramientas/prepagadas/prepagadas.js` | Cruce SIME ⇄ CM; alta de suscripción y edición de recurrencias en SIME. | Sí, SIME |
+| Consumos (`consumos`) | `reporte_consumos.html` | `assets/herramientas/consumos/consumos.js` + `assets/herramientas/consumos/paquetes.js` | Línea, titular, paquetes, movimientos y CDR; **carga de paquetes** en el CM. | Sí, CM |
+| Ajustes/Paquetes (`ajustes`) | `export_ajustes.html` | `assets/herramientas/ajustes/ajustes.js` | Ajustes de dinero y paquetes del CM. | No |
+| Titularidad (`titularidad`) | `titularidad.html` | `assets/herramientas/titularidad/titularidad.js` | Log de titularidad de **Genesis** cruzado con CM y HLR/HSS. Única que habla con Genesis. | No |
+| Tipificación (`tipificacion`) | `export_tipificacion.html` | `assets/herramientas/tipificacion/tipificacion.js` | Exportación de casos. | No |
+| Casos masivos (`casos`) | `reporte_casos_masivos.html` | `assets/herramientas/casos/casos.js` | Cierre/anotación masiva (con simulación). | Sí, CM |
+| Rechazos (`rechazo`) | `generar_rechazo.html` | `assets/herramientas/rechazo/rechazo.js` | PDF de rechazo de portabilidad. | No |
+| Aplicar PLU (`plu`) | `aplicar_plu.html` | `assets/herramientas/plu/plu.js` + `tulio-plu.js` | PLU en Tulio (`RecargaPaquete`) + verificación y borrado de bolsillos en el CM. | Sí, Tulio + CM |
+| Bloquear/Inactivar líneas (`estado-lineas`) | `estado_lineas.html` | `assets/herramientas/estado-lineas/estado-lineas.js` + `cm-lineas.js` | Bloquear/inactivar líneas en masivo. | Sí, CM |
+| Cambio IMSI y línea Claro\|Tigo (`cambio-imsi-linea`) | `cambio_imsi_linea.html` | `assets/herramientas/cambio-imsi-linea/imsi.js` + `assets/herramientas/cambio-imsi-linea/msisdn.js` (un motor por pestaña) + `assets/herramientas/cambio-imsi-linea/cambio-imsi-linea.js` + `cm-lineas.js` | Dos pestañas con una sola sesión del CM. Cambio IMSI: SIM en masivo (`línea;imsi_nueva`). Cambio de línea (MSISDN): número en masivo (`línea;línea_nueva`, texto o Excel), orden de portabilidad `PortInExistingSubscription`, queda pendiente. | Sí, CM |
+| Pre-factura (`prefactura`) | `prefactura.html` | `assets/herramientas/prefactura/calculo.js` (`window.Prefactura`) | Pre-factura del Plan Corporativo desde su Excel: corte, impuestos, resumen y archivo por filial. Local. | No |
+| HLR/HSS (`hlr-hss`) | `hlr_hss.html` | `assets/herramientas/hlr-hss/` (`claro.js`, `tigo.js`, `ambos.js`, `hlr-hss.js`) | Consulta por operador y cruce; pestaña Claro opera la línea. | Sí, red Claro |
+| Portabilidad Tigo (`portabilidad-tigo`) | `validador_portabilidad_tigo.html` | `assets/herramientas/portabilidad-tigo/portabilidad-tigo.js` | HLR Tigo con marco de portabilidad. | No |
+| Audio a MP3 (`audio-mp3`) | `convertir_audio_mp3.html` | `assets/herramientas/audio-mp3/audio-mp3.js` | Conversión local a `mp3-*.mp3`. | No |
 
-Existen páginas independientes heredadas (fuera del menú) para QDN Claro
-(`validador_qdn.html` + `logica-qdn.js` + `logica-qdn-operaciones.js`), QDN Tigo
-y cruce HLR. **Copias deliberadas que pueden divergir**:
-
-- pestaña **Ambos** de HLR/HSS ⇄ `logica-hlr-cruzado.js`;
-- pestaña **Claro** de HLR/HSS (`logica-hlr-hss-claro.js`) ⇄ `logica-qdn.js` +
-  `logica-qdn-operaciones.js` (operaciones, `USUARIOS_PROVISION`, KI).
-
-Si se toca una, revisar la otra.
+Validador QDN, QDN Tigo y Validador HLR cruzado se eliminaron junto con su código independiente por decisión del usuario: HLR/HSS las reemplaza. Su documentación técnica está integrada en `doc/hlr-hss/README.md`. La pestaña Ambos y `assets/compartido/hlr-consulta.js` aún mantienen reglas equivalentes de ubicación; hay que revisar ambos al cambiar esas reglas.
 
 ### Operaciones restringidas por usuario
 
@@ -100,7 +92,7 @@ control de acceso):
 
 | Constante | Archivo | Qué habilita |
 |---|---|---|
-| `USUARIOS_PROVISION` | `logica-hlr-hss-claro.js` y `logica-qdn-operaciones.js` | Aprovisionar/desaprovisionar (POST/DELETE) en QDN Claro. Hoy `["jpelaezg"]`. |
+| `USUARIOS_PROVISION` | `assets/herramientas/hlr-hss/claro.js` | Aprovisionar/desaprovisionar (POST/DELETE) en QDN Claro. Hoy `["jpelaezg"]`. |
 
 El resto de las escrituras (Aplicar PLU, «+ PLU» en Consumos, Bloquear/Inactivar
 líneas, Cambio IMSI) solo piden **sesión del CM vigente** (`TulioPLU.puede()`,
@@ -136,7 +128,7 @@ Conexiones base:
 | SIME Web | `http://296vnext02.grupo-exito.com/SIME/Web` | Sesión Windows (NTLM) → token `prf` | Emite el `prf`. |
 | SIME API | `https://tulio.grupo-exito.com/apimew/api/v1/simeCliente/...` y `https://titanio.grupo-exito.com/apiow/api/v1/DFXRWFBFZM/...` | Cabecera `prf` | Consulta, catálogo de planes (`GetCanalTipo`), alta (`Suscription/registrar`) y recurrencias. |
 | Tulio | `https://tulio.grupo-exito.com` (`/identity/connect/token`, `.../Recarga/RecargaPaquete`) | `client_credentials` + `X-Api-Key` | Aplicar PLU. |
-| QDN Claro | ruta `.../ValideQDN/{msisdn}` y operaciones | OAuth2 propio (en `logica-qdn.js` / motor Claro) | Consulta y operaciones HLR/HSS. |
+| QDN Claro | ruta `.../ValideQDN/{msisdn}` y operaciones | OAuth2 propio (en `assets/herramientas/hlr-hss/claro.js` / motor Claro) | Consulta y operaciones HLR/HSS. |
 | HLR Tigo | `https://tulioqa.grupo-exito.com/apimew/api/v1/autogestion/HLR/consulta` | `X-Api-Key` | Consulta de perfil Tigo. |
 | Releases (3.0.0+) | `\\296nas01\TodosNal1\Especiales\Documentacion\Movil Exito\me-operacion-release` | Sin control: cualquiera con VPN lee y escribe | `version.json` y ZIP. Hasta 2.x era `https://sebasmd.com/me/operacion/` (solo queda para el puente). |
 
@@ -164,20 +156,20 @@ MSISDN
   nombre, y `billingAccount.id` como `individualID` si no hay relación
   `Individual` (un 404 se absorbe).
 
-Mantener alineada esta resolución en `logica-consumos.js`, `logica-rechazo.js`
-y `logica-ajustes.js`.
+Mantener alineada esta resolución en `assets/herramientas/consumos/consumos.js`, `assets/herramientas/rechazo/rechazo.js`
+y `assets/herramientas/ajustes/ajustes.js`.
 
 ### Órdenes del CM (escritura)
 
 Todas siguen el patrón de la interfaz del CM: **carrito → orden → seguimiento
 → borrar el carrito siempre** (un carrito colgado lo puede reenviar la interfaz
 del CM después; ver la orden `SwitchCarrier` accidental documentada en
-`doc/cambio-imsi/README.md` §4).
+`doc/cambio-imsi-linea/README.md` §4).
 
 | Operación | Tipo de orden | Dónde |
 |---|---|---|
-| Cargar paquete | `ChangeOffer` (ADD) | `logica-paquetes-carga.js` · `doc/reporte-ajustes/recarga-de-paquetes-cm.md` |
-| Eliminar bolsillos de un PLU | `ChangeOffer`; ERCRT1002 se resuelve agregando la dependencia como `NO_CHANGE` | `logica-plu.js` |
+| Cargar paquete | `ChangeOffer` (ADD) | `assets/herramientas/consumos/paquetes.js` · `doc/reporte-ajustes/recarga-de-paquetes-cm.md` |
+| Eliminar bolsillos de un PLU | `ChangeOffer`; ERCRT1002 se resuelve agregando la dependencia como `NO_CHANGE` | `assets/herramientas/plu/plu.js` |
 | Bloquear / inactivar | `ChangeSubscriptionState` (oferta 10008: `10006` → estado 5, `10007` → estado 2) | `cm-lineas.js` |
 | Cambio IMSI Claro\|Tigo | `ChangeSim` (oferta 10012, producto 10010, `userData` de 28 campos) | `cm-lineas.js` |
 | Cambio de número | `PortInExistingSubscription` (oferta 10012/10010, `PORTIN=true`, `ADDITIONAL_DETAIL` de portabilidad `EXITO-PORT_IN_CM`); queda en «Order Created» | `cm-lineas.js` |
@@ -196,9 +188,11 @@ Convención oficial desde la release **2.2.0**: `Major.Minor.Patch` (`X.Y.Z`).
 - `Y` Minor: funcionalidad compatible; siguiente = `X.(Y+1).0`.
 - `Z` Patch: fix o documentación; siguiente = `X.Y.(Z+1)`.
 - Versiones históricas incompletas se normalizan: `2.2 == 2.2.0`.
-- Cada herramienta tiene además su propia versión: comentario de la primera
-  línea del HTML, `MEUI.init({ version })` (o su puente) y encabezado + historial
-  del README. **Las tres deben coincidir.**
+- Cada herramienta tiene además su propia versión, que vive **solo** en su
+  entrada de `assets/base/catalogo.js` (`version`); `MEUI.init` la toma de ahí
+  y el historial de su README la menciona. **Las dos deben coincidir.** La
+  versión de la base (`ME_CATALOGO.version`) debe ser igual a `scripts/VERSION`;
+  `scripts/empaquetar-release.ps1` la reescribe en el catálogo al empaquetar.
 
 Empaquetado interactivo:
 
@@ -257,11 +251,8 @@ Reglas críticas:
   la revisión de documentación de esta fecha y el nuevo canal de releases.
   Antes de empaquetar, confirmar con `git status` qué más entra.
 
-Versiones actuales por herramienta: Prepagadas 9.5.0 · Consumos 1.10.0 ·
-Ajustes 2.1.0 · Tipificación 2.0 · Casos 3.3 · Rechazos 2.1.1 · Aplicar PLU
-1.7.0 · Bloquear/Inactivar líneas 1.1.0 · Cambio IMSI Claro|Tigo 1.1.0 · Cambio MSISDN Claro|Tigo 1.0.0 · HLR/HSS 2.5 ·
-Validador QDN 3.4 · QDN Tigo 1.3 · HLR cruzado 1.2 · Portabilidad Tigo 1.4 ·
-Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
+Versión de la base compartida/lanzador: 4.0.0. Las versiones de cada
+herramienta no se repiten aquí: la fuente de verdad es `assets/base/catalogo.js`.
 
 ## 6. Cambios recientes que no deben perderse
 
@@ -282,8 +273,8 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 - `MEAPI.imsi(cardPackageID)`: IMSI de la línea (la consulta de suscriptores
   no lo trae; sale de `/cardPackage/{id}`), con caché. Lo usan Prepagadas,
   Consumos y Aplicar PLU; los HLR, Casos y cm-lineas ya lo traían.
-- `APPS` incluye `plu`, `estado-lineas` y `cambio-imsi`; `logica-inicio.js`
-  tiene sus fichas.
+- El menú y las fichas de Inicio salen de `ME_CATALOGO` (`assets/base/catalogo.js`):
+  una herramienta nueva se agrega ahí y en ningún otro sitio (ver `doc/lanzador/README.md`).
 - Esc con modales anidados cierra primero el de encima (formulario) y después
   el de información.
 - Aviso de versión nueva: `lanzador.ps1` pasa `?nv=<nueva>&va=<actual>` y
@@ -303,7 +294,7 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
   nada nuevo» (terminar por «página corta» perdía registros), con reintentos
   cuando el CM corta la paginación.
 - Carga de paquetes (1.8.0): única escritura de Consumos, en
-  `logica-paquetes-carga.js`. Leer `doc/reporte-ajustes/recarga-de-paquetes-cm.md`
+  `assets/herramientas/consumos/paquetes.js`. Leer `doc/reporte-ajustes/recarga-de-paquetes-cm.md`
   antes de tocar el carrito o la orden: la orden se arma desde la RESPUESTA del
   carrito y los paquetes activos no se reenvían. Guardas que no se quitan sin
   captura que las reemplace: solo precio 0, sin reintento de `productOrder`,
@@ -340,7 +331,7 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 - Credenciales de Tulio **dentro de `tulio-plu.js`** por decisión explícita
   del responsable (ver §7).
 
-### Tulio compartido (`assets/tulio-plu.js`)
+### Tulio compartido (`assets/compartido/tulio-plu.js`)
 
 - `window.TulioPLU`: credenciales, token, `RecargaPaquete`, `puede()` (sesión
   del CM vigente) y `leerPlus`. Lo cargan «Aplicar PLU» (1.6.0) y Consumos
@@ -348,12 +339,12 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 - «Aplicar PLU» 1.6.0: casilla «Eliminar después de cada PLU» (marcada por
   defecto) y casillas de limpieza inicial / final (`limpiarLinea`).
 
-### Bloquear/Inactivar líneas y Cambio IMSI Claro|Tigo (1.1.0)
+### Bloquear/Inactivar líneas y Cambio IMSI y línea Claro|Tigo (1.1.0 / 2.0.0)
 
 - Tabla con casillas, filtros y ocultar/mostrar como el cierre de casos
   (`CMLineas.tablaSeleccionable`); solo se opera lo marcado y visible.
 - Cada orden se sigue hasta su estado final (45 s) y la línea se relee.
-- Cambio IMSI Claro|Tigo: la IMSI nueva debe existir y estar Disponible; se revalida
+- Cambio IMSI (pestaña): la IMSI nueva debe existir y estar Disponible; se revalida
   justo antes de enviar; nota obligatoria.
 - «Activar» (`10005`) no está incluido: no hay captura de esa orden.
 
@@ -385,7 +376,15 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 - La hoja real declara un millón de filas: se lee celda por celda
   (`Prefactura.filasDeHoja`), nunca con `sheet_to_json` sobre el rango.
 
-### Cambio MSISDN Claro|Tigo (1.0.0)
+### Cambio IMSI y línea Claro|Tigo (2.0.0)
+
+- Unión de «Cambio IMSI» y «Cambio MSISDN» en una herramienta con pestañas y una sola
+  sesión del CM. Un solo juego de controles; lo que cambia por pestaña está en `PESTANAS`
+  (`assets/herramientas/cambio-imsi-linea/cambio-imsi-linea.js`). Cada pestaña conserva sus filas; la tabla se
+  rehace con `tabla.destruir()` (`cm-lineas.js`). Los motores se publican como
+  `window.CambioIMSI` / `window.CambioMSISDN` (no globales sueltos: tienen nombres internos iguales).
+
+#### Pestaña Cambio de línea (MSISDN)
 
 - Orden de la interfaz del CM para el cambio de número: `PortInExistingSubscription`
   (captura `cambio de numero.har`), calcada campo por campo. Queda en «Order
@@ -437,9 +436,9 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
   `genesismovilexito`). Desde `file://` el flujo de código no se puede
   completar: o usuario y contraseña (si el realm lo permite) o pegar el token
   de una sesión de Genesis abierta.
-- `assets/hlr-consulta.js` es una **TERCERA copia** de las reglas de
-  Claro/Tigo, junto a `logica-hlr-cruzado.js` y `logica-hlr-hss-ambos.js`.
-  Se copió sin cambiar una línea. Si se cambia una regla, va en las tres.
+- `assets/compartido/hlr-consulta.js` conserva reglas de
+  Claro/Tigo equivalentes a `assets/herramientas/hlr-hss/ambos.js`.
+  Si se cambia una regla, revisar ambos motores; Titularidad usa cascada y Ambos consulta en paralelo.
 - «En batch» aquí son **tandas controladas**: Claro no tiene servicio de lote,
   su QDN es una petición por línea.
 
@@ -452,8 +451,8 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 
 - **Repositorio público.** Hay secretos en el código por decisión explícita
   del responsable: credenciales de Tulio (`tulio-plu.js`), `client_secret` de
-  QDN Claro y `X-Api-Key` de HLR Tigo (motores `logica-qdn*.js`/`logica-hlr-*.js`/
-  `logica-portabilidad-tigo.js`). Quedan expuestos en el historial de Git:
+  QDN Claro y `X-Api-Key` de HLR Tigo (motores `assets/herramientas/hlr-hss/` y
+  `assets/herramientas/portabilidad-tigo/portabilidad-tigo.js`). Quedan expuestos en el historial de Git:
   **rotarlos** cuando sea posible. Nunca escribir usuarios, contraseñas, tokens
   o API keys en este archivo ni en los README.
 - **Capturas HAR y Postman**: traen tokens (`prf`, `refresh_token`), contraseñas
@@ -465,7 +464,7 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
   instalarían. El SHA-256 solo cubre copias incompletas. Pedir a TI solo
   lectura salvo para quien publica, si se puede.
 - **Escrituras en producción**: Prepagadas (SIME), Consumos, Aplicar PLU, Estado
-  de líneas, Cambio IMSI Claro|Tigo, Casos y la pestaña Claro de HLR/HSS. Las guardas
+  de líneas, Cambio IMSI y línea Claro|Tigo, Casos y la pestaña Claro de HLR/HSS. Las guardas
   por usuario (§3) son de interfaz, no de seguridad.
 - No inventar datos: si CM no devuelve documento/nombre, mostrar vacío o `—`;
   no inferir una CC.
@@ -481,7 +480,7 @@ Audio a MP3 1.0.0 · Pre-factura 1.0.0 · Base compartida/lanzador 3.2.0.
 Validación mínima después de cambios:
 
 ```bash
-node --check assets/logica-archivo-modificado.js
+node --check assets/herramientas/<id>/<id>.js
 ```
 
 Para una release:
@@ -504,17 +503,17 @@ Para una release:
   sesión con usuario y contraseña; si no, el único camino es pegar el token.
 - Titularidad: comparar el documento de Genesis contra el del titular en el CM
   (la resolución subiendo por la cadena de cuentas ya existe en
-  `logica-consumos.js`; no se portó para no dejar una cuarta copia).
+  `assets/herramientas/consumos/consumos.js`; no se portó para no dejar una cuarta copia).
 - Revisar en el CM la orden `SOI7869437` (`SwitchCarrier` accidental, línea
   3338066365).
 
 ## 9. Forma recomendada de continuar
 
 1. Leer este archivo y el README específico del módulo.
-2. Buscar primero en `logica-*.js`; no duplicar reglas en HTML o puente.
-3. Si se toca una lógica copiada (HLR Ambos/cruce, Claro/QDN, titular en
-   Consumos/Rechazos/Ajustes), revisar todas sus copias.
-4. Actualizar la versión de la herramienta en sus tres lugares (HTML, `init`,
-   README) y agregar la fila del historial.
+2. Buscar primero en `assets/herramientas/<id>/`; mantener configuración, reglas e interfaz en ese módulo.
+3. Si se toca una lógica copiada (HLR Ambos/HLRConsulta, titular en
+   Consumos/Rechazos/Ajustes), revisar sus copias vigentes.
+4. Actualizar la versión en `assets/base/catalogo.js` y en el encabezado
+   e historial del README; `MEUI.init({ app })` la toma del catálogo.
 5. Ejecutar comprobación sintáctica y revisar manualmente el flujo afectado.
 6. Solo después preparar la siguiente release global y sus notas.
