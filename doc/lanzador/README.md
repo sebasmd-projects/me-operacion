@@ -40,6 +40,9 @@ actualizar.bat                 lanzador delgado: solo invoca scripts\actualizar.
 scripts\                      TODO archivo .ps1 del proyecto vive aquí
   lanzador.ps1                  lógica real del lanzador (firmable con Authenticode)
   actualizar.ps1                 instala una versión nueva, siempre a mano (§7)
+  reiniciar-credenciales.bat     doble clic = dame click.bat /reset: borra las credenciales
+                                 guardadas (CM y SIME), las vuelve a pedir y abre las
+                                 herramientas; se distribuye en el paquete
   empaquetar-release.bat/.ps1    arma el paquete de una release; NUNCA se distribuye
   VERSION                        número de versión de esta copia
 
@@ -340,7 +343,7 @@ Qué entra en el paquete (lista fija, no "todo lo que haya en la carpeta"): `ind
 | `dame click.bat /solo-reporte` | Lo mismo que sin parámetros (explícito). |
 | `dame click.bat /solo-casos` | Solo el cierre masivo de casos. |
 | `dame click.bat /sinsesion` | Pide usuario y clave de Windows para SIME en vez de usar la sesión activa. |
-| `dame click.bat /reset` | Borra todas las credenciales guardadas. |
+| `dame click.bat /reset` · doble clic en `scripts\reiniciar-credenciales.bat` | Borra todas las credenciales guardadas (p. ej. si se escribió mal el usuario), las vuelve a pedir y abre las herramientas. |
 | `dame click.bat /resetsime` · `/resetcm` | Borra solo las de SIME o solo las del CM. |
 | `dame click.bat /sinupdate` | No avisa de actualizaciones esta vez. |
 | `dame click.bat /debug` | Muestra la excepción completa y el stack trace. |

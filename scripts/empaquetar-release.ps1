@@ -67,7 +67,8 @@
 
     Estructura del .zip generado (coincide con la del proyecto):
         index.html, assets\, herramientas\, doc\, dame click.bat, actualizar.bat
-        scripts\lanzador.ps1, scripts\actualizar.ps1, scripts\VERSION
+        scripts\lanzador.ps1, scripts\actualizar.ps1, scripts\reiniciar-credenciales.bat,
+        scripts\VERSION
 
     Firma (Authenticode): los .bat (dame click.bat, actualizar.bat) NO se
     pueden firmar de ninguna forma -Windows no reconoce firma en archivos
@@ -341,7 +342,7 @@ Write-Host ""
 # $incluirRaiz  -> relativo a la RAIZ del proyecto
 # $incluirScripts -> relativo a scripts\ (junto a este mismo archivo)
 $incluirRaiz    = @('index.html', 'assets', 'herramientas', 'doc', 'dame click.bat', 'actualizar.bat')
-$incluirScripts = @('lanzador.ps1', 'actualizar.ps1')
+$incluirScripts = @('lanzador.ps1', 'actualizar.ps1', 'reiniciar-credenciales.bat')
 
 $faltantes = @()
 $faltantes += $incluirRaiz | Where-Object { -not (Test-Path (Join-Path $raiz $_)) }
@@ -394,7 +395,8 @@ if ($CertThumbprint -or $CertPfx) {
 
     Write-Host ""
     Write-Host "  Firmando scripts (Authenticode)..." -ForegroundColor Gray
-    foreach ($nombre in $incluirScripts) {
+    # Solo los .ps1: un .bat (reiniciar-credenciales.bat) no admite Authenticode.
+    foreach ($nombre in ($incluirScripts | Where-Object { $_ -like '*.ps1' })) {
         $archivo = Join-Path $scriptsDir $nombre
         $r = Set-AuthenticodeSignature -FilePath $archivo -Certificate $cert -TimestampServer $TimestampServer -HashAlgorithm SHA256
         if ($r.Status -ne 'Valid') { throw ("No se pudo firmar {0}: {1}" -f $nombre, $r.StatusMessage) }
